@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import {
@@ -63,6 +64,8 @@ export function QuickAddTaskDialog({
   initialColumnId?: string | null;
 }) {
   const utils = api.useUtils();
+  const isEmptyHtml = (html: string) =>
+    !html || html.replace(/<[^>]*>/g, "").trim().length === 0;
   const sortedColumns = useMemo(
     () => [...columns].sort((a, b) => a.position - b.position),
     [columns],
@@ -134,7 +137,7 @@ export function QuickAddTaskDialog({
         boardId,
         columnId,
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: isEmptyHtml(description) ? undefined : description,
         priority: priority !== "none" ? priority : undefined,
         assigneeId: assigneeId ?? undefined,
         dueAt: dueAt ? new Date(dueAt) : undefined,
@@ -262,11 +265,10 @@ export function QuickAddTaskDialog({
               ref={titleInputRef}
               value={title}
             />
-            <Textarea
-              className="min-h-[72px] resize-none border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
-              onChange={(e) => setDescription(e.target.value)}
+            <RichTextEditor
+              minHeight="72px"
+              onChange={setDescription}
               placeholder="Add a description…"
-              rows={3}
               value={description}
             />
 

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   Sheet,
   SheetContent,
@@ -194,22 +195,24 @@ function TaskDetail({
 
       <div className="flex flex-col gap-2">
         <Label>Description</Label>
-        <Textarea
-          disabled={!canWrite}
-          onBlur={() => {
-            if (description !== (task.description ?? "")) {
-              update.mutate({
-                boardId,
-                taskId: task.id,
-                description: description || null,
-              });
-            }
-          }}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Add a description… Markdown supported."
-          rows={6}
-          value={description}
-        />
+        <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
+          <RichTextEditor
+            disabled={!canWrite}
+            minHeight="120px"
+            onBlur={() => {
+              if (description !== (task.description ?? "")) {
+                update.mutate({
+                  boardId,
+                  taskId: task.id,
+                  description: description || null,
+                });
+              }
+            }}
+            onChange={setDescription}
+            placeholder="Add a description…"
+            value={description}
+          />
+        </div>
       </div>
 
       <ChecklistPanel boardId={boardId} canWrite={canWrite} taskId={task.id} />
