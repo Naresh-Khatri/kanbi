@@ -1,21 +1,21 @@
+import { boardRouter } from "@/server/api/routers/board";
+import { columnRouter } from "@/server/api/routers/column";
+import { projectRouter } from "@/server/api/routers/project";
+import { taskRouter } from "@/server/api/routers/task";
 import {
 	createCallerFactory,
 	createTRPCRouter,
 	publicProcedure,
 } from "@/server/api/trpc";
 
-/**
- * Primary router. Sub-routers are registered here phase by phase
- * (project, board, column, task, label, checklist, attachment, comment,
- * activity, share, realtime).
- */
 export const appRouter = createTRPCRouter({
 	health: publicProcedure.query(() => ({ ok: true })),
+	project: projectRouter,
+	board: boardRouter,
+	column: columnRouter,
+	task: taskRouter,
 });
 
 export type AppRouter = typeof appRouter;
 
-/**
- * Create a server-side caller for the tRPC API.
- */
 export const createCaller = createCallerFactory(appRouter);
