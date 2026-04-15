@@ -11,9 +11,12 @@ import {
 } from "@/server/api/trpc";
 import {
 	board,
+	boardColumn,
+	label,
 	project,
 	projectInvite,
 	projectMember,
+	task,
 	user as userTable,
 } from "@/server/db/schema";
 
@@ -112,13 +115,68 @@ export const projectRouter = createTRPCRouter({
 					.returning();
 				if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-				await tx.insert(board).values({ projectId: row.id });
+				const [boardRow] = await tx
+					.insert(board)
+					.values({ projectId: row.id })
+					.returning();
+				if (!boardRow) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 				await tx.insert(projectMember).values({
 					projectId: row.id,
 					userId,
 					role: "owner",
 					acceptedAt: new Date(),
 				});
+
+				const [backlog, inProgress] = await tx
+					.insert(boardColumn)
+					.values([
+						{ boardId: boardRow.id, name: "Backlog", position: 1 },
+						{ boardId: boardRow.id, name: "In Progress", position: 2 },
+						{ boardId: boardRow.id, name: "Done", position: 3 },
+					])
+					.returning();
+
+				await tx.insert(label).values([
+					{ boardId: boardRow.id, name: "Bug", color: "#f43f5e" },
+					{ boardId: boardRow.id, name: "Feature", color: "#3b82f6" },
+					{ boardId: boardRow.id, name: "Improvement", color: "#10b981" },
+					{ boardId: boardRow.id, name: "Design", color: "#8b5cf6" },
+				]);
+
+				if (backlog && inProgress) {
+					await tx.insert(task).values([
+						{
+							boardId: boardRow.id,
+							columnId: backlog.id,
+							title: "Welcome to your new board",
+							description:
+								"Drag tasks between columns, press **C** to quick-add, or click a task to see the full detail panel.",
+							priority: "medium",
+							position: 1,
+							reporterId: userId,
+						},
+						{
+							boardId: boardRow.id,
+							columnId: backlog.id,
+							title: "Invite your team",
+							description:
+								"Use the Share button in the top right to invite collaborators or create a read-only public link.",
+							priority: "low",
+							position: 2,
+							reporterId: userId,
+						},
+						{
+							boardId: boardRow.id,
+							columnId: inProgress.id,
+							title: "Try the keyboard shortcuts",
+							description:
+								"Press `C` anywhere to quick-add a task. More shortcuts live in the command menu.",
+							priority: "none",
+							position: 1,
+							reporterId: userId,
+						},
+					]);
+				}
 				return row;
 			});
 		}),
