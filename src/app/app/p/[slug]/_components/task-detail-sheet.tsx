@@ -1,0 +1,677 @@
+"use client";
+
+import {
+	CalendarDays,
+	Check,
+	Flag,
+	Paperclip,
+	Tag,
+	Trash2,
+	User as UserIcon,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input, Textarea } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+import { api, type RouterOutputs } from "@/trpc/react";
+
+type BoardData = RouterOutputs["board"]["get"];
+type TaskRow = BoardData["tasks"][number];
+type LabelRow = BoardData["labels"][number];
+
+const PRIORITIES = ["urgent", "high", "medium", "low", "none"] as const;
+type Priority = (typeof PRIORITIES)[number];
+
+export function TaskDetailSheet({
+	open,
+	onOpenChange,
+	task,
+	boardId,
+	projectId,
+	labels,
+	taskLabels,
+	canWrite,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	task: TaskRow | null;
+	boardId: string;
+	projectId: string;
+	labels: LabelRow[];
+	taskLabels: BoardData["taskLabels"];
+	canWrite: boolean;
+}) {
+	return (
+		<Sheet onOpenChange={onOpenChange} open={open}>
+			<SheetContent className="overflow-y-auto">
+				{task ? (
+					<TaskDetail
+						boardId={boardId}
+						canWrite={canWrite}
+						labels={labels}
+						onClose={() => onOpenChange(false)}
+						projectId={projectId}
+						task={task}
+						taskLabels={taskLabels.filter((tl) => tl.taskId === task.id)}
+					/>
+				) : null}
+			</SheetContent>
+		</Sheet>
+	);
+}
+
+function TaskDetail({
+	task,
+	boardId,
+	projectId,
+	labels,
+	taskLabels,
+	canWrite,
+	onClose,
+}: {
+	task: TaskRow;
+	boardId: string;
+	projectId: string;
+	labels: LabelRow[];
+	taskLabels: BoardData["taskLabels"];
+	canWrite: boolean;
+	onClose: () => void;
+}) {
+	const utils = api.useUtils();
+	const [title, setTitle] = useState(task.title);
+	const [description, setDescription] = useState(task.description ?? "");
+
+	const update = api.task.update.useMutation({
+		onSuccess: () => utils.board.get.invalidate({ boardId }),
+		onError: (e) => toast.error(e.message),
+	});
+	const remove = api.task.delete.useMutation({
+		onSuccess: async () => {
+			onClose();
+			await utils.board.get.invalidate({ boardId });
+		},
+	});
+	const members = api.project.members.useQuery(
+		{ projectId },
+		{ enabled: canWrite },
+	);
+
+	const activeLabelIds = new Set(taskLabels.map((tl) => tl.labelId));
+
+	return (
+		<div className="flex flex-col gap-5">
+			<SheetHeader>
+				<SheetTitle>
+					<Input
+						className="border-0 bg-transparent px-0 text-lg focus-visible:ring-0"
+						disabled={!canWrite}
+						onBlur={() => {
+							if (title.trim() && title !== task.title) {
+								update.mutate({ boardId, taskId: task.id, title });
+							}
+						}}
+						onChange={(e) => setTitle(e.target.value)}
+						value={title}
+					/>
+				</SheetTitle>
+				<SheetDescription>
+					Updated{" "}
+					{task.updatedAt
+						? new Date(task.updatedAt).toLocaleString()
+						: new Date(task.createdAt).toLocaleString()}
+				</SheetDescription>
+			</SheetHeader>
+
+			<div className="grid grid-cols-[110px_1fr] gap-y-3 text-sm">
+				<MetaLabel icon={<Flag className="h-3.5 w-3.5" />}>Priority</MetaLabel>
+				<PriorityMenu
+					canWrite={canWrite}
+					onChange={(p) =>
+						update.mutate({ boardId, taskId: task.id, priority: p })
+					}
+					value={task.priority as Priority}
+				/>
+
+				<MetaLabel icon={<UserIcon className="h-3.5 w-3.5" />}>
+					Assignee
+				</MetaLabel>
+				<AssigneeMenu
+					canWrite={canWrite}
+					members={members.data ?? []}
+					onChange={(id) =>
+						update.mutate({ boardId, taskId: task.id, assigneeId: id })
+					}
+					value={task.assigneeId}
+				/>
+
+				<MetaLabel icon={<CalendarDays className="h-3.5 w-3.5" />}>
+					Due
+				</MetaLabel>
+				<Input
+					className="max-w-[200px]"
+					disabled={!canWrite}
+					onChange={(e) => {
+						const v = e.target.value;
+						update.mutate({
+							boardId,
+							taskId: task.id,
+							dueAt: v ? new Date(v) : null,
+						});
+					}}
+					type="date"
+					value={
+						task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : ""
+					}
+				/>
+
+				<MetaLabel icon={<Tag className="h-3.5 w-3.5" />}>Labels</MetaLabel>
+				<LabelsPicker
+					activeLabelIds={activeLabelIds}
+					boardId={boardId}
+					canWrite={canWrite}
+					labels={labels}
+					taskId={task.id}
+				/>
+			</div>
+
+			<div className="flex flex-col gap-2">
+				<Label>Description</Label>
+				<Textarea
+					disabled={!canWrite}
+					onBlur={() => {
+						if (description !== (task.description ?? "")) {
+							update.mutate({
+								boardId,
+								taskId: task.id,
+								description: description || null,
+							});
+						}
+					}}
+					onChange={(e) => setDescription(e.target.value)}
+					placeholder="Add a description… Markdown supported."
+					rows={6}
+					value={description}
+				/>
+			</div>
+
+			<ChecklistPanel boardId={boardId} canWrite={canWrite} taskId={task.id} />
+			<AttachmentsPanel
+				boardId={boardId}
+				canWrite={canWrite}
+				taskId={task.id}
+			/>
+			<CommentsPanel boardId={boardId} canWrite={canWrite} taskId={task.id} />
+
+			{canWrite ? (
+				<div className="mt-4 flex justify-end">
+					<Button
+						onClick={() => remove.mutate({ boardId, taskId: task.id })}
+						variant="destructive"
+					>
+						<Trash2 className="h-4 w-4" /> Delete task
+					</Button>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+function MetaLabel({
+	children,
+	icon,
+}: {
+	children: React.ReactNode;
+	icon: React.ReactNode;
+}) {
+	return (
+		<div className="flex items-center gap-1.5 pt-1.5 text-white/50 text-xs uppercase tracking-wide">
+			{icon}
+			{children}
+		</div>
+	);
+}
+
+function PriorityMenu({
+	value,
+	onChange,
+	canWrite,
+}: {
+	value: Priority;
+	onChange: (p: Priority) => void;
+	canWrite: boolean;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button disabled={!canWrite} size="sm" variant="outline">
+					{value === "none" ? "No priority" : value}
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="start">
+				{PRIORITIES.map((p) => (
+					<DropdownMenuItem key={p} onSelect={() => onChange(p)}>
+						{p === "none" ? "No priority" : p}
+						{p === value ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function AssigneeMenu({
+	value,
+	members,
+	onChange,
+	canWrite,
+}: {
+	value: string | null;
+	members: RouterOutputs["project"]["members"];
+	onChange: (id: string | null) => void;
+	canWrite: boolean;
+}) {
+	const current = members.find((m) => m.userId === value);
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button disabled={!canWrite} size="sm" variant="outline">
+					{current ? current.name : "Unassigned"}
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="start">
+				<DropdownMenuItem onSelect={() => onChange(null)}>
+					Unassigned
+					{value === null ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
+				</DropdownMenuItem>
+				{members.map((m) => (
+					<DropdownMenuItem key={m.userId} onSelect={() => onChange(m.userId)}>
+						{m.name}
+						{value === m.userId ? (
+							<Check className="ml-auto h-3.5 w-3.5" />
+						) : null}
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function LabelsPicker({
+	boardId,
+	taskId,
+	labels,
+	activeLabelIds,
+	canWrite,
+}: {
+	boardId: string;
+	taskId: string;
+	labels: LabelRow[];
+	activeLabelIds: Set<string>;
+	canWrite: boolean;
+}) {
+	const utils = api.useUtils();
+	const [name, setName] = useState("");
+	const toggle = api.label.setOnTask.useMutation({
+		onSuccess: () => utils.board.get.invalidate({ boardId }),
+	});
+	const create = api.label.create.useMutation({
+		onSuccess: async (row) => {
+			if (row) {
+				toggle.mutate({
+					boardId,
+					taskId,
+					labelId: row.id,
+					on: true,
+				});
+			}
+			setName("");
+			await utils.board.get.invalidate({ boardId });
+		},
+	});
+
+	return (
+		<div className="flex flex-wrap gap-1.5">
+			{labels.map((l) => {
+				const on = activeLabelIds.has(l.id);
+				return (
+					<button
+						className={cn(
+							"inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition",
+							on
+								? "border-transparent text-black"
+								: "border-white/15 text-white/70 hover:border-white/30",
+						)}
+						disabled={!canWrite}
+						key={l.id}
+						onClick={() =>
+							toggle.mutate({
+								boardId,
+								taskId,
+								labelId: l.id,
+								on: !on,
+							})
+						}
+						style={on ? { background: l.color } : undefined}
+						type="button"
+					>
+						{l.name}
+					</button>
+				);
+			})}
+			{canWrite ? (
+				<form
+					className="inline-flex items-center gap-1"
+					onSubmit={(e) => {
+						e.preventDefault();
+						if (!name.trim()) return;
+						create.mutate({
+							boardId,
+							name: name.trim(),
+							color: pickColor(),
+						});
+					}}
+				>
+					<Input
+						className="h-6 w-24 text-xs"
+						onChange={(e) => setName(e.target.value)}
+						placeholder="+ new"
+						value={name}
+					/>
+				</form>
+			) : null}
+		</div>
+	);
+}
+
+function pickColor() {
+	const palette = [
+		"#f43f5e",
+		"#f59e0b",
+		"#10b981",
+		"#3b82f6",
+		"#8b5cf6",
+		"#ec4899",
+	];
+	return palette[Math.floor(Math.random() * palette.length)]!;
+}
+
+function ChecklistPanel({
+	boardId,
+	taskId,
+	canWrite,
+}: {
+	boardId: string;
+	taskId: string;
+	canWrite: boolean;
+}) {
+	const utils = api.useUtils();
+	const list = api.checklist.list.useQuery({ boardId, taskId });
+	const [text, setText] = useState("");
+	const add = api.checklist.add.useMutation({
+		onSuccess: async () => {
+			setText("");
+			await utils.checklist.list.invalidate({ boardId, taskId });
+		},
+	});
+	const toggle = api.checklist.toggle.useMutation({
+		onSuccess: () => utils.checklist.list.invalidate({ boardId, taskId }),
+	});
+	const remove = api.checklist.remove.useMutation({
+		onSuccess: () => utils.checklist.list.invalidate({ boardId, taskId }),
+	});
+
+	return (
+		<div className="flex flex-col gap-2">
+			<Label>Checklist</Label>
+			<ul className="flex flex-col gap-1">
+				{(list.data ?? []).map((it) => (
+					<li className="group flex items-center gap-2" key={it.id}>
+						<input
+							checked={it.done}
+							className="accent-white"
+							disabled={!canWrite}
+							onChange={(e) =>
+								toggle.mutate({
+									boardId,
+									itemId: it.id,
+									done: e.target.checked,
+								})
+							}
+							type="checkbox"
+						/>
+						<span
+							className={cn(
+								"flex-1 text-sm",
+								it.done && "text-white/40 line-through",
+							)}
+						>
+							{it.text}
+						</span>
+						{canWrite ? (
+							<button
+								className="text-white/40 opacity-0 transition hover:text-white group-hover:opacity-100"
+								onClick={() => remove.mutate({ boardId, itemId: it.id })}
+								type="button"
+							>
+								<Trash2 className="h-3.5 w-3.5" />
+							</button>
+						) : null}
+					</li>
+				))}
+			</ul>
+			{canWrite ? (
+				<form
+					className="flex gap-2"
+					onSubmit={(e) => {
+						e.preventDefault();
+						if (!text.trim()) return;
+						add.mutate({ boardId, taskId, text: text.trim() });
+					}}
+				>
+					<Input
+						onChange={(e) => setText(e.target.value)}
+						placeholder="Add item"
+						value={text}
+					/>
+					<Button size="sm" type="submit">
+						Add
+					</Button>
+				</form>
+			) : null}
+		</div>
+	);
+}
+
+function AttachmentsPanel({
+	boardId,
+	taskId,
+	canWrite,
+}: {
+	boardId: string;
+	taskId: string;
+	canWrite: boolean;
+}) {
+	const utils = api.useUtils();
+	const list = api.attachment.list.useQuery({ boardId, taskId });
+	const createUrl = api.attachment.createUploadUrl.useMutation();
+	const create = api.attachment.create.useMutation({
+		onSuccess: () => utils.attachment.list.invalidate({ boardId, taskId }),
+	});
+	const remove = api.attachment.remove.useMutation({
+		onSuccess: () => utils.attachment.list.invalidate({ boardId, taskId }),
+	});
+	const inputRef = useRef<HTMLInputElement>(null);
+	const [busy, setBusy] = useState(false);
+
+	async function onFileChosen(file: File) {
+		try {
+			setBusy(true);
+			const { key, uploadUrl } = await createUrl.mutateAsync({
+				boardId,
+				taskId,
+				filename: file.name,
+				mime: file.type || "application/octet-stream",
+				sizeBytes: file.size,
+			});
+			const put = await fetch(uploadUrl, {
+				method: "PUT",
+				headers: { "Content-Type": file.type || "application/octet-stream" },
+				body: file,
+			});
+			if (!put.ok) throw new Error("Upload failed");
+			await create.mutateAsync({
+				boardId,
+				taskId,
+				key,
+				filename: file.name,
+				mime: file.type || "application/octet-stream",
+				sizeBytes: file.size,
+			});
+		} catch (err) {
+			toast.error((err as Error).message);
+		} finally {
+			setBusy(false);
+			if (inputRef.current) inputRef.current.value = "";
+		}
+	}
+
+	return (
+		<div className="flex flex-col gap-2">
+			<Label>Attachments</Label>
+			<ul className="flex flex-col gap-1 text-sm">
+				{(list.data ?? []).map((a) => (
+					<li className="flex items-center gap-2" key={a.id}>
+						<Paperclip className="h-3.5 w-3.5 text-white/40" />
+						<a
+							className="flex-1 truncate text-white hover:underline"
+							href={a.url}
+							rel="noreferrer"
+							target="_blank"
+						>
+							{a.filename}
+						</a>
+						<span className="text-white/40 text-xs">
+							{formatBytes(a.sizeBytes)}
+						</span>
+						{canWrite ? (
+							<button
+								className="text-white/40 hover:text-white"
+								onClick={() => remove.mutate({ boardId, attachmentId: a.id })}
+								type="button"
+							>
+								<Trash2 className="h-3.5 w-3.5" />
+							</button>
+						) : null}
+					</li>
+				))}
+			</ul>
+			{canWrite ? (
+				<div>
+					<input
+						className="hidden"
+						onChange={(e) => {
+							const f = e.target.files?.[0];
+							if (f) onFileChosen(f);
+						}}
+						ref={inputRef}
+						type="file"
+					/>
+					<Button
+						disabled={busy}
+						onClick={() => inputRef.current?.click()}
+						size="sm"
+						variant="outline"
+					>
+						<Paperclip className="h-4 w-4" />
+						{busy ? "Uploading…" : "Attach file"}
+					</Button>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+function formatBytes(n: number) {
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+	return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function CommentsPanel({
+	boardId,
+	taskId,
+	canWrite,
+}: {
+	boardId: string;
+	taskId: string;
+	canWrite: boolean;
+}) {
+	const utils = api.useUtils();
+	const list = api.comment.list.useQuery({ boardId, taskId });
+	const [body, setBody] = useState("");
+	const create = api.comment.create.useMutation({
+		onSuccess: async () => {
+			setBody("");
+			await utils.comment.list.invalidate({ boardId, taskId });
+		},
+	});
+
+	return (
+		<div className="flex flex-col gap-2">
+			<Label>Comments</Label>
+			<ul className="flex flex-col gap-3 text-sm">
+				{(list.data ?? []).map((c) => (
+					<li className="flex flex-col gap-1" key={c.id}>
+						<div className="flex items-center gap-2 text-white/50 text-xs">
+							<span className="font-medium text-white/80">{c.authorName}</span>
+							<span>{new Date(c.createdAt).toLocaleString()}</span>
+						</div>
+						<p className="whitespace-pre-wrap">{c.body}</p>
+					</li>
+				))}
+			</ul>
+			{canWrite ? (
+				<form
+					className="flex flex-col gap-2"
+					onSubmit={(e) => {
+						e.preventDefault();
+						if (!body.trim()) return;
+						create.mutate({ boardId, taskId, body: body.trim() });
+					}}
+				>
+					<Textarea
+						onChange={(e) => setBody(e.target.value)}
+						placeholder="Leave a comment…"
+						rows={2}
+						value={body}
+					/>
+					<div className="flex justify-end">
+						<Button
+							disabled={!body.trim() || create.isPending}
+							size="sm"
+							type="submit"
+						>
+							Comment
+						</Button>
+					</div>
+				</form>
+			) : null}
+		</div>
+	);
+}

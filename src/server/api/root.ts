@@ -1,5 +1,9 @@
+import { attachmentRouter } from "@/server/api/routers/attachment";
 import { boardRouter } from "@/server/api/routers/board";
+import { checklistRouter } from "@/server/api/routers/checklist";
 import { columnRouter } from "@/server/api/routers/column";
+import { commentRouter } from "@/server/api/routers/comment";
+import { labelRouter } from "@/server/api/routers/label";
 import { projectRouter } from "@/server/api/routers/project";
 import { taskRouter } from "@/server/api/routers/task";
 import {
@@ -14,6 +18,10 @@ export const appRouter = createTRPCRouter({
 	board: boardRouter,
 	column: columnRouter,
 	task: taskRouter,
+	label: labelRouter,
+	checklist: checklistRouter,
+	attachment: attachmentRouter,
+	comment: commentRouter,
 });
 
 export type AppRouter = typeof appRouter;

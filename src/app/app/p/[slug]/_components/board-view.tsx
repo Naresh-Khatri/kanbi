@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { TaskDetailSheet } from "./task-detail-sheet";
 
 type BoardData = RouterOutputs["board"]["get"];
 type TaskRow = BoardData["tasks"][number];
@@ -45,16 +46,22 @@ type ActiveDrag =
 
 export function BoardView({
 	boardId,
+	projectId,
 	projectName,
 }: {
 	boardId: string;
+	projectId: string;
 	projectName: string;
 	projectSlug: string;
 }) {
 	const [data] = api.board.get.useSuspenseQuery({ boardId });
 	const utils = api.useUtils();
-	const { columns, tasks, access } = data;
+	const { columns, tasks, labels, taskLabels, access } = data;
 	const canWrite = access.canWrite;
+	const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+	const openTask = openTaskId
+		? (tasks.find((t) => t.id === openTaskId) ?? null)
+		: null;
 
 	const moveTask = api.task.move.useMutation({
 		onSettled: () => utils.board.get.invalidate({ boardId }),
@@ -203,6 +210,7 @@ export function BoardView({
 									canWrite={canWrite}
 									column={col}
 									key={col.id}
+									onOpenTask={setOpenTaskId}
 									tasks={tasksByColumn.get(col.id) ?? []}
 								/>
 							))}
@@ -220,6 +228,18 @@ export function BoardView({
 					) : null}
 				</DragOverlay>
 			</DndContext>
+			<TaskDetailSheet
+				boardId={boardId}
+				canWrite={canWrite}
+				labels={labels}
+				onOpenChange={(o) => {
+					if (!o) setOpenTaskId(null);
+				}}
+				open={!!openTask}
+				projectId={projectId}
+				task={openTask}
+				taskLabels={taskLabels}
+			/>
 		</main>
 	);
 }
@@ -229,11 +249,13 @@ function SortableColumn({
 	column,
 	tasks,
 	canWrite,
+	onOpenTask,
 }: {
 	boardId: string;
 	column: ColumnRow;
 	tasks: TaskRow[];
 	canWrite: boolean;
+	onOpenTask: (taskId: string) => void;
 }) {
 	const sortable = useSortable({
 		id: column.id,
@@ -278,6 +300,7 @@ function SortableColumn({
 							canWrite={canWrite}
 							columnId={column.id}
 							key={t.id}
+							onOpen={() => onOpenTask(t.id)}
 							task={t}
 						/>
 					))}
@@ -387,11 +410,13 @@ function SortableTaskCard({
 	task,
 	columnId,
 	canWrite,
+	onOpen,
 }: {
 	boardId: string;
 	task: TaskRow;
 	columnId: string;
 	canWrite: boolean;
+	onOpen: () => void;
 }) {
 	const sortable = useSortable({
 		id: task.id,
@@ -412,7 +437,7 @@ function SortableTaskCard({
 			{...sortable.attributes}
 			{...sortable.listeners}
 		>
-			<TaskCard boardId={boardId} task={task} />
+			<TaskCard boardId={boardId} onOpen={onOpen} task={task} />
 		</div>
 	);
 }
@@ -425,13 +450,26 @@ function TaskCardPreview({ task }: { task: TaskRow }) {
 	);
 }
 
-function TaskCard({ boardId, task }: { boardId: string; task: TaskRow }) {
+function TaskCard({
+	boardId,
+	task,
+	onOpen,
+}: {
+	boardId: string;
+	task: TaskRow;
+	onOpen: () => void;
+}) {
 	const utils = api.useUtils();
 	const remove = api.task.delete.useMutation({
 		onSuccess: () => utils.board.get.invalidate({ boardId }),
 	});
 	return (
-		<div className="group rounded-lg border border-white/5 bg-[#14151c] p-3 transition hover:border-white/15">
+		// biome-ignore lint/a11y/useKeyWithClickEvents: dnd-kit sortable wrapper handles keyboard focus and activation
+		// biome-ignore lint/a11y/noStaticElementInteractions: draggable surface
+		<div
+			className="group w-full cursor-pointer rounded-lg border border-white/5 bg-[#14151c] p-3 transition hover:border-white/15"
+			onClick={onOpen}
+		>
 			<div className="flex items-start justify-between gap-2">
 				<p className="text-sm leading-snug">{task.title}</p>
 				<DropdownMenu>

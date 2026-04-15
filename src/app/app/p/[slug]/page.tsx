@@ -18,6 +18,7 @@ export default async function ProjectPage({
 		<HydrateClient>
 			<BoardView
 				boardId={project.boardId}
+				projectId={project.id}
 				projectName={project.name}
 				projectSlug={project.slug}
 			/>
