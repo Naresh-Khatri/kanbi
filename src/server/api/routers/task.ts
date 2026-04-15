@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { positionAtEnd } from "@/lib/position";
+import { positionAtEnd, positionBetween } from "@/lib/position";
 import {
 	assertCanWrite,
 	boardProcedure,
@@ -85,6 +85,34 @@ export const taskRouter = createTRPCRouter({
 			assertCanWrite(ctx.access);
 			await ctx.db
 				.delete(task)
+				.where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
+		}),
+
+	move: boardProcedure
+		.input(
+			z.object({
+				taskId: z.string().min(1),
+				toColumnId: z.string().min(1),
+				before: z.number().nullable(),
+				after: z.number().nullable(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			assertCanWrite(ctx.access);
+			const col = await ctx.db
+				.select({ boardId: boardColumn.boardId })
+				.from(boardColumn)
+				.where(eq(boardColumn.id, input.toColumnId))
+				.limit(1);
+			if (!col[0] || col[0].boardId !== input.boardId) {
+				throw new TRPCError({ code: "NOT_FOUND" });
+			}
+			await ctx.db
+				.update(task)
+				.set({
+					columnId: input.toColumnId,
+					position: positionBetween(input.before, input.after),
+				})
 				.where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
 		}),
 
