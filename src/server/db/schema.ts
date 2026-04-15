@@ -364,7 +364,8 @@ export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   ownedProjects: many(project),
   memberships: many(projectMember),
-  assignedTasks: many(task),
+  assignedTasks: many(task, { relationName: "task_assignee" }),
+  reportedTasks: many(task, { relationName: "task_reporter" }),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({
@@ -423,8 +424,16 @@ export const taskRelations = relations(task, ({ one, many }) => ({
     fields: [task.columnId],
     references: [boardColumn.id],
   }),
-  reporter: one(user, { fields: [task.reporterId], references: [user.id] }),
-  assignee: one(user, { fields: [task.assigneeId], references: [user.id] }),
+  reporter: one(user, {
+    fields: [task.reporterId],
+    references: [user.id],
+    relationName: "task_reporter",
+  }),
+  assignee: one(user, {
+    fields: [task.assigneeId],
+    references: [user.id],
+    relationName: "task_assignee",
+  }),
   labels: many(taskLabel),
   checklist: many(checklistItem),
   attachments: many(taskAttachment),
