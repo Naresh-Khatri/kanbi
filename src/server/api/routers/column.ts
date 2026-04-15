@@ -9,6 +9,7 @@ import {
 	createTRPCRouter,
 } from "@/server/api/trpc";
 import { boardColumn } from "@/server/db/schema";
+import { bus } from "@/server/realtime/bus";
 
 export const columnRouter = createTRPCRouter({
 	create: boardProcedure
@@ -29,6 +30,10 @@ export const columnRouter = createTRPCRouter({
 					position: positionAtEnd(existing),
 				})
 				.returning();
+			bus.emitBoard(input.boardId, {
+				scope: "column",
+				ids: row ? [row.id] : [],
+			});
 			return row;
 		}),
 
@@ -45,6 +50,10 @@ export const columnRouter = createTRPCRouter({
 				.update(boardColumn)
 				.set({ name: input.name })
 				.where(eq(boardColumn.id, input.columnId));
+			bus.emitBoard(input.boardId, {
+				scope: "column",
+				ids: [input.columnId],
+			});
 		}),
 
 	reorder: boardProcedure
@@ -61,6 +70,10 @@ export const columnRouter = createTRPCRouter({
 				.update(boardColumn)
 				.set({ position: positionBetween(input.before, input.after) })
 				.where(eq(boardColumn.id, input.columnId));
+			bus.emitBoard(input.boardId, {
+				scope: "column",
+				ids: [input.columnId],
+			});
 		}),
 
 	delete: boardProcedure
@@ -79,5 +92,9 @@ export const columnRouter = createTRPCRouter({
 			await ctx.db
 				.delete(boardColumn)
 				.where(eq(boardColumn.id, input.columnId));
+			bus.emitBoard(input.boardId, {
+				scope: "column",
+				ids: [input.columnId],
+			});
 		}),
 });

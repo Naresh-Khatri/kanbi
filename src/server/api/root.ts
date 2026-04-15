@@ -5,6 +5,7 @@ import { columnRouter } from "@/server/api/routers/column";
 import { commentRouter } from "@/server/api/routers/comment";
 import { labelRouter } from "@/server/api/routers/label";
 import { projectRouter } from "@/server/api/routers/project";
+import { realtimeRouter } from "@/server/api/routers/realtime";
 import { shareRouter } from "@/server/api/routers/share";
 import { taskRouter } from "@/server/api/routers/task";
 import {
@@ -24,6 +25,7 @@ export const appRouter = createTRPCRouter({
 	attachment: attachmentRouter,
 	comment: commentRouter,
 	share: shareRouter,
+	realtime: realtimeRouter,
 });
 
 export type AppRouter = typeof appRouter;

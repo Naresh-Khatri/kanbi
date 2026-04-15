@@ -9,6 +9,7 @@ import {
 	createTRPCRouter,
 } from "@/server/api/trpc";
 import { boardColumn, task, taskPriority } from "@/server/db/schema";
+import { bus } from "@/server/realtime/bus";
 
 const priorityEnum = z.enum(taskPriority.enumValues);
 
@@ -56,6 +57,7 @@ export const taskRouter = createTRPCRouter({
 					dueAt: input.dueAt ?? null,
 				})
 				.returning();
+			bus.emitBoard(input.boardId, { scope: "task", ids: row ? [row.id] : [] });
 			return row;
 		}),
 
@@ -77,6 +79,7 @@ export const taskRouter = createTRPCRouter({
 				.update(task)
 				.set(rest)
 				.where(and(eq(task.id, taskId), eq(task.boardId, boardId)));
+			bus.emitBoard(boardId, { scope: "task", ids: [taskId] });
 		}),
 
 	delete: boardProcedure
@@ -86,6 +89,7 @@ export const taskRouter = createTRPCRouter({
 			await ctx.db
 				.delete(task)
 				.where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
+			bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
 		}),
 
 	move: boardProcedure
@@ -114,6 +118,7 @@ export const taskRouter = createTRPCRouter({
 					position: positionBetween(input.before, input.after),
 				})
 				.where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
+			bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
 		}),
 
 	archive: boardProcedure
@@ -124,5 +129,6 @@ export const taskRouter = createTRPCRouter({
 				.update(task)
 				.set({ archivedAt: input.archived ? new Date() : null })
 				.where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
+			bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
 		}),
 });

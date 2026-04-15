@@ -64,6 +64,27 @@ export function BoardView({
 		? (tasks.find((t) => t.id === openTaskId) ?? null)
 		: null;
 
+	api.realtime.onBoardChange.useSubscription(
+		{ boardId },
+		{
+			onData: (evt) => {
+				if (evt.scope === "comment") {
+					utils.comment.list.invalidate();
+					return;
+				}
+				if (evt.scope === "checklist") {
+					utils.checklist.list.invalidate();
+					return;
+				}
+				if (evt.scope === "attachment") {
+					utils.attachment.list.invalidate();
+					return;
+				}
+				utils.board.get.invalidate({ boardId });
+			},
+		},
+	);
+
 	const moveTask = api.task.move.useMutation({
 		onSettled: () => utils.board.get.invalidate({ boardId }),
 	});

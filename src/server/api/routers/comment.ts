@@ -8,6 +8,7 @@ import {
 	createTRPCRouter,
 } from "@/server/api/trpc";
 import { comment, task, user as userTable } from "@/server/db/schema";
+import { bus } from "@/server/realtime/bus";
 
 async function assertTaskOnBoard(
 	db: { select: (...a: unknown[]) => unknown },
@@ -64,6 +65,7 @@ export const commentRouter = createTRPCRouter({
 					body: input.body,
 				})
 				.returning();
+			bus.emitBoard(input.boardId, { scope: "comment", ids: [input.taskId] });
 			return row;
 		}),
 
@@ -85,6 +87,10 @@ export const commentRouter = createTRPCRouter({
 						eq(comment.authorId, ctx.session.user.id),
 					),
 				);
+			bus.emitBoard(input.boardId, {
+				scope: "comment",
+				ids: [input.commentId],
+			});
 		}),
 
 	delete: boardProcedure
@@ -99,5 +105,9 @@ export const commentRouter = createTRPCRouter({
 						eq(comment.authorId, ctx.session.user.id),
 					),
 				);
+			bus.emitBoard(input.boardId, {
+				scope: "comment",
+				ids: [input.commentId],
+			});
 		}),
 });

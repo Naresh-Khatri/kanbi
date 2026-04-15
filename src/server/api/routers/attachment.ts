@@ -9,6 +9,7 @@ import {
 	createTRPCRouter,
 } from "@/server/api/trpc";
 import { task, taskAttachment, user as userTable } from "@/server/db/schema";
+import { bus } from "@/server/realtime/bus";
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
@@ -100,6 +101,10 @@ export const attachmentRouter = createTRPCRouter({
 					uploaderId: ctx.session.user.id,
 				})
 				.returning();
+			bus.emitBoard(input.boardId, {
+				scope: "attachment",
+				ids: [input.taskId],
+			});
 			return row;
 		}),
 
@@ -122,5 +127,9 @@ export const attachmentRouter = createTRPCRouter({
 			await ctx.db
 				.delete(taskAttachment)
 				.where(eq(taskAttachment.id, input.attachmentId));
+			bus.emitBoard(input.boardId, {
+				scope: "attachment",
+				ids: [input.attachmentId],
+			});
 		}),
 });

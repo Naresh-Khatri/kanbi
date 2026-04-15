@@ -8,6 +8,7 @@ import {
 	createTRPCRouter,
 } from "@/server/api/trpc";
 import { label, task, taskLabel } from "@/server/db/schema";
+import { bus } from "@/server/realtime/bus";
 
 export const labelRouter = createTRPCRouter({
 	create: boardProcedure
@@ -27,6 +28,10 @@ export const labelRouter = createTRPCRouter({
 					color: input.color,
 				})
 				.returning();
+			bus.emitBoard(input.boardId, {
+				scope: "label",
+				ids: row ? [row.id] : [],
+			});
 			return row;
 		}),
 
@@ -45,6 +50,7 @@ export const labelRouter = createTRPCRouter({
 				.update(label)
 				.set({ name, color })
 				.where(and(eq(label.id, labelId), eq(label.boardId, input.boardId)));
+			bus.emitBoard(input.boardId, { scope: "label", ids: [labelId] });
 		}),
 
 	delete: boardProcedure
@@ -56,6 +62,7 @@ export const labelRouter = createTRPCRouter({
 				.where(
 					and(eq(label.id, input.labelId), eq(label.boardId, input.boardId)),
 				);
+			bus.emitBoard(input.boardId, { scope: "label", ids: [input.labelId] });
 		}),
 
 	setOnTask: boardProcedure
@@ -93,5 +100,6 @@ export const labelRouter = createTRPCRouter({
 						),
 					);
 			}
+			bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
 		}),
 });

@@ -10,6 +10,7 @@ import {
 } from "@/server/api/trpc";
 import type { db as Db } from "@/server/db";
 import { checklistItem, task } from "@/server/db/schema";
+import { bus } from "@/server/realtime/bus";
 
 async function assertTaskOnBoard(
 	db: typeof Db,
@@ -61,6 +62,10 @@ export const checklistRouter = createTRPCRouter({
 					position: positionAtEnd(existing),
 				})
 				.returning();
+			bus.emitBoard(input.boardId, {
+				scope: "checklist",
+				ids: [input.taskId],
+			});
 			return row;
 		}),
 
@@ -72,6 +77,7 @@ export const checklistRouter = createTRPCRouter({
 				.update(checklistItem)
 				.set({ done: input.done })
 				.where(eq(checklistItem.id, input.itemId));
+			bus.emitBoard(input.boardId, { scope: "checklist", ids: [input.itemId] });
 		}),
 
 	rename: boardProcedure
@@ -87,6 +93,7 @@ export const checklistRouter = createTRPCRouter({
 				.update(checklistItem)
 				.set({ text: input.text })
 				.where(eq(checklistItem.id, input.itemId));
+			bus.emitBoard(input.boardId, { scope: "checklist", ids: [input.itemId] });
 		}),
 
 	remove: boardProcedure
@@ -96,5 +103,6 @@ export const checklistRouter = createTRPCRouter({
 			await ctx.db
 				.delete(checklistItem)
 				.where(eq(checklistItem.id, input.itemId));
+			bus.emitBoard(input.boardId, { scope: "checklist", ids: [input.itemId] });
 		}),
 });
