@@ -31,8 +31,10 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input, Textarea } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { PRIORITY_META, PriorityIcon, type Priority } from "./priority";
+import { QuickAddTaskDialog } from "./quick-add-task-dialog";
 import { ShareDialog } from "./share-dialog";
 import { TaskDetailSheet } from "./task-detail-sheet";
 
@@ -61,19 +63,15 @@ export function BoardView({
 	const canWrite = access.canWrite;
 	const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 	const [quickAddOpen, setQuickAddOpen] = useState(false);
-	const [quickAddTitle, setQuickAddTitle] = useState("");
+	const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
 	const createTaskToken = useAppShell((s) => s.createTaskToken);
 	useEffect(() => {
-		if (createTaskToken > 0 && columns.length > 0) setQuickAddOpen(true);
+		if (createTaskToken > 0 && columns.length > 0) {
+			setQuickAddColumnId(null);
+			setQuickAddOpen(true);
+		}
 	}, [createTaskToken, columns.length]);
 
-	const createQuickTask = api.task.create.useMutation({
-		onSuccess: async () => {
-			setQuickAddTitle("");
-			setQuickAddOpen(false);
-			await utils.board.get.invalidate({ boardId });
-		},
-	});
 	const openTask = openTaskId
 		? (tasks.find((t) => t.id === openTaskId) ?? null)
 		: null;
@@ -254,6 +252,10 @@ export function BoardView({
 									canWrite={canWrite}
 									column={col}
 									key={col.id}
+									onAddTask={(id) => {
+										setQuickAddColumnId(id);
+										setQuickAddOpen(true);
+									}}
 									onOpenTask={setOpenTaskId}
 									tasks={tasksByColumn.get(col.id) ?? []}
 								/>
@@ -284,42 +286,16 @@ export function BoardView({
 				task={openTask}
 				taskLabels={taskLabels}
 			/>
-			{quickAddOpen && columns.length > 0 ? (
-				// biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-close
-				// biome-ignore lint/a11y/useKeyWithClickEvents: dismiss-on-click-outside pattern
-				<div
-					className="fixed inset-0 z-[55] flex items-start justify-center bg-black/40 p-4 pt-[20vh] backdrop-blur-sm"
-					onClick={(e) => {
-						if (e.target === e.currentTarget) setQuickAddOpen(false);
-					}}
-				>
-					<form
-						className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1016] p-4 shadow-2xl"
-						onSubmit={(e) => {
-							e.preventDefault();
-							if (!quickAddTitle.trim()) return;
-							createQuickTask.mutate({
-								boardId,
-								columnId: sortedColumns[0]!.id,
-								title: quickAddTitle.trim(),
-							});
-						}}
-					>
-						<div className="mb-2 text-white/50 text-xs">
-							New task in{" "}
-							<span className="text-white">{sortedColumns[0]!.name}</span>
-						</div>
-						<Input
-							autoFocus
-							onChange={(e) => setQuickAddTitle(e.target.value)}
-							onKeyDown={(e) => {
-								if (e.key === "Escape") setQuickAddOpen(false);
-							}}
-							placeholder="Task title"
-							value={quickAddTitle}
-						/>
-					</form>
-				</div>
+			{columns.length > 0 ? (
+				<QuickAddTaskDialog
+					boardId={boardId}
+					columns={columns}
+					initialColumnId={quickAddColumnId}
+					labels={labels}
+					onOpenChange={setQuickAddOpen}
+					open={quickAddOpen}
+					projectId={projectId}
+				/>
 			) : null}
 		</main>
 	);
@@ -331,12 +307,14 @@ function SortableColumn({
 	tasks,
 	canWrite,
 	onOpenTask,
+	onAddTask,
 }: {
 	boardId: string;
 	column: ColumnRow;
 	tasks: TaskRow[];
 	canWrite: boolean;
 	onOpenTask: (taskId: string) => void;
+	onAddTask: (columnId: string) => void;
 }) {
 	const sortable = useSortable({
 		id: column.id,
@@ -390,7 +368,16 @@ function SortableColumn({
 					<div className="h-2 rounded-md border border-white/5 border-dashed" />
 				) : null}
 			</div>
-			{canWrite ? <AddTask boardId={boardId} columnId={column.id} /> : null}
+			{canWrite ? (
+				<Button
+					className="justify-start text-white/60"
+					onClick={() => onAddTask(column.id)}
+					size="sm"
+					variant="ghost"
+				>
+					<Plus className="h-4 w-4" /> Add task
+				</Button>
+			) : null}
 		</div>
 	);
 }
@@ -575,78 +562,21 @@ function TaskCard({
 				</DropdownMenu>
 			</div>
 			{task.priority !== "none" ? (
-				<div className="mt-2 inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/70 uppercase tracking-wide">
-					{task.priority}
+				<div
+					className="mt-2 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
+					style={{
+						borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
+						color: PRIORITY_META[task.priority as Priority].color,
+					}}
+				>
+					<PriorityIcon
+						className="h-3 w-3"
+						priority={task.priority as Priority}
+					/>
+					{PRIORITY_META[task.priority as Priority].label}
 				</div>
 			) : null}
 		</div>
-	);
-}
-
-function AddTask({ boardId, columnId }: { boardId: string; columnId: string }) {
-	const utils = api.useUtils();
-	const [open, setOpen] = useState(false);
-	const [title, setTitle] = useState("");
-	const create = api.task.create.useMutation({
-		onSuccess: async () => {
-			setTitle("");
-			setOpen(false);
-			await utils.board.get.invalidate({ boardId });
-		},
-		onError: (e) => toast.error(e.message),
-	});
-
-	if (!open) {
-		return (
-			<Button
-				className="justify-start text-white/60"
-				onClick={() => setOpen(true)}
-				size="sm"
-				variant="ghost"
-			>
-				<Plus className="h-4 w-4" /> Add task
-			</Button>
-		);
-	}
-
-	return (
-		<form
-			className="flex flex-col gap-2"
-			onSubmit={(e) => {
-				e.preventDefault();
-				if (!title.trim()) return;
-				create.mutate({ boardId, columnId, title: title.trim() });
-			}}
-		>
-			<Textarea
-				autoFocus
-				onChange={(e) => setTitle(e.target.value)}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" && !e.shiftKey) {
-						e.preventDefault();
-						if (title.trim()) {
-							create.mutate({ boardId, columnId, title: title.trim() });
-						}
-					}
-					if (e.key === "Escape") setOpen(false);
-				}}
-				placeholder="Task title — ⏎ to add, Esc to cancel"
-				value={title}
-			/>
-			<div className="flex gap-2">
-				<Button disabled={create.isPending} size="sm" type="submit">
-					Add
-				</Button>
-				<Button
-					onClick={() => setOpen(false)}
-					size="sm"
-					type="button"
-					variant="ghost"
-				>
-					Cancel
-				</Button>
-			</div>
-		</form>
 	);
 }
 

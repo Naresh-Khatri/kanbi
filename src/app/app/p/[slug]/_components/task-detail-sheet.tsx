@@ -9,6 +9,12 @@ import {
 	Trash2,
 	User as UserIcon,
 } from "lucide-react";
+import {
+	PRIORITIES,
+	PRIORITY_META,
+	PriorityIcon,
+	type Priority,
+} from "./priority";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -34,9 +40,6 @@ import { api, type RouterOutputs } from "@/trpc/react";
 type BoardData = RouterOutputs["board"]["get"];
 type TaskRow = BoardData["tasks"][number];
 type LabelRow = BoardData["labels"][number];
-
-const PRIORITIES = ["urgent", "high", "medium", "low", "none"] as const;
-type Priority = (typeof PRIORITIES)[number];
 
 export function TaskDetailSheet({
 	open,
@@ -261,13 +264,15 @@ function PriorityMenu({
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button disabled={!canWrite} size="sm" variant="outline">
-					{value === "none" ? "No priority" : value}
+					<PriorityIcon className="h-3.5 w-3.5" priority={value} />
+					{PRIORITY_META[value].label}
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start">
 				{PRIORITIES.map((p) => (
 					<DropdownMenuItem key={p} onSelect={() => onChange(p)}>
-						{p === "none" ? "No priority" : p}
+						<PriorityIcon className="mr-2 h-3.5 w-3.5" priority={p} />
+						{PRIORITY_META[p].label}
 						{p === value ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
 					</DropdownMenuItem>
 				))}
@@ -552,11 +557,50 @@ function AttachmentsPanel({
 		}
 	}
 
+	const items = list.data ?? [];
+	const images = items.filter((a) => a.mime.startsWith("image/"));
+	const files = items.filter((a) => !a.mime.startsWith("image/"));
+
 	return (
 		<div className="flex flex-col gap-2">
 			<Label>Attachments</Label>
+			{images.length > 0 ? (
+				<div className="grid grid-cols-3 gap-2">
+					{images.map((a) => (
+						<div
+							className="group relative overflow-hidden rounded-md border border-white/10 bg-white/[0.04]"
+							key={a.id}
+						>
+							<a href={a.url} rel="noreferrer" target="_blank">
+								<img
+									alt={a.filename}
+									className="aspect-square w-full object-cover transition group-hover:brightness-110"
+									src={a.url}
+								/>
+							</a>
+							<div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/80 to-transparent px-2 pt-6 pb-1.5 opacity-0 transition group-hover:opacity-100">
+								<span className="truncate text-[10px] text-white/80">
+									{a.filename}
+								</span>
+								{canWrite ? (
+									<button
+										aria-label="Remove attachment"
+										className="text-white/70 hover:text-white"
+										onClick={() =>
+											remove.mutate({ boardId, attachmentId: a.id })
+										}
+										type="button"
+									>
+										<Trash2 className="h-3 w-3" />
+									</button>
+								) : null}
+							</div>
+						</div>
+					))}
+				</div>
+			) : null}
 			<ul className="flex flex-col gap-1 text-sm">
-				{(list.data ?? []).map((a) => (
+				{files.map((a) => (
 					<li className="flex items-center gap-2" key={a.id}>
 						<Paperclip className="h-3.5 w-3.5 text-white/40" />
 						<a
