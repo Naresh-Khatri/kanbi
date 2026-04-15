@@ -12,9 +12,9 @@ import superjson from "superjson";
 import { ZodError, z } from "zod";
 
 import {
-	resolveBoardAccess,
-	resolveProjectAccess,
-	resolvePublicBoardAccess,
+  resolveBoardAccess,
+  resolveProjectAccess,
+  resolvePublicBoardAccess,
 } from "@/server/api/permissions";
 import { auth } from "@/server/better-auth";
 import { db } from "@/server/db";
@@ -32,14 +32,14 @@ import { db } from "@/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-	const session = await auth.api.getSession({
-		headers: opts.headers,
-	});
-	return {
-		db,
-		session,
-		...opts,
-	};
+  const session = await auth.api.getSession({
+    headers: opts.headers,
+  });
+  return {
+    db,
+    session,
+    ...opts,
+  };
 };
 
 /**
@@ -50,17 +50,17 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
  * errors on the backend.
  */
 const t = initTRPC.context<typeof createTRPCContext>().create({
-	transformer: superjson,
-	errorFormatter({ shape, error }) {
-		return {
-			...shape,
-			data: {
-				...shape.data,
-				zodError:
-					error.cause instanceof ZodError ? error.cause.flatten() : null,
-			},
-		};
-	},
+  transformer: superjson,
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        zodError:
+          error.cause instanceof ZodError ? error.cause.flatten() : null,
+      },
+    };
+  },
 });
 
 /**
@@ -91,20 +91,20 @@ export const createTRPCRouter = t.router;
  * network latency that would occur in production but not in local development.
  */
 const timingMiddleware = t.middleware(async ({ next, path }) => {
-	const start = Date.now();
+  const start = Date.now();
 
-	if (t._config.isDev) {
-		// artificial delay in dev
-		const waitMs = Math.floor(Math.random() * 400) + 100;
-		await new Promise((resolve) => setTimeout(resolve, waitMs));
-	}
+  if (t._config.isDev) {
+    // artificial delay in dev
+    const waitMs = Math.floor(Math.random() * 400) + 100;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
 
-	const result = await next();
+  const result = await next();
 
-	const end = Date.now();
-	console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+  const end = Date.now();
+  console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
 
-	return result;
+  return result;
 });
 
 /**
@@ -125,72 +125,72 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  * @see https://trpc.io/docs/procedures
  */
 export const protectedProcedure = t.procedure
-	.use(timingMiddleware)
-	.use(({ ctx, next }) => {
-		if (!ctx.session?.user) {
-			throw new TRPCError({ code: "UNAUTHORIZED" });
-		}
-		return next({
-			ctx: {
-				// infers the `session` as non-nullable
-				session: { ...ctx.session, user: ctx.session.user },
-			},
-		});
-	});
+  .use(timingMiddleware)
+  .use(({ ctx, next }) => {
+    if (!ctx.session?.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    return next({
+      ctx: {
+        // infers the `session` as non-nullable
+        session: { ...ctx.session, user: ctx.session.user },
+      },
+    });
+  });
 
 /**
  * Project-scoped procedure — requires auth and membership on the project.
  * Provide `projectId` on the input; `ctx.access` exposes role + permissions.
  */
 export const projectProcedure = protectedProcedure
-	.input(z.object({ projectId: z.string().min(1) }))
-	.use(async ({ ctx, input, next }) => {
-		const access = await resolveProjectAccess({
-			db: ctx.db,
-			userId: ctx.session.user.id,
-			projectId: input.projectId,
-		});
-		return next({ ctx: { ...ctx, access } });
-	});
+  .input(z.object({ projectId: z.string().min(1) }))
+  .use(async ({ ctx, input, next }) => {
+    const access = await resolveProjectAccess({
+      db: ctx.db,
+      userId: ctx.session.user.id,
+      projectId: input.projectId,
+    });
+    return next({ ctx: { ...ctx, access } });
+  });
 
 /**
  * Board-scoped procedure — requires auth and project membership via the board.
  * Provide `boardId` on the input; `ctx.access` is a full BoardAccess.
  */
 export const boardProcedure = protectedProcedure
-	.input(z.object({ boardId: z.string().min(1) }))
-	.use(async ({ ctx, input, next }) => {
-		const access = await resolveBoardAccess({
-			db: ctx.db,
-			userId: ctx.session.user.id,
-			boardId: input.boardId,
-		});
-		return next({ ctx: { ...ctx, access } });
-	});
+  .input(z.object({ boardId: z.string().min(1) }))
+  .use(async ({ ctx, input, next }) => {
+    const access = await resolveBoardAccess({
+      db: ctx.db,
+      userId: ctx.session.user.id,
+      boardId: input.boardId,
+    });
+    return next({ ctx: { ...ctx, access } });
+  });
 
 /**
  * Public board procedure — read-only via a share token. No auth required.
  * Input requires `{ boardId, shareToken }`.
  */
 export const publicBoardProcedure = publicProcedure
-	.input(
-		z.object({ boardId: z.string().min(1), shareToken: z.string().min(1) }),
-	)
-	.use(async ({ ctx, input, next }) => {
-		const access = await resolvePublicBoardAccess({
-			db: ctx.db,
-			boardId: input.boardId,
-			shareToken: input.shareToken,
-		});
-		return next({ ctx: { ...ctx, access } });
-	});
+  .input(
+    z.object({ boardId: z.string().min(1), shareToken: z.string().min(1) }),
+  )
+  .use(async ({ ctx, input, next }) => {
+    const access = await resolvePublicBoardAccess({
+      db: ctx.db,
+      boardId: input.boardId,
+      shareToken: input.shareToken,
+    });
+    return next({ ctx: { ...ctx, access } });
+  });
 
 /** Helper: assert the caller can write on the current board, else FORBIDDEN. */
 export function assertCanWrite(access: { canWrite: boolean }) {
-	if (!access.canWrite) throw new TRPCError({ code: "FORBIDDEN" });
+  if (!access.canWrite) throw new TRPCError({ code: "FORBIDDEN" });
 }
 
 /** Helper: assert the caller is an admin (owner) on the current scope. */
 export function assertCanAdmin(access: { canAdmin: boolean }) {
-	if (!access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+  if (!access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
 }

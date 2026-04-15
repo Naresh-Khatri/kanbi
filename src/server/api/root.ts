@@ -10,24 +10,24 @@ import { realtimeRouter } from "@/server/api/routers/realtime";
 import { shareRouter } from "@/server/api/routers/share";
 import { taskRouter } from "@/server/api/routers/task";
 import {
-	createCallerFactory,
-	createTRPCRouter,
-	publicProcedure,
+  createCallerFactory,
+  createTRPCRouter,
+  publicProcedure,
 } from "@/server/api/trpc";
 
 export const appRouter = createTRPCRouter({
-	health: publicProcedure.query(() => ({ ok: true })),
-	project: projectRouter,
-	board: boardRouter,
-	column: columnRouter,
-	task: taskRouter,
-	label: labelRouter,
-	checklist: checklistRouter,
-	attachment: attachmentRouter,
-	comment: commentRouter,
-	share: shareRouter,
-	activity: activityRouter,
-	realtime: realtimeRouter,
+  health: publicProcedure.query(() => ({ ok: true })),
+  project: projectRouter,
+  board: boardRouter,
+  column: columnRouter,
+  task: taskRouter,
+  label: labelRouter,
+  checklist: checklistRouter,
+  attachment: attachmentRouter,
+  comment: commentRouter,
+  share: shareRouter,
+  activity: activityRouter,
+  realtime: realtimeRouter,
 });
 
 export type AppRouter = typeof appRouter;
