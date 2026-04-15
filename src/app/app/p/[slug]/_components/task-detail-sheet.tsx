@@ -217,6 +217,7 @@ function TaskDetail({
 				taskId={task.id}
 			/>
 			<CommentsPanel boardId={boardId} canWrite={canWrite} taskId={task.id} />
+			<ActivityPanel boardId={boardId} taskId={task.id} />
 
 			{canWrite ? (
 				<div className="mt-4 flex justify-end">
@@ -674,4 +675,49 @@ function CommentsPanel({
 			) : null}
 		</div>
 	);
+}
+
+function ActivityPanel({
+	boardId,
+	taskId,
+}: {
+	boardId: string;
+	taskId: string;
+}) {
+	const list = api.activity.list.useQuery({ boardId, taskId, limit: 50 });
+	if (!list.data || list.data.length === 0) return null;
+	return (
+		<div className="flex flex-col gap-2">
+			<Label>Activity</Label>
+			<ul className="flex flex-col gap-1 text-sm">
+				{list.data.map((a) => (
+					<li
+						className="flex items-center gap-2 text-white/60 text-xs"
+						key={a.id}
+					>
+						<span className="font-medium text-white/80">{a.actorName}</span>
+						<span>{formatVerb(a.verb)}</span>
+						<span className="ml-auto">
+							{new Date(a.createdAt).toLocaleString()}
+						</span>
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
+
+function formatVerb(verb: string) {
+	switch (verb) {
+		case "task.created":
+			return "created this task";
+		case "task.updated":
+			return "updated the task";
+		case "task.moved":
+			return "moved the task";
+		case "comment.created":
+			return "commented";
+		default:
+			return verb;
+	}
 }

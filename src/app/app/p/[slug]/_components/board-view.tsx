@@ -70,6 +70,7 @@ export function BoardView({
 			onData: (evt) => {
 				if (evt.scope === "comment") {
 					utils.comment.list.invalidate();
+					utils.activity.list.invalidate();
 					return;
 				}
 				if (evt.scope === "checklist") {
@@ -78,6 +79,10 @@ export function BoardView({
 				}
 				if (evt.scope === "attachment") {
 					utils.attachment.list.invalidate();
+					return;
+				}
+				if (evt.scope === "activity") {
+					utils.activity.list.invalidate();
 					return;
 				}
 				utils.board.get.invalidate({ boardId });

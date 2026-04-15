@@ -1,3 +1,4 @@
+import { activityRouter } from "@/server/api/routers/activity";
 import { attachmentRouter } from "@/server/api/routers/attachment";
 import { boardRouter } from "@/server/api/routers/board";
 import { checklistRouter } from "@/server/api/routers/checklist";
@@ -25,6 +26,7 @@ export const appRouter = createTRPCRouter({
 	attachment: attachmentRouter,
 	comment: commentRouter,
 	share: shareRouter,
+	activity: activityRouter,
 	realtime: realtimeRouter,
 });
 

@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
-
+import { recordActivity } from "@/server/activity/record";
 import {
 	assertCanWrite,
 	boardProcedure,
@@ -66,6 +66,12 @@ export const commentRouter = createTRPCRouter({
 				})
 				.returning();
 			bus.emitBoard(input.boardId, { scope: "comment", ids: [input.taskId] });
+			await recordActivity(ctx.db, {
+				boardId: input.boardId,
+				taskId: input.taskId,
+				actorId: ctx.session.user.id,
+				verb: "comment.created",
+			});
 			return row;
 		}),
 
