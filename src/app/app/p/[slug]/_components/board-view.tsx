@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { ShareDialog } from "./share-dialog";
 import { TaskDetailSheet } from "./task-detail-sheet";
 
 type BoardData = RouterOutputs["board"]["get"];
@@ -191,6 +192,9 @@ export function BoardView({
 		<main className="flex h-[calc(100vh-57px)] flex-col">
 			<div className="flex items-center justify-between border-white/5 border-b px-6 py-3">
 				<h1 className="font-semibold text-xl">{projectName}</h1>
+				{access.canAdmin ? (
+					<ShareDialog boardId={boardId} projectId={projectId} />
+				) : null}
 			</div>
 			<DndContext
 				collisionDetection={closestCorners}

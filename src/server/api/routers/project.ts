@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, or } from "drizzle-orm";
 import { z } from "zod";
 
-import { slugify, slugSuffix } from "@/lib/ids";
+import { shareToken, slugify, slugSuffix } from "@/lib/ids";
 import {
 	assertCanAdmin,
 	createTRPCRouter,
@@ -12,6 +12,7 @@ import {
 import {
 	board,
 	project,
+	projectInvite,
 	projectMember,
 	user as userTable,
 } from "@/server/db/schema";
@@ -141,6 +142,111 @@ export const projectRouter = createTRPCRouter({
 		assertCanAdmin(ctx.access);
 		await ctx.db.delete(project).where(eq(project.id, input.projectId));
 	}),
+
+	invite: projectProcedure
+		.input(
+			z.object({
+				email: z.string().email(),
+				role: z.enum(["editor", "viewer"]).default("editor"),
+				expiresInDays: z.number().int().min(1).max(30).default(7),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+			const expiresAt = new Date(
+				Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000,
+			);
+			const [row] = await ctx.db
+				.insert(projectInvite)
+				.values({
+					projectId: input.projectId,
+					email: input.email.toLowerCase(),
+					role: input.role,
+					token: shareToken(),
+					invitedById: ctx.session.user.id,
+					expiresAt,
+				})
+				.returning();
+			return row;
+		}),
+
+	listInvites: projectProcedure.query(({ ctx, input }) =>
+		ctx.db
+			.select()
+			.from(projectInvite)
+			.where(
+				and(
+					eq(projectInvite.projectId, input.projectId),
+					// unaccepted only
+				),
+			)
+			.orderBy(desc(projectInvite.createdAt)),
+	),
+
+	revokeInvite: projectProcedure
+		.input(z.object({ inviteId: z.string().min(1) }))
+		.mutation(async ({ ctx, input }) => {
+			if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+			await ctx.db
+				.delete(projectInvite)
+				.where(
+					and(
+						eq(projectInvite.id, input.inviteId),
+						eq(projectInvite.projectId, input.projectId),
+					),
+				);
+		}),
+
+	acceptInvite: protectedProcedure
+		.input(z.object({ token: z.string().min(1) }))
+		.mutation(async ({ ctx, input }) => {
+			const now = new Date();
+			const row = await ctx.db
+				.select()
+				.from(projectInvite)
+				.where(eq(projectInvite.token, input.token))
+				.limit(1);
+			const inv = row[0];
+			if (!inv) throw new TRPCError({ code: "NOT_FOUND" });
+			if (inv.acceptedAt) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Invite already used",
+				});
+			}
+			if (inv.expiresAt && inv.expiresAt < now) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "Invite expired",
+				});
+			}
+
+			const userId = ctx.session.user.id;
+			await ctx.db
+				.insert(projectMember)
+				.values({
+					projectId: inv.projectId,
+					userId,
+					role: inv.role,
+					acceptedAt: now,
+				})
+				.onConflictDoUpdate({
+					target: [projectMember.projectId, projectMember.userId],
+					set: { role: inv.role, acceptedAt: now },
+				});
+
+			await ctx.db
+				.update(projectInvite)
+				.set({ acceptedAt: now })
+				.where(eq(projectInvite.id, inv.id));
+
+			const p = await ctx.db
+				.select({ slug: project.slug })
+				.from(project)
+				.where(eq(project.id, inv.projectId))
+				.limit(1);
+			return { projectSlug: p[0]?.slug ?? null };
+		}),
 
 	members: projectProcedure.query(async ({ ctx, input }) => {
 		return ctx.db
