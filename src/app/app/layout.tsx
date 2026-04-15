@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { UserMenu } from "@/app/app/_components/user-menu";
+import { KeybindProvider } from "@/components/keybinds/keybind-provider";
 import { getSession } from "@/server/better-auth/server";
 
 export default async function AppLayout({
@@ -23,6 +24,7 @@ export default async function AppLayout({
 				/>
 			</header>
 			<div className="flex-1">{children}</div>
+			<KeybindProvider />
 		</div>
 	);
 }

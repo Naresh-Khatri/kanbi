@@ -21,9 +21,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
+import { useAppShell } from "@/components/keybinds/shell-store";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -60,6 +60,20 @@ export function BoardView({
 	const { columns, tasks, labels, taskLabels, access } = data;
 	const canWrite = access.canWrite;
 	const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+	const [quickAddOpen, setQuickAddOpen] = useState(false);
+	const [quickAddTitle, setQuickAddTitle] = useState("");
+	const createTaskToken = useAppShell((s) => s.createTaskToken);
+	useEffect(() => {
+		if (createTaskToken > 0 && columns.length > 0) setQuickAddOpen(true);
+	}, [createTaskToken, columns.length]);
+
+	const createQuickTask = api.task.create.useMutation({
+		onSuccess: async () => {
+			setQuickAddTitle("");
+			setQuickAddOpen(false);
+			await utils.board.get.invalidate({ boardId });
+		},
+	});
 	const openTask = openTaskId
 		? (tasks.find((t) => t.id === openTaskId) ?? null)
 		: null;
@@ -270,6 +284,43 @@ export function BoardView({
 				task={openTask}
 				taskLabels={taskLabels}
 			/>
+			{quickAddOpen && columns.length > 0 ? (
+				// biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-close
+				// biome-ignore lint/a11y/useKeyWithClickEvents: dismiss-on-click-outside pattern
+				<div
+					className="fixed inset-0 z-[55] flex items-start justify-center bg-black/40 p-4 pt-[20vh] backdrop-blur-sm"
+					onClick={(e) => {
+						if (e.target === e.currentTarget) setQuickAddOpen(false);
+					}}
+				>
+					<form
+						className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1016] p-4 shadow-2xl"
+						onSubmit={(e) => {
+							e.preventDefault();
+							if (!quickAddTitle.trim()) return;
+							createQuickTask.mutate({
+								boardId,
+								columnId: sortedColumns[0]!.id,
+								title: quickAddTitle.trim(),
+							});
+						}}
+					>
+						<div className="mb-2 text-white/50 text-xs">
+							New task in{" "}
+							<span className="text-white">{sortedColumns[0]!.name}</span>
+						</div>
+						<Input
+							autoFocus
+							onChange={(e) => setQuickAddTitle(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Escape") setQuickAddOpen(false);
+							}}
+							placeholder="Task title"
+							value={quickAddTitle}
+						/>
+					</form>
+				</div>
+			) : null}
 		</main>
 	);
 }

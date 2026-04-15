@@ -2,8 +2,10 @@
 
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+import { useAppShell } from "@/components/keybinds/shell-store";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -72,6 +74,11 @@ function NewProjectDialog() {
 	const [open, setOpen] = useState(false);
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
+	const createProjectToken = useAppShell((s) => s.createProjectToken);
+
+	useEffect(() => {
+		if (createProjectToken > 0) setOpen(true);
+	}, [createProjectToken]);
 
 	const create = api.project.create.useMutation({
 		onSuccess: async () => {
