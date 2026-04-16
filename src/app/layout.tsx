@@ -7,6 +7,7 @@ import { Toaster } from "sonner";
 import { TRPCReactProvider } from "@/trpc/react";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3000"),
   title: "Kanbi",
   description: "A fast, keyboard-first kanban.",
 };
