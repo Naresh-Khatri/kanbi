@@ -23,6 +23,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import confetti from "canvas-confetti";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -51,6 +52,37 @@ type ActiveDrag =
   | null;
 
 type DropTarget = { columnId: string; beforeTaskId: string | null } | null;
+
+const DONE_COLUMN_PATTERN =
+  /^(done|complete[d]?|finish(ed)?|resolved|closed|shipped|released|delivered)$/i;
+
+function isDoneLikeColumn(name: string) {
+  return DONE_COLUMN_PATTERN.test(name.trim());
+}
+
+function celebrate() {
+  const end = Date.now() + 700;
+  const colors = ["#38bdf8", "#a78bfa", "#f472b6", "#fbbf24", "#34d399"];
+  (function frame() {
+    confetti({
+      particleCount: 4,
+      angle: 60,
+      spread: 70,
+      startVelocity: 45,
+      origin: { x: 0, y: 0.9 },
+      colors,
+    });
+    confetti({
+      particleCount: 4,
+      angle: 120,
+      spread: 70,
+      startVelocity: 45,
+      origin: { x: 1, y: 0.9 },
+      colors,
+    });
+    if (Date.now() < end) requestAnimationFrame(frame);
+  })();
+}
 
 export function BoardView({
   boardId,
@@ -259,6 +291,13 @@ export function BoardView({
         before,
         after,
       });
+
+      if (activeTask.columnId !== targetColumnId) {
+        const targetColumn = columns.find((c) => c.id === targetColumnId);
+        if (targetColumn && isDoneLikeColumn(targetColumn.name)) {
+          celebrate();
+        }
+      }
     }
   }
 
