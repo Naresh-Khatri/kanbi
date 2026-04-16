@@ -1,14 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 
 import { boardProcedure, createTRPCRouter } from "@/server/api/trpc";
-import { board, boardColumn, label, task, taskLabel } from "@/server/db/schema";
+import { boardColumn, label, task, taskLabel } from "@/server/db/schema";
 
 export const boardRouter = createTRPCRouter({
   get: boardProcedure.query(async ({ ctx, input }) => {
-    const boardRow = await ctx.db.query.board.findFirst({
-      where: eq(board.id, input.boardId),
-    });
-
     const [columns, tasks, labels, taskLabels] = await Promise.all([
       ctx.db
         .select()
@@ -29,7 +25,6 @@ export const boardRouter = createTRPCRouter({
     ]);
 
     return {
-      board: boardRow!,
       columns,
       tasks,
       labels,
