@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Logo } from "@/components/ui/logo";
 import { getSession } from "@/server/better-auth/server";
 
 export default async function Home() {
@@ -10,9 +11,12 @@ export default async function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
       <div className="flex flex-col items-center gap-4 text-center">
-        <h1 className="font-extrabold text-5xl tracking-tight sm:text-6xl">
-          Kanbi
-        </h1>
+        <div className="flex gap-4">
+          <Logo className="h-18 w-18 pb-2" />
+          <h1 className="font-extrabold text-5xl tracking-tight sm:text-6xl">
+            Kanbi
+          </h1>
+        </div>
         <p className="max-w-md text-lg text-white/70">
           A fast, keyboard-first kanban for personal projects and small teams.
         </p>
