@@ -6,7 +6,6 @@ import {
   closestCorners,
   DndContext,
   type DragEndEvent,
-  type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
   KeyboardSensor,
@@ -24,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { Button } from "@/components/ui/button";
@@ -106,61 +105,9 @@ export function BoardView({
   );
 
   const moveTask = api.task.move.useMutation({
-    onMutate: async (vars) => {
-      await utils.board.get.cancel({ boardId });
-      const prev = utils.board.get.getData({ boardId });
-      utils.board.get.setData({ boardId }, (old) => {
-        if (!old) return old;
-        const newPos =
-          vars.before != null && vars.after != null
-            ? (vars.before + vars.after) / 2
-            : vars.before != null
-              ? vars.before + 1024
-              : vars.after != null
-                ? vars.after / 2
-                : 1024;
-        return {
-          ...old,
-          tasks: old.tasks.map((t) =>
-            t.id === vars.taskId
-              ? { ...t, columnId: vars.toColumnId, position: newPos }
-              : t,
-          ),
-        };
-      });
-      return { prev };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.prev) utils.board.get.setData({ boardId }, ctx.prev);
-    },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
   const reorderColumn = api.column.reorder.useMutation({
-    onMutate: async (vars) => {
-      await utils.board.get.cancel({ boardId });
-      const prev = utils.board.get.getData({ boardId });
-      utils.board.get.setData({ boardId }, (old) => {
-        if (!old) return old;
-        const newPos =
-          vars.before != null && vars.after != null
-            ? (vars.before + vars.after) / 2
-            : vars.before != null
-              ? vars.before + 1024
-              : vars.after != null
-                ? vars.after / 2
-                : 1024;
-        return {
-          ...old,
-          columns: old.columns.map((c) =>
-            c.id === vars.columnId ? { ...c, position: newPos } : c,
-          ),
-        };
-      });
-      return { prev };
-    },
-    onError: (_e, _v, ctx) => {
-      if (ctx?.prev) utils.board.get.setData({ boardId }, ctx.prev);
-    },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
 
@@ -176,7 +123,6 @@ export function BoardView({
   }, [columns, tasks]);
 
   const [active, setActive] = useState<ActiveDrag>(null);
-  const lastOverColumnRef = useRef<string | null>(null);
 
   const collisionDetection: CollisionDetection = (args) => {
     if (active?.kind === "column") {
@@ -198,40 +144,6 @@ export function BoardView({
     }),
   );
 
-  function onDragOver(e: DragOverEvent) {
-    const { active: a, over } = e;
-    if (!over) return;
-    const activeKind = a.data.current?.kind as "task" | "column" | undefined;
-    if (activeKind !== "column") return;
-    const overColumnId =
-      (over.data.current?.columnId as string | undefined) ?? String(over.id);
-    if (!overColumnId || overColumnId === a.id) return;
-    if (lastOverColumnRef.current === overColumnId) return;
-    lastOverColumnRef.current = overColumnId;
-
-    utils.board.get.setData({ boardId }, (old) => {
-      if (!old) return old;
-      const sorted = [...old.columns].sort((x, y) => x.position - y.position);
-      const fromIdx = sorted.findIndex((c) => c.id === a.id);
-      const toIdx = sorted.findIndex((c) => c.id === overColumnId);
-      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return old;
-      const reordered = [...sorted];
-      const [moved] = reordered.splice(fromIdx, 1);
-      if (!moved) return old;
-      reordered.splice(toIdx, 0, moved);
-      const byId = new Map(
-        reordered.map((c, i) => [c.id, (i + 1) * 1024] as const),
-      );
-      return {
-        ...old,
-        columns: old.columns.map((c) => ({
-          ...c,
-          position: byId.get(c.id) ?? c.position,
-        })),
-      };
-    });
-  }
-
   function onDragStart(e: DragStartEvent) {
     const id = String(e.active.id);
     const kind = e.active.data.current?.kind as "task" | "column" | undefined;
@@ -246,7 +158,6 @@ export function BoardView({
 
   function onDragEnd(e: DragEndEvent) {
     setActive(null);
-    lastOverColumnRef.current = null;
     const { active: a, over } = e;
     if (!over) return;
     const activeKind = a.data.current?.kind as "task" | "column" | undefined;
@@ -338,7 +249,6 @@ export function BoardView({
       <DndContext
         collisionDetection={collisionDetection}
         onDragEnd={canWrite ? onDragEnd : undefined}
-        onDragOver={canWrite ? onDragOver : undefined}
         onDragStart={canWrite ? onDragStart : undefined}
         sensors={sensors}
       >
