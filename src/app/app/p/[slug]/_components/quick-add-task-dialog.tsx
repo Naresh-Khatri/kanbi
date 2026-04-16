@@ -237,8 +237,8 @@ export function QuickAddTaskDialog({
         }}
       >
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="border-white/5 border-b px-5 py-3">
-            <DialogTitle className="text-sm text-white/60">
+          <DialogHeader className="border-white/10 border-b px-5 py-3">
+            <DialogTitle className="text-sm text-white/70">
               New task in{" "}
               <ColumnPicker
                 columns={sortedColumns}
@@ -286,7 +286,7 @@ export function QuickAddTaskDialog({
                         src={s.previewUrl}
                       />
                     ) : (
-                      <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 p-2 text-white/60">
+                      <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 p-2 text-white/70">
                         <Paperclip className="h-4 w-4" />
                         <span className="truncate text-[10px] leading-tight">
                           {s.file.name}
@@ -397,8 +397,8 @@ export function QuickAddTaskDialog({
             ) : null}
           </div>
 
-          <div className="flex items-center justify-between border-white/5 border-t px-5 py-3">
-            <label className="inline-flex cursor-pointer select-none items-center gap-2 text-white/60 text-xs">
+          <div className="flex items-center justify-between border-white/10 border-t px-5 py-3">
+            <label className="inline-flex cursor-pointer select-none items-center gap-2 text-white/70 text-xs">
               <CheckSquare
                 checked={keepOpen}
                 onChange={() => setKeepOpen((v) => !v)}
@@ -406,7 +406,7 @@ export function QuickAddTaskDialog({
               Create more
             </label>
             <div className="flex items-center gap-2">
-              <span className="hidden text-[11px] text-white/30 sm:block">
+              <span className="hidden text-[11px] text-white/40 sm:block">
                 ⌘+↵ to create
               </span>
               <Button

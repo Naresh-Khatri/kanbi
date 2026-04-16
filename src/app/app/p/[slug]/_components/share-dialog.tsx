@@ -99,7 +99,7 @@ function InviteTab({ projectId }: { projectId: string }) {
             value={email}
           />
           <select
-            className="rounded-md border border-white/15 bg-white/5 px-2 text-sm"
+            className="rounded-md border border-white/10 bg-white/5 px-2 text-sm"
             onChange={(e) => setRole(e.target.value as "editor" | "viewer")}
             value={role}
           >
@@ -110,7 +110,7 @@ function InviteTab({ projectId }: { projectId: string }) {
             Invite
           </Button>
         </div>
-        <p className="text-white/50 text-xs">
+        <p className="text-white/70 text-xs">
           We don't send email yet — copy the invite link below and pass it
           along.
         </p>
@@ -124,15 +124,15 @@ function InviteTab({ projectId }: { projectId: string }) {
               .filter((i) => !i.acceptedAt)
               .map((i) => (
                 <li
-                  className="flex items-center gap-2 rounded-md border border-white/5 px-2 py-1.5 text-sm"
+                  className="flex items-center gap-2 rounded-md border border-white/10 px-2 py-1.5 text-sm"
                   key={i.id}
                 >
                   <span className="w-44 truncate">{i.email}</span>
-                  <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/60 text-xs">
+                  <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/70 text-xs">
                     {i.role}
                   </span>
                   <button
-                    className="flex-1 truncate text-left text-white/50 hover:text-white"
+                    className="flex-1 truncate text-left text-white/70 hover:text-white"
                     onClick={() => {
                       navigator.clipboard.writeText(inviteUrl(i.token));
                       toast.success("Invite link copied");
@@ -175,7 +175,7 @@ function PublicLinkTab({ boardId }: { boardId: string }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-white/60">
+      <p className="text-sm text-white/70">
         Anyone with the link can view this board. No sign-in required. Links can
         be revoked.
       </p>
@@ -190,7 +190,7 @@ function PublicLinkTab({ boardId }: { boardId: string }) {
       <ul className="flex flex-col gap-1">
         {(shares.data ?? []).map((s) => (
           <li
-            className="flex items-center gap-2 rounded-md border border-white/5 px-2 py-1.5"
+            className="flex items-center gap-2 rounded-md border border-white/10 px-2 py-1.5"
             key={s.id}
           >
             <input
@@ -199,7 +199,7 @@ function PublicLinkTab({ boardId }: { boardId: string }) {
               value={shareUrl(s.token)}
             />
             <button
-              className="text-white/60 hover:text-white"
+              className="text-white/70 hover:text-white"
               onClick={() => {
                 navigator.clipboard.writeText(shareUrl(s.token));
                 toast.success("Link copied");

@@ -246,7 +246,7 @@ function MetaLabel({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-1.5 pt-1.5 text-white/50 text-xs uppercase tracking-wide">
+    <div className="flex items-center gap-1.5 pt-1.5 text-white/70 text-xs uppercase tracking-wide">
       {icon}
       {children}
     </div>
@@ -363,7 +363,7 @@ function LabelsPicker({
               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition",
               on
                 ? "border-transparent text-black"
-                : "border-white/15 text-white/70 hover:border-white/30",
+                : "border-white/10 text-white/70 hover:border-white/20",
             )}
             disabled={!canWrite}
             key={l.id}
@@ -685,7 +685,7 @@ function CommentsPanel({
       <ul className="flex flex-col gap-3 text-sm">
         {(list.data ?? []).map((c) => (
           <li className="flex flex-col gap-1" key={c.id}>
-            <div className="flex items-center gap-2 text-white/50 text-xs">
+            <div className="flex items-center gap-2 text-white/40 text-xs">
               <span className="font-medium text-white/80">{c.authorName}</span>
               <span>{new Date(c.createdAt).toLocaleString()}</span>
             </div>
@@ -738,7 +738,7 @@ function ActivityPanel({
       <ul className="flex flex-col gap-1 text-sm">
         {list.data.map((a) => (
           <li
-            className="flex items-center gap-2 text-white/60 text-xs"
+            className="flex items-center gap-2 text-white/70 text-xs"
             key={a.id}
           >
             <span className="font-medium text-white/80">{a.actorName}</span>

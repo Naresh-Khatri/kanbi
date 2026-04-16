@@ -469,11 +469,11 @@ function ColumnHeader({
       {canWrite ? (
         <button
           aria-label="Drag column"
-          className="cursor-grab text-white/40 hover:text-white/80 active:cursor-grabbing"
+          className="cursor-grab text-white/40 hover:text-white/80 active:cursor-grabbing p-2"
           type="button"
           {...dragHandleProps}
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical className="size-4" />
         </button>
       ) : null}
       {renaming ? (
