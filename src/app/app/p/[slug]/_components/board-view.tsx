@@ -6,6 +6,7 @@ import {
   closestCorners,
   DndContext,
   type DragEndEvent,
+  type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
   KeyboardSensor,
@@ -23,7 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,8 @@ type ActiveDrag =
   | { kind: "task"; task: TaskRow }
   | { kind: "column"; column: ColumnRow }
   | null;
+
+type DropTarget = { columnId: string; beforeTaskId: string | null } | null;
 
 export function BoardView({
   boardId,
@@ -123,6 +126,7 @@ export function BoardView({
   }, [columns, tasks]);
 
   const [active, setActive] = useState<ActiveDrag>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget>(null);
 
   const collisionDetection: CollisionDetection = (args) => {
     if (active?.kind === "column") {
@@ -156,8 +160,36 @@ export function BoardView({
     }
   }
 
+  function onDragOver(e: DragOverEvent) {
+    const { active: a, over } = e;
+    if (!over) {
+      setDropTarget(null);
+      return;
+    }
+    const activeKind = a.data.current?.kind as "task" | "column" | undefined;
+    if (activeKind !== "task") return;
+    const overKind = over.data.current?.kind as "task" | "column" | undefined;
+    const columnId =
+      (over.data.current?.columnId as string | undefined) ?? String(over.id);
+    if (!columnId) {
+      setDropTarget(null);
+      return;
+    }
+    const beforeTaskId =
+      overKind === "task" && String(over.id) !== String(a.id)
+        ? String(over.id)
+        : null;
+    setDropTarget({ columnId, beforeTaskId });
+  }
+
+  function onDragCancel() {
+    setActive(null);
+    setDropTarget(null);
+  }
+
   function onDragEnd(e: DragEndEvent) {
     setActive(null);
+    setDropTarget(null);
     const { active: a, over } = e;
     if (!over) return;
     const activeKind = a.data.current?.kind as "task" | "column" | undefined;
@@ -187,10 +219,7 @@ export function BoardView({
     if (activeKind === "task") {
       const overKind = over.data.current?.kind as "task" | "column" | undefined;
       const targetColumnId =
-        overKind === "column"
-          ? String(over.id)
-          : ((over.data.current?.columnId as string | undefined) ??
-            String(over.id));
+        (over.data.current?.columnId as string | undefined) ?? String(over.id);
       if (!targetColumnId) return;
 
       const activeTask = tasks.find((t) => t.id === a.id);
@@ -240,7 +269,7 @@ export function BoardView({
 
   return (
     <main className="flex h-[calc(100vh-57px)] flex-col">
-      <div className="flex items-center justify-between border-white/5 border-b px-6 py-3">
+      <div className="flex items-center justify-between border-white/10 border-b px-6 py-3">
         <h1 className="font-semibold text-xl">{projectName}</h1>
         {access.canAdmin ? (
           <ShareDialog boardId={boardId} projectId={projectId} />
@@ -248,7 +277,9 @@ export function BoardView({
       </div>
       <DndContext
         collisionDetection={collisionDetection}
+        onDragCancel={canWrite ? onDragCancel : undefined}
         onDragEnd={canWrite ? onDragEnd : undefined}
+        onDragOver={canWrite ? onDragOver : undefined}
         onDragStart={canWrite ? onDragStart : undefined}
         sensors={sensors}
       >
@@ -263,6 +294,9 @@ export function BoardView({
                   boardId={boardId}
                   canWrite={canWrite}
                   column={col}
+                  dropTarget={
+                    dropTarget?.columnId === col.id ? dropTarget : null
+                  }
                   key={col.id}
                   onAddTask={(id) => {
                     setQuickAddColumnId(id);
@@ -318,6 +352,7 @@ function SortableColumn({
   column,
   tasks,
   canWrite,
+  dropTarget,
   onOpenTask,
   onAddTask,
 }: {
@@ -325,6 +360,7 @@ function SortableColumn({
   column: ColumnRow;
   tasks: TaskRow[];
   canWrite: boolean;
+  dropTarget: DropTarget;
   onOpenTask: (taskId: string) => void;
   onAddTask: (columnId: string) => void;
 }) {
@@ -366,23 +402,28 @@ function SortableColumn({
           strategy={verticalListSortingStrategy}
         >
           {tasks.map((t) => (
-            <SortableTaskCard
-              boardId={boardId}
-              canWrite={canWrite}
-              columnId={column.id}
-              key={t.id}
-              onOpen={() => onOpenTask(t.id)}
-              task={t}
-            />
+            <Fragment key={t.id}>
+              {dropTarget?.beforeTaskId === t.id ? <DropIndicator /> : null}
+              <SortableTaskCard
+                boardId={boardId}
+                canWrite={canWrite}
+                columnId={column.id}
+                onOpen={() => onOpenTask(t.id)}
+                task={t}
+              />
+            </Fragment>
           ))}
         </SortableContext>
-        {tasks.length === 0 ? (
-          <div className="h-2 rounded-md border border-white/5 border-dashed" />
+        {dropTarget && dropTarget.beforeTaskId === null && tasks.length > 0 ? (
+          <DropIndicator />
+        ) : null}
+        {tasks.length === 0 && dropTarget ? (
+          <div className="h-16 rounded-md border border-white/40 border-dashed bg-white/[0.04]" />
         ) : null}
       </div>
       {canWrite ? (
         <Button
-          className="justify-start text-white/60"
+          className="justify-start text-white/70"
           onClick={() => onAddTask(column.id)}
           size="sm"
           variant="ghost"
@@ -522,6 +563,10 @@ function SortableTaskCard({
   );
 }
 
+function DropIndicator() {
+  return <div className="h-0.5 rounded-full bg-sky-400/80 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />;
+}
+
 function TaskCardPreview({ task }: { task: TaskRow }) {
   return (
     <div className="w-72 rotate-2 rounded-lg border border-white/10 bg-[#14151c] p-3 shadow-xl">
@@ -545,7 +590,7 @@ function TaskCard({
   });
   return (
     <div
-      className="group w-full cursor-pointer rounded-lg border border-white/5 bg-[#14151c] p-3 transition hover:border-white/15"
+      className="group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20"
       onClick={onOpen}
     >
       <div className="flex items-start justify-between gap-2">
