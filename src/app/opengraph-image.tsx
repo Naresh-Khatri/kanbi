@@ -24,9 +24,9 @@ export default async function Image() {
     position: "absolute" as const,
     left: offsetX,
     top: offsetY,
-    width: 104,
-    height: 104,
-    borderRadius: 14,
+    width: 84,
+    height: 84,
+    borderRadius: 12,
     background: "#ffffff",
     opacity,
   });
@@ -47,28 +47,28 @@ export default async function Image() {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 40,
+          gap: 32,
         }}
       >
         <div
           style={{
             position: "relative",
-            width: 156,
-            height: 140,
+            width: 128,
+            height: 116,
             display: "flex",
           }}
         >
-          <div style={card(0, 36, 0.35)} />
-          <div style={card(26, 18, 0.65)} />
-          <div style={card(52, 0, 1)} />
+          <div style={card(0, 32, 0.35)} />
+          <div style={card(22, 16, 0.65)} />
+          <div style={card(44, 0, 1)} />
         </div>
         <div
           style={{
             display: "flex",
             fontFamily: "Geist",
             fontWeight: 800,
-            fontSize: 152,
-            letterSpacing: -4,
+            fontSize: 124,
+            letterSpacing: -3,
             lineHeight: 1,
             backgroundImage:
               "linear-gradient(180deg, #ffffff 0%, #ffffff 55%, #b5b7c6 100%)",
