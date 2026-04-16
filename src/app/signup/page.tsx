@@ -30,11 +30,20 @@ export default function SignupPage() {
     router.refresh();
   }
 
+  async function onGithub() {
+    await authClient.signIn.social({
+      provider: "github",
+      callbackURL: "/app",
+    });
+  }
+
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div className="flex flex-col gap-1">
         <h1 className="font-semibold text-2xl">Create your account</h1>
-        <p className="text-sm text-white/60">It takes about 20 seconds.</p>
+        <p className="text-sm text-white/60">
+          It takes about 20 seconds. Or continue with GitHub.
+        </p>
       </div>
       <form className="flex flex-col gap-3" onSubmit={onSubmit}>
         <div className="flex flex-col gap-1.5">
@@ -74,6 +83,14 @@ export default function SignupPage() {
           {pending ? "Creating…" : "Create account"}
         </Button>
       </form>
+      <div className="flex items-center gap-3 text-white/40 text-xs">
+        <div className="h-px flex-1 bg-white/10" />
+        or
+        <div className="h-px flex-1 bg-white/10" />
+      </div>
+      <Button onClick={onGithub} variant="outline">
+        Continue with GitHub
+      </Button>
       <p className="text-center text-sm text-white/60">
         Already have an account?{" "}
         <Link className="text-white underline" href="/login">
