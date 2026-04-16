@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Check,
   Flag,
+  Loader2,
   Paperclip,
   Tag,
   Trash2,
@@ -12,6 +13,11 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +46,12 @@ import {
 type BoardData = RouterOutputs["board"]["get"];
 type TaskRow = BoardData["tasks"][number];
 type LabelRow = BoardData["labels"][number];
+type PendingUpload = {
+  id: string;
+  filename: string;
+  mime: string;
+  previewUrl: string | null;
+};
 
 export function TaskDetailSheet({
   open,
@@ -525,21 +537,30 @@ function AttachmentsPanel({
     onSuccess: () => utils.attachment.list.invalidate({ boardId, taskId }),
   });
   const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<PendingUpload[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   async function onFileChosen(file: File) {
+    const localId = crypto.randomUUID();
+    const mime = file.type || "application/octet-stream";
+    const previewUrl = mime.startsWith("image/")
+      ? URL.createObjectURL(file)
+      : null;
+    setPending((p) => [
+      ...p,
+      { id: localId, filename: file.name, mime, previewUrl },
+    ]);
     try {
-      setBusy(true);
       const { key, uploadUrl } = await createUrl.mutateAsync({
         boardId,
         taskId,
         filename: file.name,
-        mime: file.type || "application/octet-stream",
+        mime,
         sizeBytes: file.size,
       });
       const put = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
+        headers: { "Content-Type": mime },
         body: file,
       });
       if (!put.ok) throw new Error("Upload failed");
@@ -548,13 +569,14 @@ function AttachmentsPanel({
         taskId,
         key,
         filename: file.name,
-        mime: file.type || "application/octet-stream",
+        mime,
         sizeBytes: file.size,
       });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
-      setBusy(false);
+      setPending((p) => p.filter((u) => u.id !== localId));
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -562,24 +584,31 @@ function AttachmentsPanel({
   const items = list.data ?? [];
   const images = items.filter((a) => a.mime.startsWith("image/"));
   const files = items.filter((a) => !a.mime.startsWith("image/"));
+  const pendingImages = pending.filter((p) => p.mime.startsWith("image/"));
+  const pendingFiles = pending.filter((p) => !p.mime.startsWith("image/"));
+  const busy = pending.length > 0;
 
   return (
     <div className="flex flex-col gap-2">
       <Label>Attachments</Label>
-      {images.length > 0 ? (
+      {images.length > 0 || pendingImages.length > 0 ? (
         <div className="grid grid-cols-3 gap-2">
-          {images.map((a) => (
+          {images.map((a, i) => (
             <div
               className="group relative overflow-hidden rounded-md border border-white/10 bg-white/[0.04]"
               key={a.id}
             >
-              <a href={a.url} rel="noreferrer" target="_blank">
+              <button
+                className="block w-full"
+                onClick={() => setViewerIndex(i)}
+                type="button"
+              >
                 <img
                   alt={a.filename}
                   className="aspect-square w-full object-cover transition group-hover:brightness-110"
                   src={a.url}
                 />
-              </a>
+              </button>
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/80 to-transparent px-2 pt-6 pb-1.5 opacity-0 transition group-hover:opacity-100">
                 <span className="truncate text-[10px] text-white/80">
                   {a.filename}
@@ -596,6 +625,25 @@ function AttachmentsPanel({
                     <Trash2 className="h-3 w-3" />
                   </button>
                 ) : null}
+              </div>
+            </div>
+          ))}
+          {pendingImages.map((p) => (
+            <div
+              className="relative overflow-hidden rounded-md border border-white/10 bg-white/[0.04]"
+              key={p.id}
+            >
+              {p.previewUrl ? (
+                <img
+                  alt={p.filename}
+                  className="aspect-square w-full object-cover opacity-40"
+                  src={p.previewUrl}
+                />
+              ) : (
+                <div className="aspect-square w-full" />
+              )}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-white/80" />
               </div>
             </div>
           ))}
@@ -627,6 +675,13 @@ function AttachmentsPanel({
             ) : null}
           </li>
         ))}
+        {pendingFiles.map((p) => (
+          <li className="flex items-center gap-2 text-white/60" key={p.id}>
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
+            <span className="flex-1 truncate">{p.filename}</span>
+            <span className="text-white/40 text-xs">Uploading…</span>
+          </li>
+        ))}
       </ul>
       {canWrite ? (
         <div>
@@ -650,7 +705,83 @@ function AttachmentsPanel({
           </Button>
         </div>
       ) : null}
+      <ImageLightbox
+        images={images}
+        index={viewerIndex}
+        onChange={setViewerIndex}
+        onClose={() => setViewerIndex(null)}
+      />
     </div>
+  );
+}
+
+type ImageItem = {
+  id: string;
+  url: string;
+  filename: string;
+};
+
+function ImageLightbox({
+  images,
+  index,
+  onChange,
+  onClose,
+}: {
+  images: ImageItem[];
+  index: number | null;
+  onChange: (i: number) => void;
+  onClose: () => void;
+}) {
+  const current = index !== null ? images[index] : null;
+  return (
+    <Dialog
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      open={current !== null && current !== undefined}
+    >
+      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-black/95 p-0">
+        <DialogTitle className="sr-only">
+          {current?.filename ?? "Image"}
+        </DialogTitle>
+        <div
+          className="flex min-h-0 flex-1 items-center justify-center p-6"
+          onClick={onClose}
+        >
+          {current ? (
+            <img
+              alt={current.filename}
+              className="max-h-full max-w-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+              src={current.url}
+            />
+          ) : null}
+        </div>
+        {images.length > 1 ? (
+          <div className="flex shrink-0 gap-2 overflow-x-auto border-white/10 border-t p-3">
+            {images.map((img, i) => (
+              <button
+                className={cn(
+                  "h-16 w-16 shrink-0 overflow-hidden rounded-md border transition",
+                  i === index
+                    ? "border-white"
+                    : "border-white/10 opacity-60 hover:opacity-100",
+                )}
+                key={img.id}
+                onClick={() => onChange(i)}
+                type="button"
+              >
+                <img
+                  alt={img.filename}
+                  className="h-full w-full object-cover"
+                  src={img.url}
+                />
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
