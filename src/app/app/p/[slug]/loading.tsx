@@ -1,9 +1,6 @@
 export default function Loading() {
   return (
     <main className="flex h-[calc(100vh-57px)] flex-col">
-      <div className="flex items-center justify-between border-white/10 border-b px-6 py-3">
-        <div className="h-6 w-40 animate-pulse rounded bg-white/5" />
-      </div>
       <div className="flex gap-4 p-6">
         {[0, 1, 2].map((i) => (
           <div

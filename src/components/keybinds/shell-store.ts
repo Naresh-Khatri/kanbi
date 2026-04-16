@@ -1,6 +1,9 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { create } from "zustand";
+
+type HeaderSlot = { left: ReactNode; right: ReactNode };
 
 type AppShellState = {
   paletteOpen: boolean;
@@ -13,7 +16,13 @@ type AppShellState = {
   createTaskToken: number;
   requestCreateProject: () => void;
   requestCreateTask: () => void;
+  /** Per-page slots rendered inside the global app header. */
+  headerSlot: HeaderSlot;
+  setHeaderSlot: (slot: HeaderSlot) => void;
+  clearHeaderSlot: () => void;
 };
+
+const EMPTY_SLOT: HeaderSlot = { left: null, right: null };
 
 export const useAppShell = create<AppShellState>((set) => ({
   paletteOpen: false,
@@ -26,4 +35,7 @@ export const useAppShell = create<AppShellState>((set) => ({
     set((s) => ({ createProjectToken: s.createProjectToken + 1 })),
   requestCreateTask: () =>
     set((s) => ({ createTaskToken: s.createTaskToken + 1 })),
+  headerSlot: EMPTY_SLOT,
+  setHeaderSlot: (slot) => set({ headerSlot: slot }),
+  clearHeaderSlot: () => set({ headerSlot: EMPTY_SLOT }),
 }));

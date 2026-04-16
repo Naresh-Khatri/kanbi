@@ -102,12 +102,35 @@ export function BoardView({
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
+  const setHeaderSlot = useAppShell((s) => s.setHeaderSlot);
+  const clearHeaderSlot = useAppShell((s) => s.clearHeaderSlot);
   useEffect(() => {
     if (createTaskToken > 0 && columns.length > 0) {
       setQuickAddColumnId(null);
       setQuickAddOpen(true);
     }
   }, [createTaskToken, columns.length]);
+
+  useEffect(() => {
+    setHeaderSlot({
+      left: (
+        <h1 className="truncate font-medium text-sm text-white">
+          {projectName}
+        </h1>
+      ),
+      right: access.canAdmin ? (
+        <ShareDialog boardId={boardId} projectId={projectId} />
+      ) : null,
+    });
+    return () => clearHeaderSlot();
+  }, [
+    setHeaderSlot,
+    clearHeaderSlot,
+    projectName,
+    access.canAdmin,
+    boardId,
+    projectId,
+  ]);
 
   const openTask = openTaskId
     ? (tasks.find((t) => t.id === openTaskId) ?? null)
@@ -308,12 +331,6 @@ export function BoardView({
 
   return (
     <main className="flex h-[calc(100vh-57px)] flex-col">
-      <div className="flex items-center justify-between border-white/10 border-b px-6 py-3">
-        <h1 className="font-semibold text-xl">{projectName}</h1>
-        {access.canAdmin ? (
-          <ShareDialog boardId={boardId} projectId={projectId} />
-        ) : null}
-      </div>
       <DndContext
         collisionDetection={collisionDetection}
         onDragCancel={canWrite ? onDragCancel : undefined}
