@@ -8,6 +8,8 @@ import {
   createTRPCRouter,
 } from "@/server/api/trpc";
 import { comment, task, user as userTable } from "@/server/db/schema";
+import { createNotifications } from "@/server/notifications/create";
+import { resolveMentions } from "@/server/notifications/mentions";
 import { bus } from "@/server/realtime/bus";
 
 async function assertTaskOnBoard(
@@ -72,6 +74,54 @@ export const commentRouter = createTRPCRouter({
         actorId: ctx.session.user.id,
         verb: "comment.created",
       });
+
+      const taskRows = await ctx.db
+        .select({
+          title: task.title,
+          reporterId: task.reporterId,
+          assigneeId: task.assigneeId,
+        })
+        .from(task)
+        .where(eq(task.id, input.taskId))
+        .limit(1);
+      const t = taskRows[0];
+      if (t) {
+        const mentioned = new Set(
+          await resolveMentions(ctx.db, input.boardId, input.body),
+        );
+        mentioned.delete(ctx.session.user.id);
+
+        const recipients = new Set<string>();
+        if (t.reporterId) recipients.add(t.reporterId);
+        if (t.assigneeId) recipients.add(t.assigneeId);
+        recipients.delete(ctx.session.user.id);
+        for (const id of mentioned) recipients.delete(id);
+
+        const excerpt = input.body.slice(0, 200);
+        const payload: Parameters<typeof createNotifications>[1] = [];
+        for (const userId of mentioned) {
+          payload.push({
+            userId,
+            actorId: ctx.session.user.id,
+            type: "task.mention",
+            boardId: input.boardId,
+            taskId: input.taskId,
+            data: { title: t.title, excerpt },
+          });
+        }
+        for (const userId of recipients) {
+          payload.push({
+            userId,
+            actorId: ctx.session.user.id,
+            type: "task.comment",
+            boardId: input.boardId,
+            taskId: input.taskId,
+            data: { title: t.title, excerpt },
+          });
+        }
+        if (payload.length > 0) await createNotifications(ctx.db, payload);
+      }
+
       return row;
     }),
 

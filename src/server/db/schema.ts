@@ -335,6 +335,38 @@ export const activity = createTable(
   (t) => [index("activity_board_created_idx").on(t.boardId, t.createdAt)],
 );
 
+// ── Notifications ───────────────────────────────────────────────────────────
+
+export const notification = createTable(
+  "notification",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    actorId: text("actor_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    type: text("type").notNull(),
+    projectId: text("project_id").references(() => project.id, {
+      onDelete: "cascade",
+    }),
+    boardId: text("board_id").references(() => board.id, {
+      onDelete: "cascade",
+    }),
+    taskId: text("task_id").references(() => task.id, { onDelete: "cascade" }),
+    data: jsonb("data")
+      .$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("notification_user_created_idx").on(t.userId, t.createdAt),
+    index("notification_user_unread_idx").on(t.userId, t.readAt),
+  ],
+);
+
 // ── Public read-only share link ─────────────────────────────────────────────
 
 export const boardShare = createTable(
@@ -479,4 +511,15 @@ export const boardShareRelations = relations(boardShare, ({ one }) => ({
     fields: [boardShare.createdById],
     references: [user.id],
   }),
+}));
+
+export const notificationRelations = relations(notification, ({ one }) => ({
+  user: one(user, { fields: [notification.userId], references: [user.id] }),
+  actor: one(user, { fields: [notification.actorId], references: [user.id] }),
+  project: one(project, {
+    fields: [notification.projectId],
+    references: [project.id],
+  }),
+  board: one(board, { fields: [notification.boardId], references: [board.id] }),
+  task: one(task, { fields: [notification.taskId], references: [task.id] }),
 }));

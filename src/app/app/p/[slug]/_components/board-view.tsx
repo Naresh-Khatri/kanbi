@@ -28,6 +28,7 @@ import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
+import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -53,13 +54,6 @@ type ActiveDrag =
   | null;
 
 type DropTarget = { columnId: string; beforeTaskId: string | null } | null;
-
-const DONE_COLUMN_PATTERN =
-  /^(done|complete[d]?|finish(ed)?|resolved|closed|shipped|released|delivered)$/i;
-
-function isDoneLikeColumn(name: string) {
-  return DONE_COLUMN_PATTERN.test(name.trim());
-}
 
 function celebrate() {
   const end = Date.now() + 700;
@@ -474,9 +468,7 @@ function SortableColumn({
               {dropTarget?.beforeTaskId === t.id ? <DropIndicator /> : null}
               <SortableTaskCard
                 assignee={
-                  t.assigneeId
-                    ? (membersById.get(t.assigneeId) ?? null)
-                    : null
+                  t.assigneeId ? (membersById.get(t.assigneeId) ?? null) : null
                 }
                 boardId={boardId}
                 canWrite={canWrite}
@@ -644,7 +636,9 @@ function SortableTaskCard({
 }
 
 function DropIndicator() {
-  return <div className="h-0.5 rounded-full bg-sky-400/80 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />;
+  return (
+    <div className="h-0.5 rounded-full bg-sky-400/80 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
+  );
 }
 
 function TaskCardPreview({ task }: { task: TaskRow }) {
@@ -717,11 +711,7 @@ function TaskCard({
           <span />
         )}
         {assignee ? (
-          <UserAvatar
-            image={assignee.image}
-            name={assignee.name}
-            size={20}
-          />
+          <UserAvatar image={assignee.image} name={assignee.name} size={20} />
         ) : null}
       </div>
     </div>

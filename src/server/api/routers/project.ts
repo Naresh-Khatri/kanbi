@@ -20,6 +20,7 @@ import {
   user as userTable,
 } from "@/server/db/schema";
 import { sendProjectInviteEmail } from "@/server/mail";
+import { createNotifications } from "@/server/notifications/create";
 
 export const projectRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -241,6 +242,26 @@ export const projectRouter = createTRPCRouter({
       } catch (err) {
         console.error("failed to send invite email", err);
       }
+
+      const existing = await ctx.db
+        .select({ id: userTable.id })
+        .from(userTable)
+        .where(eq(userTable.email, row.email))
+        .limit(1);
+      if (existing[0]) {
+        await createNotifications(ctx.db, [
+          {
+            userId: existing[0].id,
+            actorId: ctx.session.user.id,
+            type: "project.invited",
+            projectId: input.projectId,
+            data: {
+              projectName: proj?.name ?? "a project",
+              token: row.token,
+            },
+          },
+        ]);
+      }
       return row;
     }),
 
@@ -315,11 +336,44 @@ export const projectRouter = createTRPCRouter({
         .where(eq(projectInvite.id, inv.id));
 
       const p = await ctx.db
-        .select({ slug: project.slug })
+        .select({ slug: project.slug, name: project.name })
         .from(project)
         .where(eq(project.id, inv.projectId))
         .limit(1);
+
+      await createNotifications(ctx.db, [
+        {
+          userId: inv.invitedById,
+          actorId: userId,
+          type: "project.member_joined",
+          projectId: inv.projectId,
+          data: {
+            projectName: p[0]?.name ?? "a project",
+            memberName: ctx.session.user.name,
+          },
+        },
+      ]);
+
       return { projectSlug: p[0]?.slug ?? null };
+    }),
+
+  declineInvite: protectedProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db
+        .select()
+        .from(projectInvite)
+        .where(eq(projectInvite.token, input.token))
+        .limit(1);
+      const inv = row[0];
+      if (!inv) throw new TRPCError({ code: "NOT_FOUND" });
+      if (inv.acceptedAt) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invite already used",
+        });
+      }
+      await ctx.db.delete(projectInvite).where(eq(projectInvite.id, inv.id));
     }),
 
   members: projectProcedure.query(async ({ ctx, input }) => {

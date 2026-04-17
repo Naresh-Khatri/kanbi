@@ -5,6 +5,7 @@ import {
   AppHeaderLeft,
   AppHeaderRight,
 } from "@/app/app/_components/app-header-slot";
+import { NotificationBell } from "@/app/app/_components/notification-bell";
 import { UserMenu } from "@/app/app/_components/user-menu";
 import { KeybindProvider } from "@/components/keybinds/keybind-provider";
 import { Logo } from "@/components/ui/logo";
@@ -31,6 +32,7 @@ export default async function AppLayout({
         </div>
         <div className="flex items-center gap-3">
           <AppHeaderRight />
+          <NotificationBell />
           <UserMenu
             email={session.user.email ?? ""}
             image={session.user.image ?? null}

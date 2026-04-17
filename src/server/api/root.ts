@@ -5,6 +5,7 @@ import { checklistRouter } from "@/server/api/routers/checklist";
 import { columnRouter } from "@/server/api/routers/column";
 import { commentRouter } from "@/server/api/routers/comment";
 import { labelRouter } from "@/server/api/routers/label";
+import { notificationRouter } from "@/server/api/routers/notification";
 import { projectRouter } from "@/server/api/routers/project";
 import { realtimeRouter } from "@/server/api/routers/realtime";
 import { shareRouter } from "@/server/api/routers/share";
@@ -30,6 +31,7 @@ export const appRouter = createTRPCRouter({
   activity: activityRouter,
   realtime: realtimeRouter,
   user: userRouter,
+  notification: notificationRouter,
 });
 
 export type AppRouter = typeof appRouter;

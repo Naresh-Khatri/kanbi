@@ -18,8 +18,14 @@ export type BoardEvent = {
   ids: string[];
 };
 
+export type UserEvent = {
+  scope: "notification";
+  ids: string[];
+};
+
 type Bus = EventEmitter & {
   emitBoard: (boardId: string, event: BoardEvent) => void;
+  emitUser: (userId: string, event: UserEvent) => void;
 };
 
 const globalForBus = globalThis as unknown as { __kanbiBus?: Bus };
@@ -31,6 +37,9 @@ function createBus(): Bus {
   const bus = ee as Bus;
   bus.emitBoard = (boardId, event) => {
     ee.emit(`board:${boardId}`, event);
+  };
+  bus.emitUser = (userId, event) => {
+    ee.emit(`user:${userId}`, event);
   };
   return bus;
 }
@@ -45,5 +54,15 @@ export async function* subscribeBoard(
 ): AsyncGenerator<BoardEvent> {
   for await (const [evt] of on(bus, `board:${boardId}`, { signal })) {
     yield evt as BoardEvent;
+  }
+}
+
+/** Subscribe to a user's personal event stream (notifications, etc). */
+export async function* subscribeUser(
+  userId: string,
+  signal?: AbortSignal,
+): AsyncGenerator<UserEvent> {
+  for await (const [evt] of on(bus, `user:${userId}`, { signal })) {
+    yield evt as UserEvent;
   }
 }

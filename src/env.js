@@ -30,6 +30,7 @@ export const env = createEnv({
     SMTP_USER: z.string(),
     SMTP_PASSWORD: z.string(),
     SMTP_FROM: z.string(),
+    CRON_SECRET: z.string().optional(),
   },
 
   client: {},
@@ -53,6 +54,7 @@ export const env = createEnv({
     SMTP_USER: process.env.SMTP_USER,
     SMTP_PASSWORD: process.env.SMTP_PASSWORD,
     SMTP_FROM: process.env.SMTP_FROM,
+    CRON_SECRET: process.env.CRON_SECRET,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,

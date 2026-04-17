@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionAtEnd, positionBetween } from "@/lib/position";
 import { recordActivity } from "@/server/activity/record";
 import {
@@ -10,6 +11,8 @@ import {
   createTRPCRouter,
 } from "@/server/api/trpc";
 import { boardColumn, task, taskPriority } from "@/server/db/schema";
+import { createNotifications } from "@/server/notifications/create";
+import { resolveMentions } from "@/server/notifications/mentions";
 import { bus } from "@/server/realtime/bus";
 
 const priorityEnum = z.enum(taskPriority.enumValues);
@@ -67,6 +70,36 @@ export const taskRouter = createTRPCRouter({
           verb: "task.created",
           payload: { title: row.title },
         });
+        const pending: Parameters<typeof createNotifications>[1] = [];
+        if (row.assigneeId) {
+          pending.push({
+            userId: row.assigneeId,
+            actorId: ctx.session.user.id,
+            type: "task.assigned",
+            boardId: input.boardId,
+            taskId: row.id,
+            data: { title: row.title },
+          });
+        }
+        if (row.description) {
+          const mentioned = await resolveMentions(
+            ctx.db,
+            input.boardId,
+            row.description,
+          );
+          for (const userId of mentioned) {
+            if (userId === row.assigneeId) continue;
+            pending.push({
+              userId,
+              actorId: ctx.session.user.id,
+              type: "task.mention",
+              boardId: input.boardId,
+              taskId: row.id,
+              data: { title: row.title },
+            });
+          }
+        }
+        if (pending.length > 0) await createNotifications(ctx.db, pending);
       }
       return row;
     }),
@@ -85,6 +118,18 @@ export const taskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
       const { taskId, boardId, ...rest } = input;
+
+      const existingRows = await ctx.db
+        .select({
+          assigneeId: task.assigneeId,
+          title: task.title,
+          description: task.description,
+        })
+        .from(task)
+        .where(and(eq(task.id, taskId), eq(task.boardId, boardId)))
+        .limit(1);
+      const previous = existingRows[0];
+
       await ctx.db
         .update(task)
         .set(rest)
@@ -97,6 +142,57 @@ export const taskRouter = createTRPCRouter({
         verb: "task.updated",
         payload: { fields: Object.keys(rest) },
       });
+
+      if (
+        "assigneeId" in rest &&
+        previous &&
+        rest.assigneeId !== previous.assigneeId
+      ) {
+        const title = rest.title ?? previous.title;
+        const pending = [] as Parameters<typeof createNotifications>[1];
+        if (previous.assigneeId) {
+          pending.push({
+            userId: previous.assigneeId,
+            actorId: ctx.session.user.id,
+            type: "task.unassigned",
+            boardId,
+            taskId,
+            data: { title },
+          });
+        }
+        if (rest.assigneeId) {
+          pending.push({
+            userId: rest.assigneeId,
+            actorId: ctx.session.user.id,
+            type: "task.assigned",
+            boardId,
+            taskId,
+            data: { title },
+          });
+        }
+        if (pending.length > 0) await createNotifications(ctx.db, pending);
+      }
+
+      if ("description" in rest && previous && rest.description) {
+        const before = new Set(
+          await resolveMentions(ctx.db, boardId, previous.description ?? ""),
+        );
+        const after = await resolveMentions(ctx.db, boardId, rest.description);
+        const newly = after.filter((id) => !before.has(id));
+        if (newly.length > 0) {
+          await createNotifications(
+            ctx.db,
+            newly.map((userId) => ({
+              userId,
+              actorId: ctx.session.user.id,
+              type: "task.mention" as const,
+              boardId,
+              taskId,
+              data: { title: rest.title ?? previous.title },
+            })),
+          );
+        }
+      }
     }),
 
   delete: boardProcedure
@@ -121,13 +217,26 @@ export const taskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
       const col = await ctx.db
-        .select({ boardId: boardColumn.boardId })
+        .select({ boardId: boardColumn.boardId, name: boardColumn.name })
         .from(boardColumn)
         .where(eq(boardColumn.id, input.toColumnId))
         .limit(1);
       if (!col[0] || col[0].boardId !== input.boardId) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+
+      const existing = await ctx.db
+        .select({
+          columnId: task.columnId,
+          title: task.title,
+          reporterId: task.reporterId,
+          assigneeId: task.assigneeId,
+        })
+        .from(task)
+        .where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)))
+        .limit(1);
+      const prev = existing[0];
+
       await ctx.db
         .update(task)
         .set({
@@ -143,6 +252,32 @@ export const taskRouter = createTRPCRouter({
         verb: "task.moved",
         payload: { toColumnId: input.toColumnId },
       });
+
+      const target = col[0];
+      if (
+        prev &&
+        target &&
+        prev.columnId !== input.toColumnId &&
+        isDoneLikeColumn(target.name)
+      ) {
+        const recipients = new Set<string>();
+        if (prev.reporterId) recipients.add(prev.reporterId);
+        if (prev.assigneeId) recipients.add(prev.assigneeId);
+        recipients.delete(ctx.session.user.id);
+        if (recipients.size > 0) {
+          await createNotifications(
+            ctx.db,
+            [...recipients].map((userId) => ({
+              userId,
+              actorId: ctx.session.user.id,
+              type: "task.moved_to_done" as const,
+              boardId: input.boardId,
+              taskId: input.taskId,
+              data: { title: prev.title, columnName: target.name },
+            })),
+          );
+        }
+      }
     }),
 
   archive: boardProcedure
