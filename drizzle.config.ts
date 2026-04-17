@@ -8,5 +8,5 @@ export default {
   dbCredentials: {
     url: env.DATABASE_URL,
   },
-  tablesFilter: ["kanbi_*"],
+  tablesFilter: ["kanbi_*", "user", "session", "account", "verification"],
 } satisfies Config;
