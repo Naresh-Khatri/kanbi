@@ -29,9 +29,9 @@ export const activityRouter = createTRPCRouter({
         .where(
           input.taskId
             ? and(
-              eq(activity.boardId, input.boardId),
-              eq(activity.taskId, input.taskId),
-            )
+                eq(activity.boardId, input.boardId),
+                eq(activity.taskId, input.taskId),
+              )
             : eq(activity.boardId, input.boardId),
         )
         .orderBy(desc(activity.createdAt))

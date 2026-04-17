@@ -64,9 +64,7 @@ export function ProfileEditor() {
 
   const options = useMemo(
     () =>
-      Array.from({ length: PAGE_SIZE }, (_, i) =>
-        String(page * PAGE_SIZE + i),
-      ),
+      Array.from({ length: PAGE_SIZE }, (_, i) => String(page * PAGE_SIZE + i)),
     [page],
   );
 
@@ -204,10 +202,7 @@ export function ProfileEditor() {
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button
-            disabled={save.isPending || !name.trim()}
-            type="submit"
-          >
+          <Button disabled={save.isPending || !name.trim()} type="submit">
             {save.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>

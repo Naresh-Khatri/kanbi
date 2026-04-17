@@ -67,7 +67,8 @@ export function RichTextEditor({
 
   React.useEffect(() => {
     if (!editor) return;
-    if (editor.getHTML() !== value) editor.commands.setContent(value, { emitUpdate: false });
+    if (editor.getHTML() !== value)
+      editor.commands.setContent(value, { emitUpdate: false });
   }, [editor, value]);
 
   React.useEffect(() => {
@@ -123,14 +124,21 @@ export function RichTextEditor({
         <ToolbarButton
           active={editor.isActive("link")}
           onClick={() => {
-            const prev = editor.getAttributes("link").href as string | undefined;
+            const prev = editor.getAttributes("link").href as
+              | string
+              | undefined;
             const url = window.prompt("URL", prev ?? "https://");
             if (url === null) return;
             if (url === "") {
               editor.chain().focus().extendMarkRange("link").unsetLink().run();
               return;
             }
-            editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+            editor
+              .chain()
+              .focus()
+              .extendMarkRange("link")
+              .setLink({ href: url })
+              .run();
           }}
           label="Link"
         >

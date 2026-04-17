@@ -13,11 +13,7 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -314,11 +310,7 @@ function AssigneeMenu({
         <Button disabled={!canWrite} size="sm" variant="outline">
           {current ? (
             <>
-              <UserAvatar
-                image={current.image}
-                name={current.name}
-                size={18}
-              />
+              <UserAvatar image={current.image} name={current.name} size={18} />
               {current.name}
             </>
           ) : (
@@ -829,11 +821,7 @@ function CommentsPanel({
       <ul className="flex flex-col gap-3 text-sm">
         {(list.data ?? []).map((c) => (
           <li className="flex gap-2" key={c.id}>
-            <UserAvatar
-              image={c.authorImage}
-              name={c.authorName}
-              size={24}
-            />
+            <UserAvatar image={c.authorImage} name={c.authorName} size={24} />
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <div className="flex items-center gap-2 text-white/40 text-xs">
                 <span className="font-medium text-white/80">
