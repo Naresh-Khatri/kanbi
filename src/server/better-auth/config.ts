@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 import { env } from "@/env";
 import { db } from "@/server/db";
+import { sendPasswordResetEmail } from "@/server/mail";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -13,6 +14,9 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      await sendPasswordResetEmail(user.email, url);
+    },
   },
   socialProviders: {
     github: {

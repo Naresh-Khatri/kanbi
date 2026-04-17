@@ -111,8 +111,8 @@ function InviteTab({ projectId }: { projectId: string }) {
           </Button>
         </div>
         <p className="text-white/70 text-xs">
-          We don't send email yet — copy the invite link below and pass it
-          along.
+          We'll email the invite. You can also copy the link below to share
+          directly.
         </p>
       </form>
 

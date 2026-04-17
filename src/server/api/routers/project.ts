@@ -19,6 +19,7 @@ import {
   task,
   user as userTable,
 } from "@/server/db/schema";
+import { sendProjectInviteEmail } from "@/server/mail";
 
 export const projectRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -225,6 +226,21 @@ export const projectRouter = createTRPCRouter({
           expiresAt,
         })
         .returning();
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [proj] = await ctx.db
+        .select({ name: project.name })
+        .from(project)
+        .where(eq(project.id, input.projectId))
+        .limit(1);
+      try {
+        await sendProjectInviteEmail(row.email, {
+          token: row.token,
+          projectName: proj?.name ?? "a project",
+          inviterName: ctx.session.user.name,
+        });
+      } catch (err) {
+        console.error("failed to send invite email", err);
+      }
       return row;
     }),
 
