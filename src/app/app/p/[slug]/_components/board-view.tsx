@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { PRIORITY_META, type Priority, PriorityIcon } from "./priority";
 import { QuickAddTaskDialog } from "./quick-add-task-dialog";
@@ -95,6 +96,14 @@ export function BoardView({
   projectSlug: string;
 }) {
   const [data] = api.board.get.useSuspenseQuery({ boardId });
+  const membersQuery = api.project.members.useQuery({ projectId });
+  const membersById = useMemo(() => {
+    const map = new Map<string, { name: string; image: string | null }>();
+    for (const m of membersQuery.data ?? []) {
+      map.set(m.userId, { name: m.name, image: m.image });
+    }
+    return map;
+  }, [membersQuery.data]);
   const utils = api.useUtils();
   const { columns, tasks, labels, taskLabels, access } = data;
   const canWrite = access.canWrite;
@@ -354,6 +363,7 @@ export function BoardView({
                     dropTarget?.columnId === col.id ? dropTarget : null
                   }
                   key={col.id}
+                  membersById={membersById}
                   onAddTask={(id) => {
                     setQuickAddColumnId(id);
                     setQuickAddOpen(true);
@@ -411,6 +421,7 @@ function SortableColumn({
   dropTarget,
   onOpenTask,
   onAddTask,
+  membersById,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -419,6 +430,7 @@ function SortableColumn({
   dropTarget: DropTarget;
   onOpenTask: (taskId: string) => void;
   onAddTask: (columnId: string) => void;
+  membersById: Map<string, { name: string; image: string | null }>;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -461,6 +473,11 @@ function SortableColumn({
             <Fragment key={t.id}>
               {dropTarget?.beforeTaskId === t.id ? <DropIndicator /> : null}
               <SortableTaskCard
+                assignee={
+                  t.assigneeId
+                    ? (membersById.get(t.assigneeId) ?? null)
+                    : null
+                }
                 boardId={boardId}
                 canWrite={canWrite}
                 columnId={column.id}
@@ -588,12 +605,14 @@ function SortableTaskCard({
   columnId,
   canWrite,
   onOpen,
+  assignee,
 }: {
   boardId: string;
   task: TaskRow;
   columnId: string;
   canWrite: boolean;
   onOpen: () => void;
+  assignee: { name: string; image: string | null } | null;
 }) {
   const sortable = useSortable({
     id: task.id,
@@ -614,7 +633,12 @@ function SortableTaskCard({
       {...sortable.attributes}
       {...sortable.listeners}
     >
-      <TaskCard boardId={boardId} onOpen={onOpen} task={task} />
+      <TaskCard
+        assignee={assignee}
+        boardId={boardId}
+        onOpen={onOpen}
+        task={task}
+      />
     </div>
   );
 }
@@ -635,10 +659,12 @@ function TaskCard({
   boardId,
   task,
   onOpen,
+  assignee,
 }: {
   boardId: string;
   task: TaskRow;
   onOpen: () => void;
+  assignee: { name: string; image: string | null } | null;
 }) {
   const utils = api.useUtils();
   const remove = api.task.delete.useMutation({
@@ -672,21 +698,32 @@ function TaskCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {task.priority !== "none" ? (
-        <div
-          className="mt-2 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-          style={{
-            borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
-            color: PRIORITY_META[task.priority as Priority].color,
-          }}
-        >
-          <PriorityIcon
-            className="h-3 w-3"
-            priority={task.priority as Priority}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {task.priority !== "none" ? (
+          <div
+            className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
+            style={{
+              borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
+              color: PRIORITY_META[task.priority as Priority].color,
+            }}
+          >
+            <PriorityIcon
+              className="h-3 w-3"
+              priority={task.priority as Priority}
+            />
+            {PRIORITY_META[task.priority as Priority].label}
+          </div>
+        ) : (
+          <span />
+        )}
+        {assignee ? (
+          <UserAvatar
+            image={assignee.image}
+            name={assignee.name}
+            size={20}
           />
-          {PRIORITY_META[task.priority as Priority].label}
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

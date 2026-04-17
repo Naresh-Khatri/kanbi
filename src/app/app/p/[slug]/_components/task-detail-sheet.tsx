@@ -34,6 +34,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import {
@@ -311,7 +312,18 @@ function AssigneeMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button disabled={!canWrite} size="sm" variant="outline">
-          {current ? current.name : "Unassigned"}
+          {current ? (
+            <>
+              <UserAvatar
+                image={current.image}
+                name={current.name}
+                size={18}
+              />
+              {current.name}
+            </>
+          ) : (
+            "Unassigned"
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
@@ -321,6 +333,7 @@ function AssigneeMenu({
         </DropdownMenuItem>
         {members.map((m) => (
           <DropdownMenuItem key={m.userId} onSelect={() => onChange(m.userId)}>
+            <UserAvatar image={m.image} name={m.name} size={18} />
             {m.name}
             {value === m.userId ? (
               <Check className="ml-auto h-3.5 w-3.5" />
@@ -815,12 +828,21 @@ function CommentsPanel({
       <Label>Comments</Label>
       <ul className="flex flex-col gap-3 text-sm">
         {(list.data ?? []).map((c) => (
-          <li className="flex flex-col gap-1" key={c.id}>
-            <div className="flex items-center gap-2 text-white/40 text-xs">
-              <span className="font-medium text-white/80">{c.authorName}</span>
-              <span>{new Date(c.createdAt).toLocaleString()}</span>
+          <li className="flex gap-2" key={c.id}>
+            <UserAvatar
+              image={c.authorImage}
+              name={c.authorName}
+              size={24}
+            />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex items-center gap-2 text-white/40 text-xs">
+                <span className="font-medium text-white/80">
+                  {c.authorName}
+                </span>
+                <span>{new Date(c.createdAt).toLocaleString()}</span>
+              </div>
+              <p className="whitespace-pre-wrap">{c.body}</p>
             </div>
-            <p className="whitespace-pre-wrap">{c.body}</p>
           </li>
         ))}
       </ul>
@@ -872,6 +894,7 @@ function ActivityPanel({
             className="flex items-center gap-2 text-white/70 text-xs"
             key={a.id}
           >
+            <UserAvatar image={a.actorImage} name={a.actorName} size={18} />
             <span className="font-medium text-white/80">{a.actorName}</span>
             <span>{formatVerb(a.verb)}</span>
             <span className="ml-auto">

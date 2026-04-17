@@ -9,6 +9,7 @@ import { projectRouter } from "@/server/api/routers/project";
 import { realtimeRouter } from "@/server/api/routers/realtime";
 import { shareRouter } from "@/server/api/routers/share";
 import { taskRouter } from "@/server/api/routers/task";
+import { userRouter } from "@/server/api/routers/user";
 import {
   createCallerFactory,
   createTRPCRouter,
@@ -28,6 +29,7 @@ export const appRouter = createTRPCRouter({
   share: shareRouter,
   activity: activityRouter,
   realtime: realtimeRouter,
+  user: userRouter,
 });
 
 export type AppRouter = typeof appRouter;

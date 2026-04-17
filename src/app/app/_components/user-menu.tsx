@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
@@ -10,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { authClient } from "@/server/better-auth/client";
 
 export function UserMenu({
@@ -22,12 +24,6 @@ export function UserMenu({
   image: string | null;
 }) {
   const router = useRouter();
-  const initials = name
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 
   async function onSignOut() {
     await authClient.signOut();
@@ -38,18 +34,17 @@ export function UserMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-white/10 px-2 py-1 text-sm transition hover:bg-white/10">
-        {image ? (
-          <img alt="" className="h-6 w-6 rounded-full" src={image} />
-        ) : (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-xs">
-            {initials || "?"}
-          </span>
-        )}
+        <UserAvatar image={image} name={name} size={24} />
         <span className="pr-1">{name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <div className="px-2 py-1.5 text-white/60 text-xs">{email}</div>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/app/profile">
+            <UserRound className="h-4 w-4" /> Profile
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={onSignOut}>
           <LogOut className="h-4 w-4" /> Sign out
         </DropdownMenuItem>
