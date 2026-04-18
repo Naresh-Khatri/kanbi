@@ -29,6 +29,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
+import { positionBetween } from "@/lib/position";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -166,9 +167,47 @@ export function BoardView({
   );
 
   const moveTask = api.task.move.useMutation({
+    onMutate: async (vars) => {
+      await utils.board.get.cancel({ boardId });
+      const previous = utils.board.get.getData({ boardId });
+      utils.board.get.setData({ boardId }, (old) => {
+        if (!old) return old;
+        const nextPosition = positionBetween(vars.before, vars.after);
+        return {
+          ...old,
+          tasks: old.tasks.map((t) =>
+            t.id === vars.taskId
+              ? { ...t, columnId: vars.toColumnId, position: nextPosition }
+              : t,
+          ),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
+    },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
   const reorderColumn = api.column.reorder.useMutation({
+    onMutate: async (vars) => {
+      await utils.board.get.cancel({ boardId });
+      const previous = utils.board.get.getData({ boardId });
+      utils.board.get.setData({ boardId }, (old) => {
+        if (!old) return old;
+        const nextPosition = positionBetween(vars.before, vars.after);
+        return {
+          ...old,
+          columns: old.columns.map((c) =>
+            c.id === vars.columnId ? { ...c, position: nextPosition } : c,
+          ),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
+    },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
 
