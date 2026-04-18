@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import {
+  LastUsedBadge,
+  useLastUsedAuth,
+} from "@/components/auth/last-used";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +20,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const { lastUsed, mark } = useLastUsedAuth();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,13 +31,23 @@ export default function SignupPage() {
       toast.error(res.error.message ?? "Sign up failed");
       return;
     }
+    mark("email");
     router.push("/app");
     router.refresh();
   }
 
   async function onGithub() {
+    mark("github");
     await authClient.signIn.social({
       provider: "github",
+      callbackURL: "/app",
+    });
+  }
+
+  async function onGoogle() {
+    mark("google");
+    await authClient.signIn.social({
+      provider: "google",
       callbackURL: "/app",
     });
   }
@@ -42,7 +57,7 @@ export default function SignupPage() {
       <div className="flex flex-col gap-1">
         <h1 className="font-semibold text-2xl">Create your account</h1>
         <p className="text-sm text-white/60">
-          It takes about 20 seconds. Or continue with GitHub.
+          It takes about 20 seconds. Or continue with GitHub or Google.
         </p>
       </div>
       <form className="flex flex-col gap-3" onSubmit={onSubmit}>
@@ -79,18 +94,30 @@ export default function SignupPage() {
             value={password}
           />
         </div>
-        <Button disabled={pending} type="submit">
-          {pending ? "Creating…" : "Create account"}
-        </Button>
+        <div className="relative">
+          {lastUsed === "email" && <LastUsedBadge />}
+          <Button className="w-full" disabled={pending} type="submit">
+            {pending ? "Creating…" : "Create account"}
+          </Button>
+        </div>
       </form>
       <div className="flex items-center gap-3 text-white/40 text-xs">
         <div className="h-px flex-1 bg-white/10" />
         or
         <div className="h-px flex-1 bg-white/10" />
       </div>
-      <Button onClick={onGithub} variant="outline">
-        Continue with GitHub
-      </Button>
+      <div className="relative">
+        {lastUsed === "github" && <LastUsedBadge />}
+        <Button className="w-full" onClick={onGithub} variant="outline">
+          Continue with GitHub
+        </Button>
+      </div>
+      <div className="relative">
+        {lastUsed === "google" && <LastUsedBadge />}
+        <Button className="w-full" onClick={onGoogle} variant="outline">
+          Continue with Google
+        </Button>
+      </div>
       <p className="text-center text-sm text-white/60">
         Already have an account?{" "}
         <Link className="text-white underline" href="/login">
