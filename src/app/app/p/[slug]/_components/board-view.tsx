@@ -84,24 +84,37 @@ export function BoardView({
   boardId,
   projectId,
   projectName,
+  projectColor,
+  projectDescription,
 }: {
   boardId: string;
   projectId: string;
   projectName: string;
   projectSlug: string;
+  projectColor: string | null;
+  projectDescription: string | null;
 }) {
   const [data] = api.board.get.useSuspenseQuery({ boardId });
   const membersQuery = api.project.members.useQuery({ projectId });
+  const members = membersQuery.data ?? [];
   const membersById = useMemo(() => {
     const map = new Map<string, { name: string; image: string | null }>();
-    for (const m of membersQuery.data ?? []) {
+    for (const m of members) {
       map.set(m.userId, { name: m.name, image: m.image });
     }
     return map;
-  }, [membersQuery.data]);
+  }, [members]);
   const utils = api.useUtils();
   const { columns, tasks, labels, taskLabels, access } = data;
   const canWrite = access.canWrite;
+  const canAdmin = access.canAdmin;
+  const invitesQuery = api.project.listInvites.useQuery(
+    { projectId },
+    { enabled: canAdmin },
+  );
+  const pendingInviteCount = (invitesQuery.data ?? []).filter(
+    (i) => !i.acceptedAt,
+  ).length;
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
@@ -118,20 +131,54 @@ export function BoardView({
   useEffect(() => {
     setHeaderSlot({
       left: (
-        <h1 className="truncate font-medium text-sm text-white">
-          {projectName}
-        </h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            aria-hidden
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ background: projectColor ?? "#6366f1" }}
+          />
+          <h1 className="truncate font-medium text-sm text-white">
+            {projectName}
+          </h1>
+          {projectDescription ? (
+            <span
+              className="hidden max-w-[28ch] truncate text-white/50 text-xs md:inline"
+              title={projectDescription}
+            >
+              — {projectDescription}
+            </span>
+          ) : null}
+        </div>
       ),
-      right: access.canAdmin ? (
-        <ShareDialog boardId={boardId} projectId={projectId} />
-      ) : null,
+      right: (
+        <div className="flex items-center gap-2">
+          <MemberStack members={members} />
+          <RolePill role={access.role} />
+          {canAdmin && pendingInviteCount > 0 ? (
+            <span
+              className="rounded-full bg-amber-400/10 px-2 py-0.5 text-amber-300 text-xs"
+              title={`${pendingInviteCount} pending invite${pendingInviteCount === 1 ? "" : "s"}`}
+            >
+              {pendingInviteCount} pending
+            </span>
+          ) : null}
+          {canAdmin ? (
+            <ShareDialog boardId={boardId} projectId={projectId} />
+          ) : null}
+        </div>
+      ),
     });
     return () => clearHeaderSlot();
   }, [
     setHeaderSlot,
     clearHeaderSlot,
     projectName,
-    access.canAdmin,
+    projectColor,
+    projectDescription,
+    access.role,
+    canAdmin,
+    pendingInviteCount,
+    members,
     boardId,
     projectId,
   ]);
@@ -371,8 +418,33 @@ export function BoardView({
     [columns],
   );
 
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const doneColumnIds = new Set(
+      columns.filter((c) => isDoneLikeColumn(c.name)).map((c) => c.id),
+    );
+    let total = 0;
+    let done = 0;
+    let overdue = 0;
+    let unassigned = 0;
+    let highPriority = 0;
+    for (const t of tasks) {
+      if (t.archivedAt) continue;
+      total++;
+      const isDone = doneColumnIds.has(t.columnId);
+      if (isDone) done++;
+      if (!isDone && t.dueAt && t.dueAt.getTime() < now) overdue++;
+      if (!t.assigneeId) unassigned++;
+      if (!isDone && (t.priority === "high" || t.priority === "urgent")) {
+        highPriority++;
+      }
+    }
+    return { total, done, overdue, unassigned, highPriority };
+  }, [columns, tasks]);
+
   return (
     <main className="flex h-[calc(100vh-57px)] flex-col">
+      <StatsBar stats={stats} />
       <DndContext
         collisionDetection={collisionDetection}
         onDragCancel={canWrite ? onDragCancel : undefined}
@@ -813,5 +885,122 @@ function AddColumn({ boardId }: { boardId: string }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+type ProjectMember = {
+  userId: string;
+  name: string;
+  image: string | null;
+  role: "owner" | "editor" | "viewer";
+};
+
+function MemberStack({ members }: { members: ProjectMember[] }) {
+  if (members.length === 0) return null;
+  const MAX = 4;
+  const shown = members.slice(0, MAX);
+  const extra = members.length - shown.length;
+  const sorted = [...members].sort((a, b) => {
+    const rank = { owner: 0, editor: 1, viewer: 2 } as const;
+    const r = rank[a.role] - rank[b.role];
+    return r !== 0 ? r : a.name.localeCompare(b.name);
+  });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          aria-label={`${members.length} member${members.length === 1 ? "" : "s"}`}
+          className="flex items-center rounded-full outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30"
+          type="button"
+        >
+          <span className="flex -space-x-1.5">
+            {shown.map((m) => (
+              <span
+                className="rounded-full ring-2 ring-[#0b0b0f]"
+                key={m.userId}
+                title={`${m.name}${m.role === "owner" ? " (owner)" : ""}`}
+              >
+                <UserAvatar image={m.image} name={m.name} size={22} />
+              </span>
+            ))}
+            {extra > 0 ? (
+              <span
+                className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-white/10 text-[10px] text-white/80 ring-2 ring-[#0b0b0f]"
+                title={`${extra} more`}
+              >
+                +{extra}
+              </span>
+            ) : null}
+          </span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <div className="px-2 py-1 text-white/50 text-xs">
+          {members.length} member{members.length === 1 ? "" : "s"}
+        </div>
+        {sorted.map((m) => (
+          <div
+            className="flex items-center gap-2 px-2 py-1.5 text-sm"
+            key={m.userId}
+          >
+            <UserAvatar image={m.image} name={m.name} size={24} />
+            <span className="flex-1 truncate">{m.name}</span>
+            <span className="text-white/50 text-xs capitalize">{m.role}</span>
+          </div>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function RolePill({ role }: { role: "owner" | "editor" | "viewer" }) {
+  const styles: Record<typeof role, string> = {
+    owner: "bg-violet-400/10 text-violet-300",
+    editor: "bg-sky-400/10 text-sky-300",
+    viewer: "bg-white/5 text-white/70",
+  };
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs capitalize ${styles[role]}`}
+    >
+      {role}
+    </span>
+  );
+}
+
+function StatsBar({
+  stats,
+}: {
+  stats: {
+    total: number;
+    done: number;
+    overdue: number;
+    unassigned: number;
+    highPriority: number;
+  };
+}) {
+  if (stats.total === 0) return null;
+  const pct = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-white/5 border-b px-6 py-2 text-white/70 text-xs">
+      <span>
+        <span className="text-white">
+          {stats.done}/{stats.total}
+        </span>{" "}
+        done
+        <span className="ml-1 text-white/40">({pct}%)</span>
+      </span>
+      {stats.overdue > 0 ? (
+        <span className="text-rose-300">{stats.overdue} overdue</span>
+      ) : null}
+      {stats.highPriority > 0 ? (
+        <span className="text-amber-300">
+          {stats.highPriority} high priority
+        </span>
+      ) : null}
+      {stats.unassigned > 0 ? (
+        <span>{stats.unassigned} unassigned</span>
+      ) : null}
+    </div>
   );
 }
