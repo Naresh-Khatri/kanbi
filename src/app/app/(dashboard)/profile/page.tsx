@@ -1,7 +1,7 @@
-import { ProfileEditor } from "@/app/app/profile/profile-editor";
+import { ProfileEditor } from "@/app/app/(dashboard)/profile/profile-editor";
 import { api, HydrateClient } from "@/trpc/server";
 
-export default async function ProfilePage() {
+export default function ProfilePage() {
   void api.user.me.prefetch();
   return (
     <HydrateClient>

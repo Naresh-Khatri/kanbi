@@ -50,7 +50,6 @@ import {
 } from "./board-toolbar";
 import { PRIORITY_META, type Priority, PriorityIcon } from "./priority";
 import { QuickAddTaskDialog } from "./quick-add-task-dialog";
-import { ShareDialog } from "./share-dialog";
 import { TaskDetailSheet } from "./task-detail-sheet";
 
 type BoardData = RouterOutputs["board"]["get"];
@@ -91,16 +90,10 @@ function celebrate() {
 export function BoardView({
   boardId,
   projectId,
-  projectName,
-  projectColor,
-  projectDescription,
 }: {
   boardId: string;
   projectId: string;
-  projectName: string;
   projectSlug: string;
-  projectColor: string | null;
-  projectDescription: string | null;
 }) {
   const [data] = api.board.get.useSuspenseQuery({ boardId });
   const membersQuery = api.project.members.useQuery({ projectId });
@@ -115,81 +108,16 @@ export function BoardView({
   const utils = api.useUtils();
   const { columns, tasks, labels, taskLabels, access } = data;
   const canWrite = access.canWrite;
-  const canAdmin = access.canAdmin;
-  const invitesQuery = api.project.listInvites.useQuery(
-    { projectId },
-    { enabled: canAdmin },
-  );
-  const pendingInviteCount = (invitesQuery.data ?? []).filter(
-    (i) => !i.acceptedAt,
-  ).length;
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
-  const setHeaderSlot = useAppShell((s) => s.setHeaderSlot);
-  const clearHeaderSlot = useAppShell((s) => s.clearHeaderSlot);
   useEffect(() => {
     if (createTaskToken > 0 && columns.length > 0) {
       setQuickAddColumnId(null);
       setQuickAddOpen(true);
     }
   }, [createTaskToken, columns.length]);
-
-  useEffect(() => {
-    setHeaderSlot({
-      left: (
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            aria-hidden
-            className="h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ background: projectColor ?? "#6366f1" }}
-          />
-          <h1 className="truncate font-medium text-sm text-white">
-            {projectName}
-          </h1>
-          {projectDescription ? (
-            <span
-              className="hidden max-w-[28ch] truncate text-white/50 text-xs md:inline"
-              title={projectDescription}
-            >
-              — {projectDescription}
-            </span>
-          ) : null}
-        </div>
-      ),
-      right: (
-        <div className="flex items-center gap-2">
-          <MemberStack members={members} />
-          <RolePill role={access.role} />
-          {canAdmin && pendingInviteCount > 0 ? (
-            <span
-              className="rounded-full bg-amber-400/10 px-2 py-0.5 text-amber-300 text-xs"
-              title={`${pendingInviteCount} pending invite${pendingInviteCount === 1 ? "" : "s"}`}
-            >
-              {pendingInviteCount} pending
-            </span>
-          ) : null}
-          {canAdmin ? (
-            <ShareDialog boardId={boardId} projectId={projectId} />
-          ) : null}
-        </div>
-      ),
-    });
-    return () => clearHeaderSlot();
-  }, [
-    setHeaderSlot,
-    clearHeaderSlot,
-    projectName,
-    projectColor,
-    projectDescription,
-    access.role,
-    canAdmin,
-    pendingInviteCount,
-    members,
-    boardId,
-    projectId,
-  ]);
 
   const openTask = openTaskId
     ? (tasks.find((t) => t.id === openTaskId) ?? null)
@@ -939,86 +867,6 @@ function AddColumn({ boardId }: { boardId: string }) {
         </Button>
       </div>
     </form>
-  );
-}
-
-type ProjectMember = {
-  userId: string;
-  name: string;
-  image: string | null;
-  role: "owner" | "editor" | "viewer";
-};
-
-function MemberStack({ members }: { members: ProjectMember[] }) {
-  if (members.length === 0) return null;
-  const MAX = 4;
-  const shown = members.slice(0, MAX);
-  const extra = members.length - shown.length;
-  const sorted = [...members].sort((a, b) => {
-    const rank = { owner: 0, editor: 1, viewer: 2 } as const;
-    const r = rank[a.role] - rank[b.role];
-    return r !== 0 ? r : a.name.localeCompare(b.name);
-  });
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          aria-label={`${members.length} member${members.length === 1 ? "" : "s"}`}
-          className="flex items-center rounded-full outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30"
-          type="button"
-        >
-          <span className="flex -space-x-1.5">
-            {shown.map((m) => (
-              <span
-                className="rounded-full ring-2 ring-[#0b0b0f]"
-                key={m.userId}
-                title={`${m.name}${m.role === "owner" ? " (owner)" : ""}`}
-              >
-                <UserAvatar image={m.image} name={m.name} size={22} />
-              </span>
-            ))}
-            {extra > 0 ? (
-              <span
-                className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-white/10 text-[10px] text-white/80 ring-2 ring-[#0b0b0f]"
-                title={`${extra} more`}
-              >
-                +{extra}
-              </span>
-            ) : null}
-          </span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <div className="px-2 py-1 text-white/50 text-xs">
-          {members.length} member{members.length === 1 ? "" : "s"}
-        </div>
-        {sorted.map((m) => (
-          <div
-            className="flex items-center gap-2 px-2 py-1.5 text-sm"
-            key={m.userId}
-          >
-            <UserAvatar image={m.image} name={m.name} size={24} />
-            <span className="flex-1 truncate">{m.name}</span>
-            <span className="text-white/50 text-xs capitalize">{m.role}</span>
-          </div>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function RolePill({ role }: { role: "owner" | "editor" | "viewer" }) {
-  const styles: Record<typeof role, string> = {
-    owner: "bg-violet-400/10 text-violet-300",
-    editor: "bg-sky-400/10 text-sky-300",
-    viewer: "bg-white/5 text-white/70",
-  };
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs capitalize ${styles[role]}`}
-    >
-      {role}
-    </span>
   );
 }
 

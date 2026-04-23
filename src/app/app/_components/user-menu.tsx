@@ -13,23 +13,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { authClient } from "@/server/better-auth/client";
+import { api } from "@/trpc/react";
 
-export function UserMenu({
-  name,
-  email,
-  image,
-}: {
-  name: string;
-  email: string;
-  image: string | null;
-}) {
+export function UserMenu() {
   const router = useRouter();
+  const me = api.user.me.useQuery().data;
 
   async function onSignOut() {
     await authClient.signOut();
     router.push("/");
     router.refresh();
   }
+
+  if (!me) return null;
+  const name = me.name ?? "You";
+  const email = me.email ?? "";
+  const image = me.image ?? null;
 
   return (
     <DropdownMenu>
