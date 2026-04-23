@@ -21,6 +21,7 @@ export default async function ProjectLayout({
   if (!project) notFound();
 
   void api.user.me.prefetch();
+  void api.project.list.prefetch();
   void api.project.bySlug.prefetch({ slug });
   void api.board.get.prefetch({ boardId: project.boardId });
   void api.project.members.prefetch({ projectId: project.id });
