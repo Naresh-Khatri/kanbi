@@ -25,7 +25,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import confetti from "canvas-confetti";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
@@ -584,9 +585,8 @@ function SortableColumn({
           items={tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
-          {tasks.map((t) => (
-            <Fragment key={t.id}>
-              {dropTarget?.beforeTaskId === t.id ? <DropIndicator /> : null}
+          <AnimatePresence initial={false}>
+            {tasks.map((t) => (
               <SortableTaskCard
                 assignee={
                   t.assigneeId ? (membersById.get(t.assigneeId) ?? null) : null
@@ -594,11 +594,13 @@ function SortableColumn({
                 boardId={boardId}
                 canWrite={canWrite}
                 columnId={column.id}
+                key={t.id}
                 onOpen={() => onOpenTask(t.id)}
+                showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
                 task={t}
               />
-            </Fragment>
-          ))}
+            ))}
+          </AnimatePresence>
         </SortableContext>
         {dropTarget && dropTarget.beforeTaskId === null && tasks.length > 0 ? (
           <DropIndicator />
@@ -719,6 +721,7 @@ function SortableTaskCard({
   canWrite,
   onOpen,
   assignee,
+  showDropIndicatorBefore,
 }: {
   boardId: string;
   task: TaskRow;
@@ -726,6 +729,7 @@ function SortableTaskCard({
   canWrite: boolean;
   onOpen: () => void;
   assignee: { name: string; image: string | null } | null;
+  showDropIndicatorBefore: boolean;
 }) {
   const sortable = useSortable({
     id: task.id,
@@ -740,19 +744,29 @@ function SortableTaskCard({
   };
 
   return (
-    <div
-      ref={sortable.setNodeRef}
-      style={style}
-      {...sortable.attributes}
-      {...sortable.listeners}
+    <motion.div
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col gap-2"
+      exit={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      layout={sortable.isDragging ? false : "position"}
+      transition={{ duration: 0.18, ease: "easeOut" }}
     >
-      <TaskCard
-        assignee={assignee}
-        boardId={boardId}
-        onOpen={onOpen}
-        task={task}
-      />
-    </div>
+      {showDropIndicatorBefore ? <DropIndicator /> : null}
+      <div
+        ref={sortable.setNodeRef}
+        style={style}
+        {...sortable.attributes}
+        {...sortable.listeners}
+      >
+        <TaskCard
+          assignee={assignee}
+          boardId={boardId}
+          onOpen={onOpen}
+          task={task}
+        />
+      </div>
+    </motion.div>
   );
 }
 
