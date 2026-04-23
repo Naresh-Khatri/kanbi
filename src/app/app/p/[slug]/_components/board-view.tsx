@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionBetween } from "@/lib/position";
@@ -455,7 +456,7 @@ export function BoardView({
         onDragStart={canWrite ? onDragStart : undefined}
         sensors={sensors}
       >
-        <div className="flex-1 overflow-x-auto">
+        <div className="min-h-0 flex-1 overflow-x-auto">
           <div className="flex h-full min-w-max gap-4 p-6">
             <SortableContext
               items={sortedColumns.map((c) => c.id)}
@@ -566,7 +567,7 @@ function SortableColumn({
 
   return (
     <div
-      className="flex w-72 shrink-0 flex-col gap-3 rounded-xl bg-white/[0.03] p-3"
+      className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-xl bg-white/[0.03] p-3"
       ref={sortable.setNodeRef}
       style={style}
     >
@@ -580,35 +581,39 @@ function SortableColumn({
         }}
         taskCount={tasks.length}
       />
-      <div className="flex flex-col gap-2" ref={setDropRef}>
-        <SortableContext
-          items={tasks.map((t) => t.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <AnimatePresence initial={false}>
-            {tasks.map((t) => (
-              <SortableTaskCard
-                assignee={
-                  t.assigneeId ? (membersById.get(t.assigneeId) ?? null) : null
-                }
-                boardId={boardId}
-                canWrite={canWrite}
-                columnId={column.id}
-                key={t.id}
-                onOpen={() => onOpenTask(t.id)}
-                showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
-                task={t}
-              />
-            ))}
-          </AnimatePresence>
-        </SortableContext>
-        {dropTarget && dropTarget.beforeTaskId === null && tasks.length > 0 ? (
-          <DropIndicator />
-        ) : null}
-        {tasks.length === 0 && dropTarget ? (
-          <div className="h-16 rounded-md border border-white/40 border-dashed bg-white/[0.04]" />
-        ) : null}
-      </div>
+      <ScrollArea className="-mx-1 min-h-0 flex-1">
+        <div className="flex flex-col gap-2 px-1 pb-1" ref={setDropRef}>
+          <SortableContext
+            items={tasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <AnimatePresence initial={false}>
+              {tasks.map((t) => (
+                <SortableTaskCard
+                  assignee={
+                    t.assigneeId
+                      ? (membersById.get(t.assigneeId) ?? null)
+                      : null
+                  }
+                  boardId={boardId}
+                  canWrite={canWrite}
+                  columnId={column.id}
+                  key={t.id}
+                  onOpen={() => onOpenTask(t.id)}
+                  showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
+                  task={t}
+                />
+              ))}
+            </AnimatePresence>
+          </SortableContext>
+          {dropTarget && dropTarget.beforeTaskId === null && tasks.length > 0 ? (
+            <DropIndicator />
+          ) : null}
+          {tasks.length === 0 && dropTarget ? (
+            <div className="h-16 rounded-md border border-white/40 border-dashed bg-white/[0.04]" />
+          ) : null}
+        </div>
+      </ScrollArea>
       {canWrite ? (
         <Button
           className="justify-start text-white/70"
