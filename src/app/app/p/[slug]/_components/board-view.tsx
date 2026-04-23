@@ -25,11 +25,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import confetti from "canvas-confetti";
 import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
-import { isDoneLikeColumn } from "@/lib/column-heuristics";
-import { positionBetween } from "@/lib/position";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,7 +38,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { isDoneLikeColumn } from "@/lib/column-heuristics";
+import { positionBetween } from "@/lib/position";
 import { api, type RouterOutputs } from "@/trpc/react";
+import {
+  type BoardFilters,
+  BoardToolbar,
+  EMPTY_FILTERS,
+  hasActiveFilters,
+  taskMatchesFilters,
+} from "./board-toolbar";
 import { PRIORITY_META, type Priority, PriorityIcon } from "./priority";
 import { QuickAddTaskDialog } from "./quick-add-task-dialog";
 import { ShareDialog } from "./share-dialog";
@@ -258,16 +266,53 @@ export function BoardView({
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
 
-  const tasksByColumn = useMemo(() => {
-    const map = new Map<string, TaskRow[]>();
-    for (const c of columns) map.set(c.id, []);
-    for (const t of tasks) {
-      if (t.archivedAt) continue;
-      const list = map.get(t.columnId);
-      if (list) list.push(t);
+  const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useHotkeys(
+    "/",
+    (e) => {
+      e.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    },
+    { preventDefault: true },
+  );
+
+  const labelsByTask = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const tl of taskLabels) {
+      const set = map.get(tl.taskId) ?? new Set<string>();
+      set.add(tl.labelId);
+      map.set(tl.taskId, set);
     }
     return map;
-  }, [columns, tasks]);
+  }, [taskLabels]);
+
+  const filtersActive = hasActiveFilters(filters);
+
+  const { tasksByColumn, visibleCount, totalCount } = useMemo(() => {
+    const map = new Map<string, TaskRow[]>();
+    for (const c of columns) map.set(c.id, []);
+    let visible = 0;
+    let total = 0;
+    const empty = new Set<string>();
+    for (const t of tasks) {
+      if (t.archivedAt) continue;
+      total++;
+      if (
+        filtersActive &&
+        !taskMatchesFilters(t, labelsByTask.get(t.id) ?? empty, filters)
+      ) {
+        continue;
+      }
+      const list = map.get(t.columnId);
+      if (list) {
+        list.push(t);
+        visible++;
+      }
+    }
+    return { tasksByColumn: map, visibleCount: visible, totalCount: total };
+  }, [columns, tasks, filters, filtersActive, labelsByTask]);
 
   const [active, setActive] = useState<ActiveDrag>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
@@ -445,6 +490,15 @@ export function BoardView({
   return (
     <main className="flex h-[calc(100vh-57px)] flex-col">
       <StatsBar stats={stats} />
+      <BoardToolbar
+        filters={filters}
+        labels={labels}
+        members={members}
+        onChange={setFilters}
+        ref={searchInputRef}
+        totalCount={totalCount}
+        visibleCount={visibleCount}
+      />
       <DndContext
         collisionDetection={collisionDetection}
         onDragCancel={canWrite ? onDragCancel : undefined}
@@ -645,7 +699,7 @@ function ColumnHeader({
       {canWrite ? (
         <button
           aria-label="Drag column"
-          className="cursor-grab text-white/40 hover:text-white/80 active:cursor-grabbing p-2"
+          className="cursor-grab p-2 text-white/40 hover:text-white/80 active:cursor-grabbing"
           type="button"
           {...dragHandleProps}
         >
@@ -980,7 +1034,8 @@ function StatsBar({
   };
 }) {
   if (stats.total === 0) return null;
-  const pct = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+  const pct =
+    stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
   return (
     <div className="flex flex-wrap items-center gap-3 border-white/5 border-b px-6 py-2 text-white/70 text-xs">
       <span>
@@ -998,9 +1053,7 @@ function StatsBar({
           {stats.highPriority} high priority
         </span>
       ) : null}
-      {stats.unassigned > 0 ? (
-        <span>{stats.unassigned} unassigned</span>
-      ) : null}
+      {stats.unassigned > 0 ? <span>{stats.unassigned} unassigned</span> : null}
     </div>
   );
 }

@@ -19,4 +19,8 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
       { keys: "c", description: "New task (on board)" },
     ],
   },
+  {
+    title: "Board",
+    entries: [{ keys: "/", description: "Focus task search" }],
+  },
 ];
