@@ -25,7 +25,7 @@ export function useLastUsedAuth() {
 
 export function LastUsedBadge() {
   return (
-    <span className="-top-2 absolute right-2 rounded-full bg-white px-1.5 py-0.5 font-medium text-[10px] text-black shadow-sm">
+    <span className="absolute -top-2 right-2 rounded-full bg-white px-1.5 py-0.5 font-medium text-[10px] text-black shadow-sm">
       Last used
     </span>
   );

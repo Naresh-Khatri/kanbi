@@ -1,8 +1,8 @@
 "use client";
 
+import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
 import {
   Bold,
@@ -52,7 +52,7 @@ export function RichTextEditor({
       attributes: {
         class: cn(
           "prose prose-invert prose-sm max-w-none focus:outline-none",
-          "prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0",
+          "prose-headings:my-2 prose-li:my-0 prose-ol:my-1 prose-p:my-1 prose-ul:my-1",
           "prose-code:rounded prose-code:bg-white/10 prose-code:px-1 prose-code:py-0.5 prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
           "prose-blockquote:border-l-white/20 prose-blockquote:text-white/70",
           "prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline",
@@ -80,49 +80,50 @@ export function RichTextEditor({
   return (
     <>
       <BubbleMenu
+        className="z-[100] flex items-center gap-0.5 rounded-lg border border-white/10 bg-neutral-900 p-1 shadow-xl"
         editor={editor}
         options={{ placement: "top", strategy: "fixed", offset: 8 }}
         updateDelay={150}
-        className="z-[100] flex items-center gap-0.5 rounded-lg border border-white/10 bg-neutral-900 p-1 shadow-xl"
       >
         <ToolbarButton
           active={editor.isActive("bold")}
-          onClick={() => editor.chain().focus().toggleBold().run()}
           label="Bold"
+          onClick={() => editor.chain().focus().toggleBold().run()}
         >
           <Bold className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("italic")}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
           label="Italic"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
         >
           <Italic className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("underline")}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
           label="Underline"
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
         >
           <UnderlineIcon className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("strike")}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
           label="Strikethrough"
+          onClick={() => editor.chain().focus().toggleStrike().run()}
         >
           <Strikethrough className="h-3.5 w-3.5" />
         </ToolbarButton>
         <Divider />
         <ToolbarButton
           active={editor.isActive("code")}
-          onClick={() => editor.chain().focus().toggleCode().run()}
           label="Code"
+          onClick={() => editor.chain().focus().toggleCode().run()}
         >
           <Code className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("link")}
+          label="Link"
           onClick={() => {
             const prev = editor.getAttributes("link").href as
               | string
@@ -140,29 +141,28 @@ export function RichTextEditor({
               .setLink({ href: url })
               .run();
           }}
-          label="Link"
         >
           <LinkIcon className="h-3.5 w-3.5" />
         </ToolbarButton>
         <Divider />
         <ToolbarButton
           active={editor.isActive("bulletList")}
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
           label="Bullet list"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
         >
           <List className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("orderedList")}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
           label="Ordered list"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
         >
           <ListOrdered className="h-3.5 w-3.5" />
         </ToolbarButton>
         <ToolbarButton
           active={editor.isActive("blockquote")}
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
           label="Quote"
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
         >
           <Quote className="h-3.5 w-3.5" />
         </ToolbarButton>
@@ -185,15 +185,15 @@ function ToolbarButton({
 }) {
   return (
     <button
-      type="button"
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={onClick}
       aria-label={label}
-      title={label}
       className={cn(
         "flex h-7 w-7 items-center justify-center rounded text-white/80 transition-colors hover:bg-white/10 hover:text-white",
         active && "bg-white/15 text-white",
       )}
+      onClick={onClick}
+      onMouseDown={(e) => e.preventDefault()}
+      title={label}
+      type="button"
     >
       {children}
     </button>

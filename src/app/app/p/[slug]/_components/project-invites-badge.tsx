@@ -13,10 +13,11 @@ export function ProjectInvitesBadge() {
   ).data;
   const canAdmin = board?.access.canAdmin ?? false;
 
-  const invites = api.project.listInvites.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: canAdmin && !!project?.id },
-  ).data ?? [];
+  const invites =
+    api.project.listInvites.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: canAdmin && !!project?.id },
+    ).data ?? [];
   const pending = invites.filter((i) => !i.acceptedAt).length;
 
   if (!canAdmin || pending === 0) return null;

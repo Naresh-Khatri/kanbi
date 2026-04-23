@@ -15,10 +15,11 @@ type Role = "owner" | "editor" | "viewer";
 export function ProjectMembers() {
   const { slug } = useParams<{ slug: string }>();
   const project = api.project.bySlug.useQuery({ slug }).data;
-  const members = api.project.members.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  ).data ?? [];
+  const members =
+    api.project.members.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project?.id },
+    ).data ?? [];
 
   if (members.length === 0) return null;
 
