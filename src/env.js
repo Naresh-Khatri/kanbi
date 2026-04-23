@@ -33,6 +33,8 @@ export const env = createEnv({
     SMTP_PASSWORD: z.string(),
     SMTP_FROM: z.string(),
     CRON_SECRET: z.string().optional(),
+    // Groq API key — enables AI task drafting
+    GROQ_API_KEY: z.string().optional(),
   },
 
   client: {},
@@ -60,6 +62,7 @@ export const env = createEnv({
     SMTP_PASSWORD: process.env.SMTP_PASSWORD,
     SMTP_FROM: process.env.SMTP_FROM,
     CRON_SECRET: process.env.CRON_SECRET,
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,

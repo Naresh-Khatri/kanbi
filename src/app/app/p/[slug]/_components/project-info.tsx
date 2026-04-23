@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { useAppShell } from "@/components/keybinds/shell-store";
 import {
@@ -13,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/trpc/react";
+import { ProjectSettingsDialog } from "./project-settings-dialog";
 
 export function ProjectInfo() {
   const { slug } = useParams<{ slug: string }>();
@@ -20,6 +22,7 @@ export function ProjectInfo() {
   const requestCreateProject = useAppShell((s) => s.requestCreateProject);
   const project = api.project.bySlug.useQuery({ slug }).data;
   const projects = api.project.list.useQuery().data ?? [];
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!project) return null;
 
@@ -44,9 +47,7 @@ export function ProjectInfo() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
-          <div className="px-2 py-1 text-white/50 text-xs">
-            Switch project
-          </div>
+          <div className="px-2 py-1 text-white/50 text-xs">Switch project</div>
           {projects.map((p) => {
             const active = p.slug === slug;
             return (
@@ -80,6 +81,10 @@ export function ProjectInfo() {
           >
             <Plus className="h-4 w-4" /> New project
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+            <Settings className="h-4 w-4" /> Project settings
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       {project.description ? (
@@ -90,6 +95,12 @@ export function ProjectInfo() {
           — {project.description}
         </span>
       ) : null}
+      <ProjectSettingsDialog
+        onOpenChange={setSettingsOpen}
+        open={settingsOpen}
+        projectId={project.id}
+        slug={slug}
+      />
     </div>
   );
 }

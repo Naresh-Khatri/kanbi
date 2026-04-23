@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AppHeader } from "@/app/app/_components/app-header";
+import { ProjectAiButton } from "@/app/app/p/[slug]/_components/project-ai-button";
 import { ProjectInfo } from "@/app/app/p/[slug]/_components/project-info";
 import { ProjectInvitesBadge } from "@/app/app/p/[slug]/_components/project-invites-badge";
 import { ProjectMembers } from "@/app/app/p/[slug]/_components/project-members";
@@ -34,6 +35,7 @@ export default async function ProjectLayout({
       <AppHeader
         end={
           <>
+            <ProjectAiButton />
             <ProjectMembers />
             <ProjectRole />
             <ProjectInvitesBadge />

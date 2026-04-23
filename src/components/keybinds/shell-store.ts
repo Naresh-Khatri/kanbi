@@ -11,8 +11,11 @@ type AppShellState = {
   createProjectToken: number;
   /** Incremented to signal "create a task on the current board". */
   createTaskToken: number;
+  /** Incremented to signal "open the AI task-drafting dialog". */
+  aiImportToken: number;
   requestCreateProject: () => void;
   requestCreateTask: () => void;
+  requestAiImport: () => void;
 };
 
 export const useAppShell = create<AppShellState>((set) => ({
@@ -20,10 +23,12 @@ export const useAppShell = create<AppShellState>((set) => ({
   cheatsheetOpen: false,
   createProjectToken: 0,
   createTaskToken: 0,
+  aiImportToken: 0,
   setPaletteOpen: (open) => set({ paletteOpen: open }),
   setCheatsheetOpen: (open) => set({ cheatsheetOpen: open }),
   requestCreateProject: () =>
     set((s) => ({ createProjectToken: s.createProjectToken + 1 })),
   requestCreateTask: () =>
     set((s) => ({ createTaskToken: s.createTaskToken + 1 })),
+  requestAiImport: () => set((s) => ({ aiImportToken: s.aiImportToken + 1 })),
 }));

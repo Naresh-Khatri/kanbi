@@ -74,6 +74,8 @@ function NewProjectDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const createProjectToken = useAppShell((s) => s.createProjectToken);
 
   useEffect(() => {
@@ -86,6 +88,8 @@ function NewProjectDialog() {
       setOpen(false);
       setName("");
       setDescription("");
+      setSystemPrompt("");
+      setShowSystemPrompt(false);
       await utils.project.list.invalidate();
     },
     onError: (err) => toast.error(err.message),
@@ -112,6 +116,7 @@ function NewProjectDialog() {
             create.mutate({
               name,
               description: description || undefined,
+              systemPrompt: systemPrompt.trim() || undefined,
             });
           }}
         >
@@ -133,6 +138,31 @@ function NewProjectDialog() {
               value={description}
             />
           </div>
+          {showSystemPrompt ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="project-system-prompt">
+                AI context
+                <span className="ml-2 font-normal text-white/40 text-xs">
+                  optional — helps the task drafter understand your project
+                </span>
+              </Label>
+              <Textarea
+                id="project-system-prompt"
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="e.g. This is a SaaS for dentists. Common issues: appointment booking, payments, patient records. We triage aggressively — small fixes go straight to In Progress."
+                rows={4}
+                value={systemPrompt}
+              />
+            </div>
+          ) : (
+            <button
+              className="self-start text-white/50 text-xs transition hover:text-white/80"
+              onClick={() => setShowSystemPrompt(true)}
+              type="button"
+            >
+              + Add AI context
+            </button>
+          )}
           <DialogFooter>
             <Button
               onClick={() => setOpen(false)}

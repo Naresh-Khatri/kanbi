@@ -41,6 +41,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionBetween } from "@/lib/position";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { AiDraftDialog } from "./ai-draft-dialog";
 import {
   type BoardFilters,
   BoardToolbar,
@@ -111,13 +112,31 @@ export function BoardView({
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
+  const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
+  const aiImportToken = useAppShell((s) => s.aiImportToken);
   useEffect(() => {
     if (createTaskToken > 0 && columns.length > 0) {
       setQuickAddColumnId(null);
       setQuickAddOpen(true);
     }
   }, [createTaskToken, columns.length]);
+  useEffect(() => {
+    if (aiImportToken > 0 && columns.length > 0 && canWrite) {
+      setAiDraftOpen(true);
+    }
+  }, [aiImportToken, columns.length, canWrite]);
+
+  useHotkeys(
+    "shift+v",
+    (e) => {
+      if (!canWrite || columns.length === 0) return;
+      e.preventDefault();
+      setAiDraftOpen(true);
+    },
+    { enableOnFormTags: false },
+    [canWrite, columns.length],
+  );
 
   const openTask = openTaskId
     ? (tasks.find((t) => t.id === openTaskId) ?? null)
@@ -494,6 +513,15 @@ export function BoardView({
           onOpenChange={setQuickAddOpen}
           open={quickAddOpen}
           projectId={projectId}
+        />
+      ) : null}
+      {columns.length > 0 && canWrite ? (
+        <AiDraftDialog
+          boardId={boardId}
+          columns={columns}
+          labels={labels}
+          onOpenChange={setAiDraftOpen}
+          open={aiDraftOpen}
         />
       ) : null}
     </main>

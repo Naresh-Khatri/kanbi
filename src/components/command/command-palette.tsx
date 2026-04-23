@@ -1,7 +1,7 @@
 "use client";
 
 import { Command } from "cmdk";
-import { ArrowRight, Layers, Plus } from "lucide-react";
+import { ArrowRight, Layers, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -15,6 +15,7 @@ export function CommandPalette() {
     setPaletteOpen,
     requestCreateTask,
     requestCreateProject,
+    requestAiImport,
   } = useAppShell();
   const [query, setQuery] = useState("");
 
@@ -72,6 +73,13 @@ export function CommandPalette() {
               value="new task"
             >
               New task on current board
+            </PaletteItem>
+            <PaletteItem
+              icon={<Sparkles className="h-4 w-4" />}
+              onSelect={() => go(() => requestAiImport())}
+              value="ai import tasks client message"
+            >
+              AI: Import tasks from a message
             </PaletteItem>
             <PaletteItem
               icon={<ArrowRight className="h-4 w-4" />}

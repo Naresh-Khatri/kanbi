@@ -53,6 +53,7 @@ export const projectRouter = createTRPCRouter({
           slug: project.slug,
           name: project.name,
           description: project.description,
+          systemPrompt: project.systemPrompt,
           color: project.color,
           icon: project.icon,
           ownerId: project.ownerId,
@@ -84,6 +85,7 @@ export const projectRouter = createTRPCRouter({
       z.object({
         name: z.string().min(1).max(80),
         description: z.string().max(500).optional(),
+        systemPrompt: z.string().max(4000).optional(),
         color: z.string().optional(),
         icon: z.string().optional(),
       }),
@@ -111,6 +113,7 @@ export const projectRouter = createTRPCRouter({
             slug,
             name: input.name,
             description: input.description,
+            systemPrompt: input.systemPrompt,
             color: input.color,
             icon: input.icon,
           })
@@ -188,6 +191,7 @@ export const projectRouter = createTRPCRouter({
       z.object({
         name: z.string().min(1).max(80).optional(),
         description: z.string().max(500).nullable().optional(),
+        systemPrompt: z.string().max(4000).nullable().optional(),
         color: z.string().nullable().optional(),
         icon: z.string().nullable().optional(),
       }),

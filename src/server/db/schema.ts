@@ -116,6 +116,7 @@ export const project = createTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    systemPrompt: text("system_prompt"),
     icon: text("icon"),
     color: text("color"),
     createdAt: createdAt(),
