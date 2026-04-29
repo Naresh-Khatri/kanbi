@@ -1,10 +1,16 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -101,16 +107,7 @@ export function MembersSection({
                 type="email"
                 value={email}
               />
-              <select
-                className="rounded-md border border-white/15 bg-white/5 px-2 text-sm"
-                onChange={(e) =>
-                  setRole(e.target.value as "editor" | "viewer")
-                }
-                value={role}
-              >
-                <option value="editor">Editor</option>
-                <option value="viewer">Viewer</option>
-              </select>
+              <RoleDropdown onChange={setRole} value={role} />
               <Button disabled={invite.isPending} type="submit">
                 {invite.isPending ? "Sending…" : "Send invite"}
               </Button>
@@ -143,22 +140,19 @@ export function MembersSection({
                     </span>
                   </div>
                   {editable ? (
-                    <select
-                      aria-label={`Role for ${m.name}`}
-                      className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs capitalize disabled:opacity-50"
+                    <RoleDropdown
+                      ariaLabel={`Role for ${m.name}`}
                       disabled={busy}
-                      onChange={(e) =>
+                      onChange={(next) =>
                         setMemberRole.mutate({
                           projectId,
                           userId: m.userId,
-                          role: e.target.value as "editor" | "viewer",
+                          role: next,
                         })
                       }
-                      value={m.role}
-                    >
-                      <option value="editor">Editor</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
+                      size="sm"
+                      value={m.role as "editor" | "viewer"}
+                    />
                   ) : (
                     <span className="text-xs text-white/60 capitalize">
                       {m.role}
@@ -225,5 +219,54 @@ export function MembersSection({
         ) : null}
       </div>
     </Section>
+  );
+}
+
+const ROLE_OPTIONS: { value: "editor" | "viewer"; label: string }[] = [
+  { value: "editor", label: "Editor" },
+  { value: "viewer", label: "Viewer" },
+];
+
+function RoleDropdown({
+  value,
+  onChange,
+  disabled,
+  size = "md",
+  ariaLabel,
+}: {
+  value: "editor" | "viewer";
+  onChange: (next: "editor" | "viewer") => void;
+  disabled?: boolean;
+  size?: "sm" | "md";
+  ariaLabel?: string;
+}) {
+  const current = ROLE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+  const sizeCls =
+    size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={ariaLabel}
+        className={`inline-flex items-center justify-between gap-2 rounded-md border border-white/15 bg-white/5 text-white outline-none hover:bg-white/10 focus:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 ${sizeCls}`}
+        disabled={disabled}
+        type="button"
+      >
+        <span>{current}</span>
+        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[7rem]">
+        {ROLE_OPTIONS.map((opt) => (
+          <DropdownMenuItem
+            key={opt.value}
+            onSelect={() => onChange(opt.value)}
+          >
+            <Check
+              className={`h-3.5 w-3.5 ${opt.value === value ? "opacity-100" : "opacity-0"}`}
+            />
+            <span>{opt.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
