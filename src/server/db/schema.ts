@@ -104,6 +104,16 @@ export const taskPriority = pgEnum("kanbi_task_priority", [
   "none",
 ]);
 
+export const columnSortMode = pgEnum("kanbi_column_sort_mode", [
+  "manual",
+  "priority",
+  "assignee",
+  "dueAt",
+  "createdAt",
+]);
+
+export const columnSortDir = pgEnum("kanbi_column_sort_dir", ["asc", "desc"]);
+
 // ── Projects ────────────────────────────────────────────────────────────────
 
 export const project = createTable(
@@ -196,6 +206,8 @@ export const boardColumn = createTable(
     position: real("position").notNull(),
     wipLimit: integer("wip_limit"),
     color: text("color"),
+    sortMode: columnSortMode("sort_mode").notNull().default("manual"),
+    sortDir: columnSortDir("sort_dir").notNull().default("asc"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -24,7 +24,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import confetti from "canvas-confetti";
-import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronRight,
+  GripVertical,
+  MoreHorizontal,
+  Plus,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -35,6 +43,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -42,6 +56,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionBetween } from "@/lib/position";
+import {
+  type ColumnSortDir,
+  type ColumnSortMode,
+  compareTasks,
+} from "@/lib/task-sort";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { AiDraftDialog } from "./ai-draft-dialog";
 import {
@@ -260,8 +279,20 @@ export function BoardView({
         visible++;
       }
     }
+    const nameOf = (id: string) => membersById.get(id)?.name;
+    for (const c of columns) {
+      const list = map.get(c.id);
+      if (!list) continue;
+      list.sort(
+        compareTasks(
+          c.sortMode as ColumnSortMode,
+          c.sortDir as ColumnSortDir,
+          nameOf,
+        ),
+      );
+    }
     return { tasksByColumn: map, visibleCount: visible, totalCount: total };
-  }, [columns, tasks, filters, filtersActive, labelsByTask]);
+  }, [columns, tasks, filters, filtersActive, labelsByTask, membersById]);
 
   const [active, setActive] = useState<ActiveDrag>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
@@ -362,6 +393,15 @@ export function BoardView({
 
       const activeTask = tasks.find((t) => t.id === a.id);
       if (!activeTask) return;
+
+      const sourceColumn = columns.find((c) => c.id === activeTask.columnId);
+      if (
+        sourceColumn?.sortMode !== "manual" &&
+        activeTask.columnId === targetColumnId
+      ) {
+        toast("Clear sort to reorder tasks within this column");
+        return;
+      }
 
       const columnTasks = [...(tasksByColumn.get(targetColumnId) ?? [])].filter(
         (t) => t.id !== a.id,
@@ -630,6 +670,17 @@ function SortableColumn({
   );
 }
 
+const SORT_LABELS: Record<Exclude<ColumnSortMode, "manual">, string> = {
+  priority: "Priority",
+  assignee: "Assignee",
+  dueAt: "Due date",
+  createdAt: "Added date",
+};
+
+const SORT_MODES = Object.keys(SORT_LABELS) as Array<
+  Exclude<ColumnSortMode, "manual">
+>;
+
 function ColumnHeader({
   boardId,
   column,
@@ -658,6 +709,51 @@ function ColumnHeader({
     onSuccess: () => utils.board.get.invalidate({ boardId }),
     onError: (e) => toast.error(e.message),
   });
+  const setSort = api.column.setSort.useMutation({
+    onMutate: async (vars) => {
+      await utils.board.get.cancel({ boardId });
+      const previous = utils.board.get.getData({ boardId });
+      utils.board.get.setData({ boardId }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          columns: old.columns.map((c) =>
+            c.id === vars.columnId
+              ? { ...c, sortMode: vars.sortMode, sortDir: vars.sortDir }
+              : c,
+          ),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
+      toast.error("Couldn't update sort");
+    },
+    onSettled: () => utils.board.get.invalidate({ boardId }),
+  });
+
+  const sortMode = column.sortMode as ColumnSortMode;
+  const sortDir = column.sortDir as ColumnSortDir;
+  const sorted = sortMode !== "manual";
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setMenuOpen(false), 150);
+  };
+  useEffect(() => () => cancelClose(), []);
+
+  function applySort(mode: ColumnSortMode, dir: ColumnSortDir = sortDir) {
+    setSort.mutate({ boardId, columnId: column.id, sortMode: mode, sortDir: dir });
+  }
 
   return (
     <div className="flex items-center gap-1 px-1">
@@ -687,36 +783,119 @@ function ColumnHeader({
           />
         </form>
       ) : (
-        <button
-          className="flex-1 text-left text-sm font-medium"
-          disabled={!canWrite}
-          onClick={() => setRenaming(true)}
-          type="button"
-        >
-          {column.name}
-          <span className="ml-2 text-xs text-white/40">{taskCount}</span>
-        </button>
-      )}
-      {canWrite ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setRenaming(true)}>
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              destructive
-              onSelect={() => remove.mutate({ boardId, columnId: column.id })}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            className="min-w-0 truncate text-left text-sm font-medium"
+            disabled={!canWrite}
+            onClick={() => setRenaming(true)}
+            type="button"
+          >
+            {column.name}
+            <span className="ml-2 text-xs text-white/40">{taskCount}</span>
+          </button>
+          {sorted ? (
+            <button
+              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-sky-300/80 hover:text-sky-200"
+              onClick={() => canWrite && applySort("manual")}
+              title={
+                canWrite
+                  ? `Sorted by ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">].toLowerCase()} — click to clear`
+                  : `Sorted by ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">].toLowerCase()}`
+              }
+              type="button"
             >
-              Delete column
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+              {sortDir === "asc" ? (
+                <ArrowUp className="h-3 w-3" />
+              ) : (
+                <ArrowDown className="h-3 w-3" />
+              )}
+              <span className="lowercase">
+                {SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">]}
+              </span>
+            </button>
+          ) : null}
+        </div>
+      )}
+        {canWrite ? (
+          <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              onMouseEnter={cancelClose}
+              onMouseLeave={scheduleClose}
+            >
+              <DropdownMenuItem onSelect={() => setRenaming(true)}>
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <span>Sort by</span>
+                  <ChevronRight className="ml-2 h-3.5 w-3.5 opacity-60" />
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent
+                  onMouseEnter={cancelClose}
+                  onMouseLeave={scheduleClose}
+                >
+                  {SORT_MODES.map((m) => {
+                    const isActive = sortMode === m;
+                    return (
+                      <DropdownMenuItem
+                        className={
+                          isActive
+                            ? "bg-sky-400/15 text-sky-200 focus:bg-sky-400/25"
+                            : undefined
+                        }
+                        key={m}
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          if (isActive) {
+                            applySort(m, sortDir === "asc" ? "desc" : "asc");
+                          } else {
+                            applySort(m, "asc");
+                          }
+                        }}
+                      >
+                        <span className="flex-1">{SORT_LABELS[m]}</span>
+                        {isActive ? (
+                          sortDir === "asc" ? (
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          )
+                        ) : null}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  {sorted ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          applySort("manual");
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        <span>Clear sort</span>
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                destructive
+                onSelect={() => remove.mutate({ boardId, columnId: column.id })}
+              >
+                Delete column
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
     </div>
   );
 }
