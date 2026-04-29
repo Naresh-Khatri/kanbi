@@ -136,14 +136,20 @@ export function BoardView({
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
   const aiImportToken = useAppShell((s) => s.aiImportToken);
+  const lastCreateTaskToken = useRef(createTaskToken);
+  const lastAiImportToken = useRef(aiImportToken);
   useEffect(() => {
-    if (createTaskToken > 0 && columns.length > 0) {
+    if (createTaskToken === lastCreateTaskToken.current) return;
+    lastCreateTaskToken.current = createTaskToken;
+    if (columns.length > 0) {
       setQuickAddColumnId(null);
       setQuickAddOpen(true);
     }
   }, [createTaskToken, columns.length]);
   useEffect(() => {
-    if (aiImportToken > 0 && columns.length > 0 && canWrite) {
+    if (aiImportToken === lastAiImportToken.current) return;
+    lastAiImportToken.current = aiImportToken;
+    if (columns.length > 0 && canWrite) {
       setAiDraftOpen(true);
     }
   }, [aiImportToken, columns.length, canWrite]);
