@@ -12,7 +12,7 @@ export default function GlobalError({
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="flex max-w-md flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <h1 className="font-semibold text-lg">Something went wrong</h1>
+        <h1 className="text-lg font-semibold">Something went wrong</h1>
         <p className="text-sm text-white/60">
           {error.message || "Unexpected error."}
         </p>

@@ -203,17 +203,17 @@ export function NotificationBell() {
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 ? (
-          <span className="absolute top-1 right-1 flex min-w-[1rem] items-center justify-center rounded-full bg-sky-500 px-1 font-medium text-[10px] text-white">
+          <span className="absolute top-1 right-1 flex min-w-[1rem] items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-medium text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between border-white/10 border-b px-3 py-2">
-          <span className="font-medium text-sm">Notifications</span>
+        <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+          <span className="text-sm font-medium">Notifications</span>
           {hasUnread ? (
             <button
-              className="inline-flex items-center gap-1 text-white/60 text-xs hover:text-white"
+              className="inline-flex items-center gap-1 text-xs text-white/60 hover:text-white"
               onClick={() => markAllRead.mutate()}
               type="button"
             >
@@ -249,7 +249,7 @@ export function NotificationBell() {
                       size={28}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate-2 text-sm text-white/90 leading-snug">
+                      <p className="truncate-2 text-sm leading-snug text-white/90">
                         {text}
                       </p>
                       <p className="mt-0.5 text-[11px] text-white/40">
@@ -266,7 +266,7 @@ export function NotificationBell() {
                         <button
                           className={
                             a.variant === "primary"
-                              ? "rounded-md bg-sky-500 px-2 py-1 font-medium text-[11px] text-white transition hover:bg-sky-400"
+                              ? "rounded-md bg-sky-500 px-2 py-1 text-[11px] font-medium text-white transition hover:bg-sky-400"
                               : "rounded-md px-2 py-1 text-[11px] text-white/60 transition hover:bg-white/10 hover:text-white"
                           }
                           disabled={

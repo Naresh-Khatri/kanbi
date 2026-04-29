@@ -93,7 +93,7 @@ export function ProjectSettingsDialog({
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="settings-system-prompt">
               AI context
-              <span className="ml-2 font-normal text-white/40 text-xs">
+              <span className="ml-2 text-xs font-normal text-white/40">
                 extra context passed to the task drafter
               </span>
             </Label>

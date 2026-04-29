@@ -489,7 +489,7 @@ export function BoardView({
             <TaskCardPreview task={active.task} />
           ) : active?.kind === "column" ? (
             <div className="w-72 rounded-xl bg-white/[0.06] p-3 shadow-xl">
-              <div className="font-medium text-sm">{active.column.name}</div>
+              <div className="text-sm font-medium">{active.column.name}</div>
             </div>
           ) : null}
         </DragOverlay>
@@ -606,11 +606,13 @@ function SortableColumn({
               ))}
             </AnimatePresence>
           </SortableContext>
-          {dropTarget && dropTarget.beforeTaskId === null && tasks.length > 0 ? (
+          {dropTarget &&
+          dropTarget.beforeTaskId === null &&
+          tasks.length > 0 ? (
             <DropIndicator />
           ) : null}
           {tasks.length === 0 && dropTarget ? (
-            <div className="h-16 rounded-md border border-white/40 border-dashed bg-white/[0.04]" />
+            <div className="h-16 rounded-md border border-dashed border-white/40 bg-white/[0.04]" />
           ) : null}
         </div>
       </ScrollArea>
@@ -686,13 +688,13 @@ function ColumnHeader({
         </form>
       ) : (
         <button
-          className="flex-1 text-left font-medium text-sm"
+          className="flex-1 text-left text-sm font-medium"
           disabled={!canWrite}
           onClick={() => setRenaming(true)}
           type="button"
         >
           {column.name}
-          <span className="ml-2 text-white/40 text-xs">{taskCount}</span>
+          <span className="ml-2 text-xs text-white/40">{taskCount}</span>
         </button>
       )}
       {canWrite ? (
@@ -932,7 +934,7 @@ function StatsBar({
   const pct =
     stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
   return (
-    <div className="flex flex-wrap items-center gap-3 border-white/5 border-b px-6 py-2 text-white/70 text-xs">
+    <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-6 py-2 text-xs text-white/70">
       <span>
         <span className="text-white">
           {stats.done}/{stats.total}

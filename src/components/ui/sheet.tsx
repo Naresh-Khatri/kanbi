@@ -15,10 +15,10 @@ export const SheetContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay className="data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in" />
+    <DialogPrimitive.Overlay className="data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=open]:animate-in fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
     <DialogPrimitive.Content
       className={cn(
-        "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right fixed top-0 right-0 z-50 flex h-full w-full max-w-xl flex-col gap-4 border-white/10 border-l bg-[#0f1016] p-6 text-white shadow-xl transition data-[state=closed]:animate-out data-[state=open]:animate-in",
+        "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=open]:animate-in fixed top-0 right-0 z-50 flex h-full w-full max-w-xl flex-col gap-4 border-l border-white/10 bg-[#0f1016] p-6 text-white shadow-xl transition",
         className,
       )}
       ref={ref}
@@ -48,7 +48,7 @@ export const SheetTitle = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
-    className={cn("font-semibold text-lg", className)}
+    className={cn("text-lg font-semibold", className)}
     ref={ref}
     {...props}
   />

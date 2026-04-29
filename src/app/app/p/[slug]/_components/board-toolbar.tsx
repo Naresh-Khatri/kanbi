@@ -162,8 +162,8 @@ export const BoardToolbar = forwardRef<
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-white/5 border-b px-6 py-2">
-      <div className="relative min-w-0 max-w-sm flex-1">
+    <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-6 py-2">
+      <div className="relative max-w-sm min-w-0 flex-1">
         <Search
           aria-hidden
           className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/40"
@@ -220,7 +220,7 @@ export const BoardToolbar = forwardRef<
         label="Labels"
       >
         {labels.length === 0 ? (
-          <div className="px-2 py-1.5 text-white/50 text-xs">No labels yet</div>
+          <div className="px-2 py-1.5 text-xs text-white/50">No labels yet</div>
         ) : (
           labels.map((l) => {
             const checked = filters.labelIds.includes(l.id);
@@ -313,7 +313,7 @@ export const BoardToolbar = forwardRef<
           >
             Clear
           </Button>
-          <span className="ml-auto text-white/60 text-xs">
+          <span className="ml-auto text-xs text-white/60">
             {hidden > 0 ? `${hidden} hidden` : "Showing all"}
           </span>
         </>

@@ -110,7 +110,7 @@ function InviteTab({ projectId }: { projectId: string }) {
             Invite
           </Button>
         </div>
-        <p className="text-white/70 text-xs">
+        <p className="text-xs text-white/70">
           We'll email the invite. You can also copy the link below to share
           directly.
         </p>
@@ -128,7 +128,7 @@ function InviteTab({ projectId }: { projectId: string }) {
                   key={i.id}
                 >
                   <span className="w-44 truncate">{i.email}</span>
-                  <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/70 text-xs">
+                  <span className="rounded bg-white/5 px-1.5 py-0.5 text-xs text-white/70">
                     {i.role}
                   </span>
                   <button

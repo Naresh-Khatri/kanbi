@@ -50,7 +50,7 @@ function ResetPasswordForm() {
   if (!token || error) {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-6">
-        <h1 className="font-semibold text-2xl">Link expired</h1>
+        <h1 className="text-2xl font-semibold">Link expired</h1>
         <p className="text-sm text-white/60">
           This reset link is invalid or has expired. Request a new one.
         </p>
@@ -64,7 +64,7 @@ function ResetPasswordForm() {
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div className="flex flex-col gap-1">
-        <h1 className="font-semibold text-2xl">Choose a new password</h1>
+        <h1 className="text-2xl font-semibold">Choose a new password</h1>
       </div>
       <form className="flex flex-col gap-3" onSubmit={onSubmit}>
         <div className="flex flex-col gap-1.5">

@@ -51,7 +51,7 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div className="flex flex-col gap-1">
-        <h1 className="font-semibold text-2xl">Sign in to Kanbi</h1>
+        <h1 className="text-2xl font-semibold">Sign in to Kanbi</h1>
         <p className="text-sm text-white/60">
           Welcome back. Use email or continue with GitHub or Google.
         </p>
@@ -72,7 +72,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
             <Link
-              className="text-white/60 text-xs hover:text-white"
+              className="text-xs text-white/60 hover:text-white"
               href="/forgot-password"
             >
               Forgot password?
@@ -94,7 +94,7 @@ export default function LoginPage() {
           </Button>
         </div>
       </form>
-      <div className="flex items-center gap-3 text-white/40 text-xs">
+      <div className="flex items-center gap-3 text-xs text-white/40">
         <div className="h-px flex-1 bg-white/10" />
         or
         <div className="h-px flex-1 bg-white/10" />

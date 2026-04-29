@@ -28,7 +28,7 @@ export function ProjectsDashboard() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-semibold text-2xl">Projects</h1>
+          <h1 className="text-2xl font-semibold">Projects</h1>
           <p className="text-sm text-white/60">
             Create a project, get a board, start shipping.
           </p>
@@ -37,7 +37,7 @@ export function ProjectsDashboard() {
       </div>
 
       {projects.length === 0 ? (
-        <div className="rounded-xl border border-white/10 border-dashed p-10 text-center text-white/60">
+        <div className="rounded-xl border border-dashed border-white/10 p-10 text-center text-white/60">
           No projects yet. Create your first one.
         </div>
       ) : (
@@ -142,7 +142,7 @@ function NewProjectDialog() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="project-system-prompt">
                 AI context
-                <span className="ml-2 font-normal text-white/40 text-xs">
+                <span className="ml-2 text-xs font-normal text-white/40">
                   optional — helps the task drafter understand your project
                 </span>
               </Label>
@@ -156,7 +156,7 @@ function NewProjectDialog() {
             </div>
           ) : (
             <button
-              className="self-start text-white/50 text-xs transition hover:text-white/80"
+              className="self-start text-xs text-white/50 transition hover:text-white/80"
               onClick={() => setShowSystemPrompt(true)}
               type="button"
             >

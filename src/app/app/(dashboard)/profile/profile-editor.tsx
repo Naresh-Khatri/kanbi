@@ -87,7 +87,7 @@ export function ProfileEditor() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="font-semibold text-2xl">Profile</h1>
+        <h1 className="text-2xl font-semibold">Profile</h1>
         <p className="text-sm text-white/60">
           Pick a name and avatar. Avatars use Lorelei from DiceBear.
         </p>
@@ -102,7 +102,7 @@ export function ProfileEditor() {
           />
           <div className="flex min-w-0 flex-col gap-0.5">
             <div className="truncate font-medium">{name || "Your name"}</div>
-            <div className="truncate text-white/60 text-xs">{me?.email}</div>
+            <div className="truncate text-xs text-white/60">{me?.email}</div>
           </div>
         </div>
 
@@ -120,7 +120,7 @@ export function ProfileEditor() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <Label>Pick an avatar</Label>
-            <div className="flex items-center gap-1 text-white/60 text-xs">
+            <div className="flex items-center gap-1 text-xs text-white/60">
               <button
                 aria-label="Previous page"
                 className="rounded p-1 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent"

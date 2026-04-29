@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div className="flex flex-col gap-1">
-        <h1 className="font-semibold text-2xl">Forgot your password?</h1>
+        <h1 className="text-2xl font-semibold">Forgot your password?</h1>
         <p className="text-sm text-white/60">
           Enter your email and we'll send you a reset link.
         </p>

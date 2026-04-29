@@ -20,7 +20,7 @@ export function ProjectAiButton() {
   return (
     <button
       aria-label="Draft tasks with AI"
-      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-white/70 text-xs transition hover:border-white/20 hover:text-white"
+      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70 transition hover:border-white/20 hover:text-white"
       onClick={() => requestAiImport()}
       title="Draft tasks from a message (Shift+V)"
       type="button"

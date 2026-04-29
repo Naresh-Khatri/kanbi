@@ -208,7 +208,7 @@ export function AiDraftDialog({
           }
         }}
       >
-        <DialogHeader className="border-white/10 border-b px-5 py-3">
+        <DialogHeader className="border-b border-white/10 px-5 py-3">
           <DialogTitle className="flex items-center gap-2 text-sm text-white/80">
             <Sparkles className="h-4 w-4 text-white/60" />
             Draft tasks from a message
@@ -258,7 +258,7 @@ export function AiDraftDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-white/10 border-t px-5 py-3">
+        <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
           {issues === null ? (
             <>
               <span className="text-[11px] text-white/40">
@@ -280,7 +280,7 @@ export function AiDraftDialog({
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2 text-white/70 text-xs">
+              <div className="flex items-center gap-2 text-xs text-white/70">
                 <span>Create in</span>
                 <ColumnPicker
                   columns={sortedColumns}
@@ -346,7 +346,7 @@ function RawPreview({
 }) {
   return (
     <button
-      className="flex items-start gap-2 border-white/10 border-b bg-white/[0.02] px-5 py-2 text-left text-white/50 text-xs transition hover:bg-white/[0.04]"
+      className="flex items-start gap-2 border-b border-white/10 bg-white/[0.02] px-5 py-2 text-left text-xs text-white/50 transition hover:bg-white/[0.04]"
       onClick={onToggle}
       type="button"
     >
@@ -400,7 +400,7 @@ function IssueCard({
             className={cn("h-2 w-2 shrink-0 rounded-full", meta.dot)}
             title={meta.label}
           />
-          <span className="truncate text-white/70 text-xs">
+          <span className="truncate text-xs text-white/70">
             {issue.summary}
           </span>
         </div>
@@ -437,7 +437,7 @@ function IssueCard({
 
           <div className="flex flex-col gap-2 px-4 pb-3">
             <Input
-              className="border-0 bg-transparent px-0 font-medium text-sm focus-visible:ring-0"
+              className="border-0 bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
               onChange={(e) => onVariantEdit({ title: e.target.value })}
               placeholder="Task title"
               value={variant.title}
@@ -581,7 +581,7 @@ function ColumnPicker({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-sm text-white transition hover:bg-white/5"
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium text-white transition hover:bg-white/5"
           type="button"
         >
           {current?.name ?? "column"}

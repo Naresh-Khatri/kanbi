@@ -34,13 +34,13 @@ export function AcceptInvite({ token }: { token: string }) {
 
   return (
     <div className="flex max-w-sm flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-      <h1 className="font-semibold text-lg">Project invitation</h1>
+      <h1 className="text-lg font-semibold">Project invitation</h1>
       {status === "idle" ? (
         <p className="text-sm text-white/60">Accepting invite…</p>
       ) : null}
       {status === "err" ? (
         <>
-          <p className="text-red-400 text-sm">{message}</p>
+          <p className="text-sm text-red-400">{message}</p>
           <Button onClick={() => router.push("/app")} variant="outline">
             Go to dashboard
           </Button>

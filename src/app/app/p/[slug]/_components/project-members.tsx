@@ -37,7 +37,7 @@ export function ProjectMembers() {
       <DropdownMenuTrigger asChild>
         <button
           aria-label={`${members.length} member${members.length === 1 ? "" : "s"}`}
-          className="flex items-center rounded-full outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30"
+          className="flex items-center rounded-full transition outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/30"
           type="button"
         >
           <span className="flex -space-x-1.5">
@@ -62,7 +62,7 @@ export function ProjectMembers() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        <div className="px-2 py-1 text-white/50 text-xs">
+        <div className="px-2 py-1 text-xs text-white/50">
           {members.length} member{members.length === 1 ? "" : "s"}
         </div>
         {sorted.map((m) => (
@@ -72,7 +72,7 @@ export function ProjectMembers() {
           >
             <UserAvatar image={m.image} name={m.name} size={24} />
             <span className="flex-1 truncate">{m.name}</span>
-            <span className="text-white/50 text-xs capitalize">{m.role}</span>
+            <span className="text-xs text-white/50 capitalize">{m.role}</span>
           </div>
         ))}
       </DropdownMenuContent>

@@ -37,7 +37,7 @@ export function UserMenu() {
         <span className="pr-1">{name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <div className="px-2 py-1.5 text-white/60 text-xs">{email}</div>
+        <div className="px-2 py-1.5 text-xs text-white/60">{email}</div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/app/profile">

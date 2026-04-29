@@ -20,7 +20,7 @@ export function KeybindCheatsheet() {
         <div className="flex flex-col gap-4">
           {KEYBIND_GROUPS.map((g) => (
             <div className="flex flex-col gap-1.5" key={g.title}>
-              <div className="text-white/50 text-xs uppercase tracking-wide">
+              <div className="text-xs tracking-wide text-white/50 uppercase">
                 {g.title}
               </div>
               <ul className="flex flex-col gap-1 text-sm">
@@ -30,7 +30,7 @@ export function KeybindCheatsheet() {
                     key={e.keys}
                   >
                     <span className="text-white/80">{e.description}</span>
-                    <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/80 text-xs">
+                    <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/80">
                       {e.keys}
                     </kbd>
                   </li>

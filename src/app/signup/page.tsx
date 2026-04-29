@@ -52,7 +52,7 @@ export default function SignupPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div className="flex flex-col gap-1">
-        <h1 className="font-semibold text-2xl">Create your account</h1>
+        <h1 className="text-2xl font-semibold">Create your account</h1>
         <p className="text-sm text-white/60">
           It takes about 20 seconds. Or continue with GitHub or Google.
         </p>
@@ -98,7 +98,7 @@ export default function SignupPage() {
           </Button>
         </div>
       </form>
-      <div className="flex items-center gap-3 text-white/40 text-xs">
+      <div className="flex items-center gap-3 text-xs text-white/40">
         <div className="h-px flex-1 bg-white/10" />
         or
         <div className="h-px flex-1 bg-white/10" />

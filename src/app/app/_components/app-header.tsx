@@ -12,10 +12,10 @@ export function AppHeader({
   end?: React.ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-40 flex h-[57px] items-center justify-between gap-3 border-white/10 border-b bg-[#0b0b0f]/80 px-6 backdrop-blur">
+    <header className="sticky top-0 z-40 flex h-[57px] items-center justify-between gap-3 border-b border-white/10 bg-[#0b0b0f]/80 px-6 backdrop-blur">
       <div className="flex min-w-0 items-center gap-3">
         <Link
-          className="flex items-center gap-2 font-semibold text-lg"
+          className="flex items-center gap-2 text-lg font-semibold"
           href="/app"
         >
           <Logo className="h-5 w-5" />

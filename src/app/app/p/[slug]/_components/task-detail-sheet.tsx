@@ -255,7 +255,7 @@ function MetaLabel({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-1.5 pt-1.5 text-white/70 text-xs uppercase tracking-wide">
+    <div className="flex items-center gap-1.5 pt-1.5 text-xs tracking-wide text-white/70 uppercase">
       {icon}
       {children}
     </div>
@@ -490,7 +490,7 @@ function ChecklistPanel({
             </span>
             {canWrite ? (
               <button
-                className="text-white/40 opacity-0 transition hover:text-white group-hover:opacity-100"
+                className="text-white/40 opacity-0 transition group-hover:opacity-100 hover:text-white"
                 onClick={() => remove.mutate({ boardId, itemId: it.id })}
                 type="button"
               >
@@ -666,7 +666,7 @@ function AttachmentsPanel({
             >
               {a.filename}
             </a>
-            <span className="text-white/40 text-xs">
+            <span className="text-xs text-white/40">
               {formatBytes(a.sizeBytes)}
             </span>
             {canWrite ? (
@@ -684,7 +684,7 @@ function AttachmentsPanel({
           <li className="flex items-center gap-2 text-white/60" key={p.id}>
             <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
             <span className="flex-1 truncate">{p.filename}</span>
-            <span className="text-white/40 text-xs">Uploading…</span>
+            <span className="text-xs text-white/40">Uploading…</span>
           </li>
         ))}
       </ul>
@@ -763,7 +763,7 @@ function ImageLightbox({
           ) : null}
         </div>
         {images.length > 1 ? (
-          <div className="flex shrink-0 gap-2 overflow-x-auto border-white/10 border-t p-3">
+          <div className="flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 p-3">
             {images.map((img, i) => (
               <button
                 className={cn(
@@ -823,7 +823,7 @@ function CommentsPanel({
           <li className="flex gap-2" key={c.id}>
             <UserAvatar image={c.authorImage} name={c.authorName} size={24} />
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex items-center gap-2 text-white/40 text-xs">
+              <div className="flex items-center gap-2 text-xs text-white/40">
                 <span className="font-medium text-white/80">
                   {c.authorName}
                 </span>
@@ -879,7 +879,7 @@ function ActivityPanel({
       <ul className="flex flex-col gap-1 text-sm">
         {list.data.map((a) => (
           <li
-            className="flex items-center gap-2 text-white/70 text-xs"
+            className="flex items-center gap-2 text-xs text-white/70"
             key={a.id}
           >
             <UserAvatar image={a.actorImage} name={a.actorName} size={18} />

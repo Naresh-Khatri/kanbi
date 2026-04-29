@@ -21,9 +21,9 @@ export function PublicBoardView({ token }: { token: string }) {
 
   return (
     <main className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 flex items-center justify-between border-white/5 border-b bg-[#0b0b0f]/80 px-6 py-3 backdrop-blur">
-        <h1 className="font-semibold text-lg">{board.projectName}</h1>
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-white/60 text-xs">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-[#0b0b0f]/80 px-6 py-3 backdrop-blur">
+        <h1 className="text-lg font-semibold">{board.projectName}</h1>
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs text-white/60">
           <Eye className="h-3.5 w-3.5" /> View only
         </div>
       </header>
@@ -35,8 +35,8 @@ export function PublicBoardView({ token }: { token: string }) {
               key={col.id}
             >
               <div className="flex items-center gap-2 px-1">
-                <span className="font-medium text-sm">{col.name}</span>
-                <span className="text-white/40 text-xs">
+                <span className="text-sm font-medium">{col.name}</span>
+                <span className="text-xs text-white/40">
                   {tasksByColumn.get(col.id)?.length ?? 0}
                 </span>
               </div>
@@ -48,7 +48,7 @@ export function PublicBoardView({ token }: { token: string }) {
                   >
                     <p className="text-sm leading-snug">{t.title}</p>
                     {t.priority !== "none" ? (
-                      <div className="mt-2 inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/70 uppercase tracking-wide">
+                      <div className="mt-2 inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[10px] tracking-wide text-white/70 uppercase">
                         {t.priority}
                       </div>
                     ) : null}

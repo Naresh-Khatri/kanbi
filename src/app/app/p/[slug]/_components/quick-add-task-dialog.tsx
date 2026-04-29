@@ -237,7 +237,7 @@ export function QuickAddTaskDialog({
         }}
       >
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="border-white/10 border-b px-5 py-3">
+          <DialogHeader className="border-b border-white/10 px-5 py-3">
             <DialogTitle className="text-sm text-white/70">
               New task in{" "}
               <ColumnPicker
@@ -253,7 +253,7 @@ export function QuickAddTaskDialog({
 
           <div className="flex flex-col gap-3 px-5 py-4">
             <Input
-              className="border-0 bg-transparent px-0 font-medium text-base focus-visible:ring-0"
+              className="border-0 bg-transparent px-0 text-base font-medium focus-visible:ring-0"
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -331,10 +331,10 @@ export function QuickAddTaskDialog({
                 />
               </MetaChip>
 
-              <label className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-white/70 text-xs transition focus-within:border-white/30 hover:border-white/20 hover:text-white">
+              <label className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70 transition focus-within:border-white/30 hover:border-white/20 hover:text-white">
                 <CalendarDays className="h-3.5 w-3.5" />
                 <input
-                  className="w-[110px] bg-transparent text-xs outline-none [color-scheme:dark]"
+                  className="w-[110px] bg-transparent text-xs [color-scheme:dark] outline-none"
                   onChange={(e) => setDueAt(e.target.value)}
                   type="date"
                   value={dueAt}
@@ -364,7 +364,7 @@ export function QuickAddTaskDialog({
               </MetaChip>
 
               <button
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-white/70 text-xs transition hover:border-white/20 hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70 transition hover:border-white/20 hover:text-white"
                 onClick={() => fileInputRef.current?.click()}
                 type="button"
               >
@@ -397,8 +397,8 @@ export function QuickAddTaskDialog({
             ) : null}
           </div>
 
-          <div className="flex items-center justify-between border-white/10 border-t px-5 py-3">
-            <label className="inline-flex cursor-pointer select-none items-center gap-2 text-white/70 text-xs">
+          <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-white/70 select-none">
               <CheckSquare
                 checked={keepOpen}
                 onChange={() => setKeepOpen((v) => !v)}
@@ -462,7 +462,7 @@ function MetaChip({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-white/70 text-xs capitalize transition hover:border-white/20 hover:text-white"
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70 capitalize transition hover:border-white/20 hover:text-white"
           type="button"
         >
           {icon}
@@ -488,7 +488,7 @@ function ColumnPicker({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="ml-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-sm text-white transition hover:bg-white/5"
+          className="ml-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium text-white transition hover:bg-white/5"
           type="button"
         >
           {current?.name ?? "column"}

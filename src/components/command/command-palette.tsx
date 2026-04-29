@@ -52,12 +52,12 @@ export function CommandPalette() {
           placeholder="Type a command or search projects…"
           value={query}
         />
-        <Command.List className="max-h-[50vh] overflow-y-auto border-white/5 border-t py-1">
+        <Command.List className="max-h-[50vh] overflow-y-auto border-t border-white/5 py-1">
           <Command.Empty className="px-4 py-6 text-center text-sm text-white/50">
             No results.
           </Command.Empty>
           <Command.Group
-            className="px-2 py-1 text-white/40 text-xs uppercase tracking-wide"
+            className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
             heading="Actions"
           >
             <PaletteItem
@@ -92,7 +92,7 @@ export function CommandPalette() {
 
           {projects.data && projects.data.length > 0 ? (
             <Command.Group
-              className="px-2 py-1 text-white/40 text-xs uppercase tracking-wide"
+              className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
               heading="Projects"
             >
               {projects.data.map((p) => (

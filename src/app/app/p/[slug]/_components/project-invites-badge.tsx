@@ -24,7 +24,7 @@ export function ProjectInvitesBadge() {
 
   return (
     <span
-      className="rounded-full bg-amber-400/10 px-2 py-0.5 text-amber-300 text-xs"
+      className="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs text-amber-300"
       title={`${pending} pending invite${pending === 1 ? "" : "s"}`}
     >
       {pending} pending

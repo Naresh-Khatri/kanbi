@@ -32,7 +32,7 @@ export function ProjectInfo() {
         <DropdownMenuTrigger asChild>
           <button
             aria-label="Switch project"
-            className="group flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 outline-none transition hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/20"
+            className="group flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/20"
             type="button"
           >
             <span
@@ -40,14 +40,14 @@ export function ProjectInfo() {
               className="h-2.5 w-2.5 shrink-0 rounded-full"
               style={{ background: project.color ?? "#6366f1" }}
             />
-            <h1 className="truncate font-medium text-sm text-white">
+            <h1 className="truncate text-sm font-medium text-white">
               {project.name}
             </h1>
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-white/40 group-hover:text-white/70" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
-          <div className="px-2 py-1 text-white/50 text-xs">Switch project</div>
+          <div className="px-2 py-1 text-xs text-white/50">Switch project</div>
           {projects.map((p) => {
             const active = p.slug === slug;
             return (
@@ -89,7 +89,7 @@ export function ProjectInfo() {
       </DropdownMenu>
       {project.description ? (
         <span
-          className="hidden max-w-[28ch] truncate text-white/50 text-xs md:inline"
+          className="hidden max-w-[28ch] truncate text-xs text-white/50 md:inline"
           title={project.description}
         >
           — {project.description}

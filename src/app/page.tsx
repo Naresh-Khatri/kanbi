@@ -13,7 +13,7 @@ export default async function Home() {
       <div className="flex flex-col items-center gap-4 text-center">
         <div className="flex gap-4">
           <Logo className="h-18 w-18 pb-2" />
-          <h1 className="font-extrabold text-5xl tracking-tight sm:text-6xl">
+          <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
             Kanbi
           </h1>
         </div>
