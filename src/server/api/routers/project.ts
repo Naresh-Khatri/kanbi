@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { shareToken, slugify, slugSuffix } from "@/lib/ids";
@@ -9,6 +9,7 @@ import {
   projectProcedure,
   protectedProcedure,
 } from "@/server/api/trpc";
+import type { ProjectRole } from "@/server/api/permissions";
 import {
   board,
   boardColumn,
@@ -36,9 +37,18 @@ export const projectRouter = createTRPCRouter({
         ownerId: project.ownerId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
+        role: sql<ProjectRole>`case when ${project.ownerId} = ${userId} then 'owner'::kanbi_project_role else ${projectMember.role} end`.as(
+          "role",
+        ),
       })
       .from(project)
-      .leftJoin(projectMember, eq(projectMember.projectId, project.id))
+      .leftJoin(
+        projectMember,
+        and(
+          eq(projectMember.projectId, project.id),
+          eq(projectMember.userId, userId),
+        ),
+      )
       .where(or(eq(project.ownerId, userId), eq(projectMember.userId, userId)))
       .orderBy(desc(project.updatedAt));
   }),
@@ -205,6 +215,24 @@ export const projectRouter = createTRPCRouter({
   delete: projectProcedure.mutation(async ({ ctx, input }) => {
     assertCanAdmin(ctx.access);
     await ctx.db.delete(project).where(eq(project.id, input.projectId));
+  }),
+
+  leave: projectProcedure.mutation(async ({ ctx, input }) => {
+    if (ctx.access.role === "owner") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Owners can't leave their own project. Transfer ownership or delete the project instead.",
+      });
+    }
+    await ctx.db
+      .delete(projectMember)
+      .where(
+        and(
+          eq(projectMember.projectId, input.projectId),
+          eq(projectMember.userId, ctx.session.user.id),
+        ),
+      );
   }),
 
   invite: projectProcedure

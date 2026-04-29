@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { api } from "@/trpc/react";
@@ -23,11 +24,12 @@ export function ProjectInvitesBadge() {
   if (!canAdmin || pending === 0) return null;
 
   return (
-    <span
-      className="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs text-amber-300"
+    <Link
+      className="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs text-amber-300 hover:bg-amber-400/20"
+      href={`/app/p/${slug}/settings#members`}
       title={`${pending} pending invite${pending === 1 ? "" : "s"}`}
     >
       {pending} pending
-    </span>
+    </Link>
   );
 }

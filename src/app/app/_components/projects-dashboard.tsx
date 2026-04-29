@@ -1,10 +1,11 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Settings, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { DeleteProjectDialog } from "@/app/app/p/[slug]/settings/_components/delete-project-dialog";
 import { useAppShell } from "@/components/keybinds/shell-store";
 
 import { Button } from "@/components/ui/button";
@@ -17,9 +18,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/trpc/react";
+
+type ProjectCard = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  role: "owner" | "editor" | "viewer";
+};
 
 export function ProjectsDashboard() {
   const [projects] = api.project.list.useSuspenseQuery();
@@ -43,29 +59,78 @@ export function ProjectsDashboard() {
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
-            <li key={p.id}>
-              <Link
-                className="block rounded-xl border border-white/10 bg-white/[0.02] p-5 transition hover:border-white/20 hover:bg-white/5"
-                href={`/app/p/${p.slug}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ background: p.color ?? "#6366f1" }}
-                  />
-                  <span className="font-medium">{p.name}</span>
-                </div>
-                {p.description ? (
-                  <p className="mt-2 line-clamp-2 text-sm text-white/60">
-                    {p.description}
-                  </p>
-                ) : null}
-              </Link>
-            </li>
+            <ProjectCardItem key={p.id} project={p} />
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+function ProjectCardItem({ project }: { project: ProjectCard }) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const isOwner = project.role === "owner";
+
+  return (
+    <li className="relative">
+      <Link
+        className="block rounded-xl border border-white/10 bg-white/[0.02] p-5 transition hover:border-white/20 hover:bg-white/5"
+        href={`/app/p/${project.slug}`}
+      >
+        <div className="flex items-center gap-2 pr-8">
+          <span
+            className="h-3 w-3 shrink-0 rounded-full"
+            style={{ background: project.color ?? "#6366f1" }}
+          />
+          <span className="truncate font-medium">{project.name}</span>
+        </div>
+        {project.description ? (
+          <p className="mt-2 line-clamp-2 text-sm text-white/60">
+            {project.description}
+          </p>
+        ) : null}
+      </Link>
+      <div className="absolute top-3 right-3">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label="Project actions"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-white/50 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+              onClick={(e) => e.preventDefault()}
+              type="button"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem asChild>
+              <Link href={`/app/p/${project.slug}/settings`}>
+                <Settings className="h-4 w-4" /> Settings
+              </Link>
+            </DropdownMenuItem>
+            {isOwner ? (
+              <DropdownMenuItem
+                destructive
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setDeleteOpen(true);
+                }}
+              >
+                <Trash2 className="h-4 w-4" /> Delete
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {isOwner ? (
+        <DeleteProjectDialog
+          onOpenChange={setDeleteOpen}
+          open={deleteOpen}
+          projectId={project.id}
+          projectName={project.name}
+        />
+      ) : null}
+    </li>
   );
 }
 
