@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "next build",
-    "check": "biome check .",
-    "check:unsafe": "biome check --write --unsafe .",
-    "check:write": "biome check --write .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -67,7 +68,6 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.5",
     "@tailwindcss/postcss": "^4.0.15",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20.14.10",
@@ -75,8 +75,16 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@eslint/eslintrc": "^3.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "drizzle-kit": "^0.31.10",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.2.3",
+    "eslint-config-prettier": "^9.1.0",
     "postcss": "^8.5.3",
+    "prettier": "^3.3.3",
+    "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss": "^4.0.15",
     "typescript": "^5.8.2"
   },

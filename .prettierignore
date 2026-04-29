@@ -1,0 +1,10 @@
+node_modules
+.next
+.vercel
+build
+out
+coverage
+drizzle
+pnpm-lock.yaml
+next-env.d.ts
+*.tsbuildinfo
