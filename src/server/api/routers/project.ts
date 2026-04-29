@@ -422,4 +422,62 @@ export const projectRouter = createTRPCRouter({
       .innerJoin(userTable, eq(userTable.id, projectMember.userId))
       .where(eq(projectMember.projectId, input.projectId));
   }),
+
+  setMemberRole: projectProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        role: z.enum(["editor", "viewer"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+      const [proj] = await ctx.db
+        .select({ ownerId: project.ownerId })
+        .from(project)
+        .where(eq(project.id, input.projectId))
+        .limit(1);
+      if (!proj) throw new TRPCError({ code: "NOT_FOUND" });
+      if (proj.ownerId === input.userId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Can't change the project owner's role",
+        });
+      }
+      await ctx.db
+        .update(projectMember)
+        .set({ role: input.role })
+        .where(
+          and(
+            eq(projectMember.projectId, input.projectId),
+            eq(projectMember.userId, input.userId),
+          ),
+        );
+    }),
+
+  removeMember: projectProcedure
+    .input(z.object({ userId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+      const [proj] = await ctx.db
+        .select({ ownerId: project.ownerId })
+        .from(project)
+        .where(eq(project.id, input.projectId))
+        .limit(1);
+      if (!proj) throw new TRPCError({ code: "NOT_FOUND" });
+      if (proj.ownerId === input.userId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Can't remove the project owner",
+        });
+      }
+      await ctx.db
+        .delete(projectMember)
+        .where(
+          and(
+            eq(projectMember.projectId, input.projectId),
+            eq(projectMember.userId, input.userId),
+          ),
+        );
+    }),
 });

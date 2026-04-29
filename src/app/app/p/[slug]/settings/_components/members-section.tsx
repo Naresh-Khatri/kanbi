@@ -47,6 +47,20 @@ export function MembersSection({
     onSuccess: () => utils.project.listInvites.invalidate({ projectId }),
     onError: (e) => toast.error(e.message),
   });
+  const setMemberRole = api.project.setMemberRole.useMutation({
+    onSuccess: () => {
+      toast.success("Role updated");
+      return utils.project.members.invalidate({ projectId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeMember = api.project.removeMember.useMutation({
+    onSuccess: () => {
+      toast.success("Member removed");
+      return utils.project.members.invalidate({ projectId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const sorted = [...members].sort((a, b) => {
     const r = ROLE_RANK[a.role as Role] - ROLE_RANK[b.role as Role];
@@ -109,23 +123,63 @@ export function MembersSection({
             {members.length} member{members.length === 1 ? "" : "s"}
           </Label>
           <ul className="flex flex-col divide-y divide-white/5 rounded-md border border-white/10">
-            {sorted.map((m) => (
-              <li
-                className="flex items-center gap-3 px-3 py-2 text-sm"
-                key={m.userId}
-              >
-                <UserAvatar image={m.image} name={m.name} size={28} />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{m.name}</span>
-                  <span className="truncate text-xs text-white/50">
-                    {m.email}
-                  </span>
-                </div>
-                <span className="text-xs text-white/60 capitalize">
-                  {m.role}
-                </span>
-              </li>
-            ))}
+            {sorted.map((m) => {
+              const editable = isOwner && m.role !== "owner";
+              const busy =
+                (setMemberRole.isPending &&
+                  setMemberRole.variables?.userId === m.userId) ||
+                (removeMember.isPending &&
+                  removeMember.variables?.userId === m.userId);
+              return (
+                <li
+                  className="flex items-center gap-3 px-3 py-2 text-sm"
+                  key={m.userId}
+                >
+                  <UserAvatar image={m.image} name={m.name} size={28} />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate">{m.name}</span>
+                    <span className="truncate text-xs text-white/50">
+                      {m.email}
+                    </span>
+                  </div>
+                  {editable ? (
+                    <select
+                      aria-label={`Role for ${m.name}`}
+                      className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs capitalize disabled:opacity-50"
+                      disabled={busy}
+                      onChange={(e) =>
+                        setMemberRole.mutate({
+                          projectId,
+                          userId: m.userId,
+                          role: e.target.value as "editor" | "viewer",
+                        })
+                      }
+                      value={m.role}
+                    >
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                  ) : (
+                    <span className="text-xs text-white/60 capitalize">
+                      {m.role}
+                    </span>
+                  )}
+                  {editable ? (
+                    <button
+                      aria-label={`Remove ${m.name}`}
+                      className="text-white/40 hover:text-red-400 disabled:opacity-50"
+                      disabled={busy}
+                      onClick={() =>
+                        removeMember.mutate({ projectId, userId: m.userId })
+                      }
+                      type="button"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </div>
 
