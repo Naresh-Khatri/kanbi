@@ -329,6 +329,19 @@ export function BoardView({
     }
   }
 
+  function isDropAfter(
+    a: DragOverEvent["active"] | DragEndEvent["active"],
+    over: NonNullable<DragOverEvent["over"] | DragEndEvent["over"]>,
+  ) {
+    const activeRect = a.rect.current.translated;
+    const overRect = over.rect;
+    if (!activeRect || !overRect) return false;
+    return (
+      activeRect.top + activeRect.height / 2 >
+      overRect.top + overRect.height / 2
+    );
+  }
+
   function onDragOver(e: DragOverEvent) {
     const { active: a, over } = e;
     if (!over) {
@@ -344,10 +357,18 @@ export function BoardView({
       setDropTarget(null);
       return;
     }
-    const beforeTaskId =
-      overKind === "task" && String(over.id) !== String(a.id)
-        ? String(over.id)
-        : null;
+    let beforeTaskId: string | null = null;
+    if (overKind === "task" && String(over.id) !== String(a.id)) {
+      if (isDropAfter(a, over)) {
+        const list = (tasksByColumn.get(columnId) ?? []).filter(
+          (t) => t.id !== a.id,
+        );
+        const idx = list.findIndex((t) => t.id === over.id);
+        beforeTaskId = list[idx + 1]?.id ?? null;
+      } else {
+        beforeTaskId = String(over.id);
+      }
+    }
     setDropTarget({ columnId, beforeTaskId });
   }
 
@@ -414,8 +435,10 @@ export function BoardView({
         const overIdx = columnTasks.findIndex((t) => t.id === over.id);
         if (overIdx === -1) {
           before = columnTasks[columnTasks.length - 1]?.position ?? null;
+        } else if (isDropAfter(a, over)) {
+          before = columnTasks[overIdx]?.position ?? null;
+          after = columnTasks[overIdx + 1]?.position ?? null;
         } else {
-          // Place above the hovered task by default
           before = columnTasks[overIdx - 1]?.position ?? null;
           after = columnTasks[overIdx]?.position ?? null;
         }
