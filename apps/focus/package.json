@@ -1,0 +1,44 @@
+{
+  "name": "focus",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "private": true,
+  "scripts": {
+    "dev": "expo start",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kanbi/shared": "workspace:*",
+    "@tanstack/react-query": "^5.69.0",
+    "expo": "~55.0.18",
+    "expo-battery": "~55.0.13",
+    "expo-camera": "~55.0.16",
+    "expo-constants": "~55.0.15",
+    "expo-haptics": "~55.0.14",
+    "expo-keep-awake": "~55.0.6",
+    "expo-linking": "~55.0.14",
+    "expo-router": "~55.0.13",
+    "expo-screen-orientation": "~55.0.13",
+    "expo-secure-store": "~55.0.13",
+    "expo-status-bar": "~55.0.5",
+    "expo-system-ui": "~55.0.16",
+    "nativewind": "^4.1.0",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-css-interop": "0.2.3",
+    "react-native-gesture-handler": "~2.30.0",
+    "react-native-reanimated": "4.2.1",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "tailwindcss": "^3.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.0.0",
+    "typescript": "^5.8.2"
+  }
+}

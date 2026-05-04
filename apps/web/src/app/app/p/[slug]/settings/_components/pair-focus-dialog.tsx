@@ -5,6 +5,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
+import { type PairPayload } from "@kanbi/shared";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,16 +31,6 @@ function rewriteForLan(origin: string): string {
   } catch {
     return origin;
   }
-}
-
-/**
- * Payload format consumed by the kanbi-focus Expo app.
- * Bumping `v` is a breaking change for the mobile scanner.
- */
-interface PairPayload {
-  v: 1;
-  baseUrl: string;
-  token: string;
 }
 
 export function PairFocusDialog({ token }: { token: string }) {

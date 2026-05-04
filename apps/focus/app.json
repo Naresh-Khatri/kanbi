@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Kanbi Focus",
+    "slug": "kanbi-focus",
+    "version": "0.1.0",
+    "orientation": "landscape",
+    "scheme": "kanbi-focus",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": true
+    },
+    "android": {
+      "package": "com.kanbi.focus",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#000000"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-screen-orientation",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Kanbi Focus to scan pairing QR codes."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
