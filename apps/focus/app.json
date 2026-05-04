@@ -27,7 +27,8 @@
         {
           "cameraPermission": "Allow Kanbi Focus to scan pairing QR codes."
         }
-      ]
+      ],
+      "./modules/kanbi-dream/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true

@@ -26,6 +26,7 @@
     "expo-secure-store": "~55.0.13",
     "expo-status-bar": "~55.0.5",
     "expo-system-ui": "~55.0.16",
+    "kanbi-dream": "link:./modules/kanbi-dream",
     "nativewind": "^4.1.0",
     "react": "19.2.0",
     "react-native": "0.83.6",

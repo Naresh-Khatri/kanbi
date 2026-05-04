@@ -9,6 +9,7 @@ import { Link, Redirect, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
+import KanbiDream from "kanbi-dream";
 
 import { fetchBoardSnapshot, FocusApiError } from "@/lib/trpc";
 import { loadConfig } from "@/lib/storage";
@@ -20,6 +21,11 @@ import { PomodoroRing } from "@/components/pomodoro-ring";
 export default function FocusScreen() {
   useKeepAwake();
   const isCharging = useChargingState();
+
+  useEffect(() => {
+    KanbiDream.setShowWhenLocked(true);
+    KanbiDream.setTurnScreenOn(true);
+  }, []);
 
   const configQuery = useQuery({
     queryKey: ["config"],
