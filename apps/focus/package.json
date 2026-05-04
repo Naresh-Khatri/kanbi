@@ -4,11 +4,14 @@
   "main": "index.ts",
   "private": true,
   "scripts": {
-    "dev": "expo start",
-    "start": "expo start",
-    "android": "expo start --android",
+    "dev": "expo start --dev-client",
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "prebuild": "expo prebuild --platform android",
+    "build:apk": "expo prebuild --platform android && cd android && ./gradlew assembleDebug",
+    "build:apk:release": "expo prebuild --platform android && cd android && ./gradlew assembleRelease",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
