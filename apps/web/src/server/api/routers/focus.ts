@@ -1,59 +1,105 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
+import { resolveBoardAccess } from "@/server/api/permissions";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/server/api/trpc";
 import {
   board,
   boardColumn,
-  boardShare,
   project,
+  projectMember,
   task,
 } from "@/server/db/schema";
 
 /**
- * Public, polling-friendly read for the Expo focus companion app.
- * Uses an existing share token but does not increment usesCount,
- * so a steady poll won't exhaust a `maxUses` cap.
+ * Endpoints for the kanbi-focus Expo client. Authenticates via either a
+ * cookie session (web preview) or `Authorization: Bearer kbf_…` from a
+ * paired device. All reads use the same per-project ACL as the web app.
  */
 export const focusRouter = createTRPCRouter({
-  peek: publicProcedure
-    .input(z.object({ token: z.string().min(1) }))
-    .query(async ({ ctx, input }) => {
-      const now = new Date();
-      const [share] = await ctx.db
-        .select({
-          id: boardShare.id,
-          boardId: boardShare.boardId,
-          maxUses: boardShare.maxUses,
-          usesCount: boardShare.usesCount,
-        })
-        .from(boardShare)
-        .where(
-          and(
-            eq(boardShare.token, input.token),
-            isNull(boardShare.revokedAt),
-            or(isNull(boardShare.expiresAt), gt(boardShare.expiresAt, now)),
-          ),
-        )
-        .limit(1);
+  me: protectedProcedure.query(({ ctx }) => ({
+    id: ctx.session.user.id,
+    name: ctx.session.user.name,
+    email: ctx.session.user.email,
+    image: ctx.session.user.image ?? null,
+    via: ctx.device ? ("device" as const) : ("session" as const),
+  })),
 
-      if (!share) throw new TRPCError({ code: "NOT_FOUND" });
-      if (share.maxUses != null && share.usesCount >= share.maxUses) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Share link exhausted",
-        });
-      }
+  listBoards: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const projectFields = {
+      boardId: board.id,
+      projectId: project.id,
+      projectName: project.name,
+      projectSlug: project.slug,
+      projectIcon: project.icon,
+      projectColor: project.color,
+    };
+
+    const [owned, member] = await Promise.all([
+      ctx.db
+        .select(projectFields)
+        .from(board)
+        .innerJoin(project, eq(project.id, board.projectId))
+        .where(eq(project.ownerId, userId)),
+      ctx.db
+        .select(projectFields)
+        .from(board)
+        .innerJoin(project, eq(project.id, board.projectId))
+        .innerJoin(
+          projectMember,
+          and(
+            eq(projectMember.projectId, project.id),
+            eq(projectMember.userId, userId),
+          ),
+        ),
+    ]);
+
+    const seen = new Set<string>();
+    const merged = [...owned, ...member]
+      .filter((row) => {
+        if (seen.has(row.boardId)) return false;
+        seen.add(row.boardId);
+        return true;
+      })
+      .map((row) => ({
+        boardId: row.boardId,
+        project: {
+          id: row.projectId,
+          name: row.projectName,
+          slug: row.projectSlug,
+          icon: row.projectIcon,
+          color: row.projectColor,
+        },
+      }));
+
+    return merged;
+  }),
+
+  boardSnapshot: protectedProcedure
+    .input(z.object({ boardId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      // Permission check piggybacks on the same helper the web app uses.
+      const access = await resolveBoardAccess({
+        db: ctx.db,
+        userId: ctx.session.user.id,
+        boardId: input.boardId,
+      });
 
       const [boardRow] = await ctx.db
         .select({
           id: board.id,
+          projectId: project.id,
           projectName: project.name,
+          projectSlug: project.slug,
         })
         .from(board)
         .innerJoin(project, eq(project.id, board.projectId))
-        .where(eq(board.id, share.boardId))
+        .where(eq(board.id, access.boardId))
         .limit(1);
       if (!boardRow) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -65,7 +111,7 @@ export const focusRouter = createTRPCRouter({
             position: boardColumn.position,
           })
           .from(boardColumn)
-          .where(eq(boardColumn.boardId, share.boardId))
+          .where(eq(boardColumn.boardId, access.boardId))
           .orderBy(asc(boardColumn.position)),
         ctx.db
           .select({
@@ -75,14 +121,25 @@ export const focusRouter = createTRPCRouter({
             priority: task.priority,
             position: task.position,
             dueAt: task.dueAt,
+            assigneeId: task.assigneeId,
           })
           .from(task)
           .where(
-            and(eq(task.boardId, share.boardId), isNull(task.archivedAt)),
+            and(eq(task.boardId, access.boardId), isNull(task.archivedAt)),
           )
           .orderBy(asc(task.position)),
       ]);
 
-      return { board: boardRow, columns, tasks, fetchedAt: now };
+      return {
+        board: {
+          id: boardRow.id,
+          projectId: boardRow.projectId,
+          projectName: boardRow.projectName,
+          projectSlug: boardRow.projectSlug,
+        },
+        columns,
+        tasks,
+        fetchedAt: new Date(),
+      };
     }),
 });

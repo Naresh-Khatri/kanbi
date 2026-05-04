@@ -4,6 +4,7 @@ import { boardRouter } from "@/server/api/routers/board";
 import { checklistRouter } from "@/server/api/routers/checklist";
 import { columnRouter } from "@/server/api/routers/column";
 import { commentRouter } from "@/server/api/routers/comment";
+import { deviceRouter } from "@/server/api/routers/device";
 import { focusRouter } from "@/server/api/routers/focus";
 import { labelRouter } from "@/server/api/routers/label";
 import { notificationRouter } from "@/server/api/routers/notification";
@@ -33,6 +34,7 @@ export const appRouter = createTRPCRouter({
   realtime: realtimeRouter,
   user: userRouter,
   notification: notificationRouter,
+  device: deviceRouter,
   focus: focusRouter,
 });
 

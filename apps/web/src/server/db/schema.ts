@@ -380,6 +380,25 @@ export const notification = createTable(
   ],
 );
 
+// ── Device tokens (Focus / Expo companion) ──────────────────────────────────
+
+export const deviceToken = createTable(
+  "device_token",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenPrefix: text("token_prefix").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("device_token_user_idx").on(t.userId)],
+);
+
 // ── Public read-only share link ─────────────────────────────────────────────
 
 export const boardShare = createTable(
@@ -411,6 +430,11 @@ export const userRelations = relations(user, ({ many }) => ({
   memberships: many(projectMember),
   assignedTasks: many(task, { relationName: "task_assignee" }),
   reportedTasks: many(task, { relationName: "task_reporter" }),
+  deviceTokens: many(deviceToken),
+}));
+
+export const deviceTokenRelations = relations(deviceToken, ({ one }) => ({
+  user: one(user, { fields: [deviceToken.userId], references: [user.id] }),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({

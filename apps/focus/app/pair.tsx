@@ -9,7 +9,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 
-import { fetchFocusPeek, FocusApiError } from "@/lib/trpc";
+import { fetchFocusMe, FocusApiError } from "@/lib/trpc";
 import { parsePairPayload, saveConfig } from "@/lib/storage";
 
 type Status =
@@ -35,7 +35,7 @@ export default function PairScreen() {
     if (!payload) {
       setStatus({
         kind: "error",
-        message: "Not a Kanbi pairing code.",
+        message: "Not a Kanbi pairing code (or older v1 — re-pair from web).",
       });
       return;
     }
@@ -47,19 +47,21 @@ export default function PairScreen() {
     );
 
     try {
-      await fetchFocusPeek({
+      await fetchFocusMe({
         baseUrl: payload.baseUrl,
-        shareToken: payload.token,
+        deviceToken: payload.deviceToken,
       });
       const config = {
         baseUrl: payload.baseUrl,
-        shareToken: payload.token,
+        deviceToken: payload.deviceToken,
+        deviceId: payload.deviceId,
+        boardId: null,
         preferredColumn: null,
       };
       await saveConfig(config);
       queryClient.setQueryData(["config"], config);
-      queryClient.invalidateQueries({ queryKey: ["focus.peek"] });
-      router.replace("/");
+      queryClient.invalidateQueries({ queryKey: ["focus"] });
+      router.replace("/boards");
     } catch (e) {
       lockRef.current = false;
       const message =
@@ -121,7 +123,7 @@ export default function PairScreen() {
             Kanbi · Pair
           </Text>
           <Text className="mt-1 text-base text-white/90">
-            Scan the QR from board → settings → Sharing.
+            Scan the QR from Profile → Focus devices.
           </Text>
         </View>
 

@@ -1,4 +1,4 @@
-import type { FocusColumn, FocusPeek, FocusTask } from "./trpc";
+import type { FocusColumn, FocusBoardSnapshot, FocusTask } from "./trpc";
 
 const DOING_HINTS = [
   "in progress",
@@ -24,7 +24,7 @@ function findColumn(columns: FocusColumn[], hints: string[]) {
  * to the top of a "todo"-like column, falling back to the first task overall.
  */
 export function pickActiveTask(
-  data: FocusPeek,
+  data: FocusBoardSnapshot,
   preferredColumnId: string | null,
 ): { task: FocusTask | null; column: FocusColumn | null } {
   if (data.tasks.length === 0) return { task: null, column: null };

@@ -18,6 +18,7 @@ import {
 } from "@/server/api/permissions";
 import { auth } from "@/server/better-auth";
 import { db } from "@/server/db";
+import { resolveBearerSession } from "@/server/device-tokens";
 
 /**
  * 1. CONTEXT
@@ -32,12 +33,41 @@ import { db } from "@/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const session = await auth.api.getSession({
-    headers: opts.headers,
-  });
+  const cookieSession = await auth.api.getSession({ headers: opts.headers });
+
+  // Native clients (kanbi-focus) authenticate with `Authorization: Bearer kbf_…`
+  // so they can call the same protected procedures as a logged-in browser.
+  let device: { id: string; name: string } | null = null;
+  let session = cookieSession;
+  if (!session) {
+    const bearer = await resolveBearerSession({ db, headers: opts.headers });
+    if (bearer) {
+      device = bearer.device;
+      session = {
+        session: {
+          id: `device:${bearer.device.id}`,
+          token: "device",
+          userId: bearer.user.id,
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ipAddress: null,
+          userAgent: null,
+        },
+        user: {
+          ...bearer.user,
+          emailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      } as typeof cookieSession;
+    }
+  }
+
   return {
     db,
     session,
+    device,
     ...opts,
   };
 };

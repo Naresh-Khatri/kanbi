@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { router } from "expo-router";
@@ -17,7 +16,11 @@ import {
   saveConfig,
   type PersistedConfig,
 } from "@/lib/storage";
-import { fetchFocusPeek, FocusApiError } from "@/lib/trpc";
+import {
+  fetchBoardSnapshot,
+  fetchFocusMe,
+  FocusApiError,
+} from "@/lib/trpc";
 
 export default function SettingsScreen() {
   const queryClient = useQueryClient();
@@ -27,32 +30,31 @@ export default function SettingsScreen() {
     staleTime: Infinity,
   });
 
-  const [baseUrl, setBaseUrl] = useState("");
-  const [shareToken, setShareToken] = useState("");
-  const [preferredColumn, setPreferredColumn] = useState<string | null>(null);
+  const [config, setConfig] = useState<PersistedConfig | null>(null);
   const [testing, setTesting] = useState(false);
   const [columns, setColumns] = useState<{ id: string; name: string }[]>([]);
+  const [whoami, setWhoami] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!existing.data) return;
-    setBaseUrl(existing.data.baseUrl);
-    setShareToken(existing.data.shareToken);
-    setPreferredColumn(existing.data.preferredColumn);
+    setConfig(existing.data ?? null);
   }, [existing.data]);
 
   const handleTest = async () => {
-    if (!baseUrl || !shareToken) {
-      Alert.alert("Missing fields", "Set both base URL and share token.");
-      return;
-    }
+    if (!config) return;
     setTesting(true);
     try {
-      const peek = await fetchFocusPeek({ baseUrl, shareToken });
-      setColumns(peek.columns.map((c) => ({ id: c.id, name: c.name })));
-      Alert.alert(
-        "Connected",
-        `${peek.board.projectName}\n${peek.tasks.length} tasks visible`,
-      );
+      const me = await fetchFocusMe({
+        baseUrl: config.baseUrl,
+        deviceToken: config.deviceToken,
+      });
+      setWhoami(`${me.name} (${me.email})`);
+      if (config.boardId) {
+        const snap = await fetchBoardSnapshot(
+          { baseUrl: config.baseUrl, deviceToken: config.deviceToken },
+          config.boardId,
+        );
+        setColumns(snap.columns.map((c) => ({ id: c.id, name: c.name })));
+      }
     } catch (e) {
       const message =
         e instanceof FocusApiError
@@ -64,29 +66,21 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSave = async () => {
-    if (!baseUrl || !shareToken) {
-      Alert.alert("Missing fields", "Set both base URL and share token.");
-      return;
-    }
-    const config: PersistedConfig = {
-      baseUrl: baseUrl.trim(),
-      shareToken: shareToken.trim(),
-      preferredColumn,
-    };
-    await saveConfig(config);
-    queryClient.setQueryData(["config"], config);
-    queryClient.invalidateQueries({ queryKey: ["focus.peek"] });
-    router.replace("/");
-  };
-
   const handleReset = async () => {
     await clearConfig();
     queryClient.setQueryData(["config"], null);
-    setBaseUrl("");
-    setShareToken("");
-    setPreferredColumn(null);
+    setConfig(null);
     setColumns([]);
+    setWhoami(null);
+    router.replace("/pair");
+  };
+
+  const updatePreferredColumn = async (preferredColumn: string | null) => {
+    if (!config) return;
+    const next = { ...config, preferredColumn };
+    await saveConfig(next);
+    setConfig(next);
+    queryClient.setQueryData(["config"], next);
   };
 
   return (
@@ -96,51 +90,56 @@ export default function SettingsScreen() {
     >
       <Text className="text-2xl font-semibold text-white">Kanbi Focus</Text>
       <Text className="mt-1 text-sm text-zinc-500">
-        Point this device at a kanbi board via a share token.
+        Paired devices read whichever board you pick. Re-pair from the web app
+        in Profile → Focus devices.
       </Text>
 
-      <View className="mt-6">
+      <View className="mt-6 rounded-md border border-zinc-800 px-4 py-3">
         <Text className="text-[10px] uppercase tracking-widest text-zinc-500">
-          Base URL
+          Status
         </Text>
-        <TextInput
-          value={baseUrl}
-          onChangeText={setBaseUrl}
-          placeholder="http://192.168.1.10:3333"
-          placeholderTextColor="#52525b"
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-white"
-        />
+        {config ? (
+          <>
+            <Text className="mt-1 text-sm text-white">
+              {config.baseUrl}
+            </Text>
+            <Text className="text-[11px] text-zinc-500">
+              token …{config.deviceToken.slice(-6)} · device {config.deviceId}
+            </Text>
+            <Text className="text-[11px] text-zinc-500">
+              board: {config.boardId ?? "—"}
+            </Text>
+            {whoami ? (
+              <Text className="mt-1 text-[11px] text-emerald-400">
+                signed in as {whoami}
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          <Text className="mt-1 text-sm text-zinc-400">Not paired.</Text>
+        )}
       </View>
 
-      <View className="mt-4">
-        <Text className="text-[10px] uppercase tracking-widest text-zinc-500">
-          Share token
-        </Text>
-        <TextInput
-          value={shareToken}
-          onChangeText={setShareToken}
-          placeholder="from board → share"
-          placeholderTextColor="#52525b"
-          autoCapitalize="none"
-          autoCorrect={false}
-          className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-white"
-        />
-      </View>
-
-      <View className="mt-5 flex-row gap-3">
+      <View className="mt-5 flex-row flex-wrap gap-3">
         <Pressable
           onPress={() => router.push("/pair")}
           className="rounded-md bg-white px-4 py-2"
         >
           <Text className="text-xs font-semibold uppercase tracking-widest text-black">
-            Pair via QR
+            Re-pair via QR
           </Text>
         </Pressable>
         <Pressable
-          disabled={testing}
+          onPress={() => router.push("/boards")}
+          className="rounded-md border border-zinc-800 px-4 py-2"
+          disabled={!config}
+        >
+          <Text className="text-xs uppercase tracking-widest text-zinc-300">
+            Pick board
+          </Text>
+        </Pressable>
+        <Pressable
+          disabled={testing || !config}
           onPress={handleTest}
           className="rounded-md border border-zinc-800 px-4 py-2"
         >
@@ -153,19 +152,11 @@ export default function SettingsScreen() {
           )}
         </Pressable>
         <Pressable
-          onPress={handleSave}
-          className="rounded-md border border-zinc-800 px-4 py-2"
-        >
-          <Text className="text-xs uppercase tracking-widest text-zinc-300">
-            Save & start
-          </Text>
-        </Pressable>
-        <Pressable
           onPress={handleReset}
           className="rounded-md border border-zinc-800 px-4 py-2"
         >
           <Text className="text-xs uppercase tracking-widest text-zinc-300">
-            Clear
+            Sign out
           </Text>
         </Pressable>
       </View>
@@ -181,16 +172,16 @@ export default function SettingsScreen() {
           </Text>
           <View className="mt-3 flex-row flex-wrap gap-2">
             <Pressable
-              onPress={() => setPreferredColumn(null)}
+              onPress={() => updatePreferredColumn(null)}
               className={`rounded-md border px-3 py-1.5 ${
-                preferredColumn == null
+                !config?.preferredColumn
                   ? "border-white bg-white"
                   : "border-zinc-800"
               }`}
             >
               <Text
                 className={`text-xs uppercase tracking-widest ${
-                  preferredColumn == null ? "text-black" : "text-zinc-300"
+                  !config?.preferredColumn ? "text-black" : "text-zinc-300"
                 }`}
               >
                 Auto
@@ -199,16 +190,18 @@ export default function SettingsScreen() {
             {columns.map((c) => (
               <Pressable
                 key={c.id}
-                onPress={() => setPreferredColumn(c.id)}
+                onPress={() => updatePreferredColumn(c.id)}
                 className={`rounded-md border px-3 py-1.5 ${
-                  preferredColumn === c.id
+                  config?.preferredColumn === c.id
                     ? "border-white bg-white"
                     : "border-zinc-800"
                 }`}
               >
                 <Text
                   className={`text-xs uppercase tracking-widest ${
-                    preferredColumn === c.id ? "text-black" : "text-zinc-300"
+                    config?.preferredColumn === c.id
+                      ? "text-black"
+                      : "text-zinc-300"
                   }`}
                 >
                   {c.name}

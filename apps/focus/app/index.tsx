@@ -5,12 +5,12 @@ import {
   Text,
   View,
 } from "react-native";
-import { Link, Redirect } from "expo-router";
+import { Link, Redirect, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
 
-import { fetchFocusPeek, FocusApiError } from "@/lib/trpc";
+import { fetchBoardSnapshot, FocusApiError } from "@/lib/trpc";
 import { loadConfig } from "@/lib/storage";
 import { pickActiveTask, priorityColor } from "@/lib/active-task";
 import { formatClock, usePomodoro } from "@/lib/pomodoro";
@@ -27,15 +27,20 @@ export default function FocusScreen() {
     staleTime: Infinity,
   });
 
-  const peek = useQuery({
-    queryKey: ["focus.peek", configQuery.data?.shareToken],
-    enabled: !!configQuery.data,
+  const snapshot = useQuery({
+    queryKey: [
+      "focus.boardSnapshot",
+      configQuery.data?.deviceToken,
+      configQuery.data?.boardId,
+    ],
+    enabled: !!configQuery.data?.boardId,
     queryFn: ({ signal }) =>
-      fetchFocusPeek(
+      fetchBoardSnapshot(
         {
           baseUrl: configQuery.data!.baseUrl,
-          shareToken: configQuery.data!.shareToken,
+          deviceToken: configQuery.data!.deviceToken,
         },
+        configQuery.data!.boardId!,
         signal,
       ),
     refetchInterval: isCharging ? 15_000 : 60_000,
@@ -50,15 +55,22 @@ export default function FocusScreen() {
   });
 
   const active = useMemo(() => {
-    if (!peek.data) return null;
-    return pickActiveTask(peek.data, configQuery.data?.preferredColumn ?? null);
-  }, [peek.data, configQuery.data?.preferredColumn]);
+    if (!snapshot.data) return null;
+    return pickActiveTask(
+      snapshot.data,
+      configQuery.data?.preferredColumn ?? null,
+    );
+  }, [snapshot.data, configQuery.data?.preferredColumn]);
 
+  // Bad token → drop to pairing.
   useEffect(() => {
-    if (peek.error instanceof FocusApiError && peek.error.code === "NOT_FOUND") {
-      // bad token — bounce to settings
+    if (
+      snapshot.error instanceof FocusApiError &&
+      snapshot.error.code === "UNAUTHORIZED"
+    ) {
+      router.replace("/pair");
     }
-  }, [peek.error]);
+  }, [snapshot.error]);
 
   if (configQuery.isLoading) {
     return (
@@ -68,9 +80,8 @@ export default function FocusScreen() {
     );
   }
 
-  if (!configQuery.data) {
-    return <Redirect href="/pair" />;
-  }
+  if (!configQuery.data) return <Redirect href="/pair" />;
+  if (!configQuery.data.boardId) return <Redirect href="/boards" />;
 
   const progress =
     pomodoro.totalMs > 0
@@ -88,7 +99,7 @@ export default function FocusScreen() {
       <View className="flex-1 justify-between pr-8">
         <View>
           <Text className="text-xs uppercase tracking-[3px] text-zinc-500">
-            {peek.data?.board.projectName ?? "Kanbi"}
+            {snapshot.data?.board.projectName ?? "Kanbi"}
           </Text>
           <View className="mt-2 flex-row items-center gap-2">
             <View
@@ -107,12 +118,12 @@ export default function FocusScreen() {
         </View>
 
         <View>
-          {peek.isLoading ? (
+          {snapshot.isLoading ? (
             <ActivityIndicator color="#fff" />
-          ) : peek.error ? (
+          ) : snapshot.error ? (
             <Text className="text-base text-red-400">
-              {peek.error instanceof FocusApiError
-                ? `${peek.error.code}: ${peek.error.message}`
+              {snapshot.error instanceof FocusApiError
+                ? `${snapshot.error.code}: ${snapshot.error.message}`
                 : "Failed to load tasks"}
             </Text>
           ) : !active?.task ? (
@@ -150,13 +161,22 @@ export default function FocusScreen() {
         </View>
 
         <View className="flex-row items-center justify-between">
-          <Link href="/settings" asChild>
-            <Pressable className="rounded-md border border-zinc-800 px-3 py-1.5">
-              <Text className="text-xs uppercase tracking-widest text-zinc-400">
-                Settings
-              </Text>
-            </Pressable>
-          </Link>
+          <View className="flex-row gap-2">
+            <Link href="/boards" asChild>
+              <Pressable className="rounded-md border border-zinc-800 px-3 py-1.5">
+                <Text className="text-xs uppercase tracking-widest text-zinc-400">
+                  Boards
+                </Text>
+              </Pressable>
+            </Link>
+            <Link href="/settings" asChild>
+              <Pressable className="rounded-md border border-zinc-800 px-3 py-1.5">
+                <Text className="text-xs uppercase tracking-widest text-zinc-400">
+                  Settings
+                </Text>
+              </Pressable>
+            </Link>
+          </View>
           <Text className="text-[10px] uppercase tracking-widest text-zinc-600">
             cycle {pomodoro.cyclesCompleted} · {pomodoro.phase}
           </Text>
