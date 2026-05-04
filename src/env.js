@@ -37,7 +37,9 @@ export const env = createEnv({
     GROQ_API_KEY: z.string().optional(),
   },
 
-  client: {},
+  client: {
+    NEXT_PUBLIC_LAN_HOST: z.string().optional(),
+  },
 
   runtimeEnv: {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
@@ -63,6 +65,7 @@ export const env = createEnv({
     SMTP_FROM: process.env.SMTP_FROM,
     CRON_SECRET: process.env.CRON_SECRET,
     GROQ_API_KEY: process.env.GROQ_API_KEY,
+    NEXT_PUBLIC_LAN_HOST: process.env.NEXT_PUBLIC_LAN_HOST,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,

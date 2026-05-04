@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@/trpc/react";
+import { PairFocusDialog } from "./pair-focus-dialog";
 import { Section } from "./section";
 
 export function SharingSection({
@@ -78,6 +79,7 @@ export function SharingSection({
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </button>
+                  <PairFocusDialog token={s.token} />
                   <button
                     aria-label="Revoke link"
                     className="text-white/40 hover:text-red-400"

@@ -54,6 +54,7 @@
     "next": "^15.2.3",
     "nodemailer": "^7.0.13",
     "pg": "^8.20.0",
+    "qrcode.react": "^4.2.0",
     "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
