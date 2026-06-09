@@ -109,6 +109,7 @@ export function TaskCard({
           <DropdownMenuTrigger asChild>
             <Button
               className="opacity-0 group-hover:opacity-100"
+              onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               size="icon"
               variant="ghost"
@@ -116,7 +117,10 @@ export function TaskCard({
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent
+            align="end"
+            onClick={(e) => e.stopPropagation()}
+          >
             <DropdownMenuItem
               destructive
               onSelect={() =>
