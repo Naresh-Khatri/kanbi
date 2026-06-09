@@ -1,0 +1,24 @@
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+
+# The web image never needs the focus (Expo/React Native) app — exclude all of
+# it except the manifest, which the Dockerfile's deps stage copies to validate
+# the workspace lockfile.
+apps/focus/**
+!apps/focus/package.json
+.git
+.gitignore
+**/Dockerfile
+**/.dockerignore
+**/compose.yml
+**/*.md
+**/.env
+**/.env.*
+!**/.env.example
+**/npm-debug.log
+**/.DS_Store
+.vscode
+.idea
+**/tsconfig.tsbuildinfo

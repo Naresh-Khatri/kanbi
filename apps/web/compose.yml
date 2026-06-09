@@ -1,6 +1,9 @@
 services:
   kanbi:
-    build: .
+    build:
+      # Context is the monorepo root; the Dockerfile lives in apps/web.
+      context: ../..
+      dockerfile: apps/web/Dockerfile
     image: kanbi
     ports:
       - "3000:3000"
