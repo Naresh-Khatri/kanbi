@@ -3,7 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
-import { positionAtEnd, positionBetween } from "@/lib/position";
+import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
 import { recordActivity } from "@/server/activity/record";
 import { GROQ_DRAFT_MODEL, getGroq } from "@/server/ai/groq";
 import {
@@ -14,11 +14,14 @@ import {
 import {
   board,
   boardColumn,
+  checklistItem,
   label,
   project,
+  projectMember,
   task,
   taskLabel,
   taskPriority,
+  user as userTable,
 } from "@/server/db/schema";
 import { createNotifications } from "@/server/notifications/create";
 import { resolveMentions } from "@/server/notifications/mentions";
@@ -27,16 +30,29 @@ import { bus } from "@/server/realtime/bus";
 const priorityEnum = z.enum(taskPriority.enumValues);
 const confidenceEnum = z.enum(["high", "med", "low"]);
 
+// AI emits dueAt as a calendar day (YYYY-MM-DD); the client turns it into a Date.
+const draftDueAtSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullable()
+  .default(null);
+
+// A variant is one way to write the same issue — only the wording and the
+// breakdown differ. Ownership/scheduling attributes live on the issue so they
+// don't silently change when the user flips between variants.
 const draftVariantSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(10_000).default(""),
-  priority: priorityEnum.default("none"),
-  labelIds: z.array(z.string()).default([]),
+  checklist: z.array(z.string().min(1).max(280)).max(20).default([]),
 });
 
 const draftIssueSchema = z.object({
   summary: z.string().min(1).max(300),
   confidence: confidenceEnum.default("med"),
+  priority: priorityEnum.default("none"),
+  labelIds: z.array(z.string()).default([]),
+  assigneeId: z.string().nullable().default(null),
+  dueAt: draftDueAtSchema,
   variants: z.array(draftVariantSchema).min(1).max(3),
 });
 
@@ -49,6 +65,9 @@ const enhanceResponseSchema = z.object({
   description: z.string().max(10_000).default(""),
   priority: priorityEnum.default("none"),
   labelIds: z.array(z.string()).default([]),
+  assigneeId: z.string().nullable().default(null),
+  dueAt: draftDueAtSchema,
+  checklist: z.array(z.string().min(1).max(280)).max(20).default([]),
 });
 
 export const taskRouter = createTRPCRouter({
@@ -348,11 +367,23 @@ export const taskRouter = createTRPCRouter({
         .from(label)
         .where(eq(label.boardId, input.boardId));
 
+      const members = await ctx.db
+        .select({ id: projectMember.userId, name: userTable.name })
+        .from(projectMember)
+        .innerJoin(board, eq(board.projectId, projectMember.projectId))
+        .innerJoin(userTable, eq(userTable.id, projectMember.userId))
+        .where(eq(board.id, input.boardId));
+
       const priorities = taskPriority.enumValues.join(", ");
       const labelList =
         labels.length > 0
           ? labels.map((l) => `- ${l.id}: ${l.name}`).join("\n")
           : "(no labels defined)";
+      const memberList =
+        members.length > 0
+          ? members.map((m) => `- ${m.id}: ${m.name}`).join("\n")
+          : "(no members defined)";
+      const today = new Date().toISOString().slice(0, 10);
 
       const system = [
         "You are a task drafter for a kanban board. Read a raw client message and extract distinct actionable issues.",
@@ -360,14 +391,20 @@ export const taskRouter = createTRPCRouter({
         proj.systemPrompt ? `Project context:\n${proj.systemPrompt}` : "",
         `Available labels (use exact ids, never invent):\n${labelList}`,
         `Available priorities: ${priorities}`,
+        `Project members (use exact ids, never invent):\n${memberList}`,
+        `Today's date is ${today}.`,
         "Output JSON matching this shape exactly:",
-        `{"issues":[{"summary":string,"confidence":"high"|"med"|"low","variants":[{"title":string,"description":string,"priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[]}]}]}`,
+        `{"issues":[{"summary":string,"confidence":"high"|"med"|"low","priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[],"assigneeId":string|null,"dueAt":string|null,"variants":[{"title":string,"description":string,"checklist":string[]}]}]}`,
         "Rules:",
         "- One issue per distinct problem/request. If the message is a single issue, return one.",
-        "- Produce exactly 3 variants per issue: concise, detailed, and aggressive-scope.",
+        "- priority, labelIds, assigneeId, and dueAt describe the issue as a whole — set them once per issue, NOT per variant.",
+        "- Produce exactly 3 variants per issue: concise, detailed, and aggressive-scope. Variants differ ONLY in title, description, and checklist depth.",
         "- title: imperative, under 80 chars.",
-        "- description: simple HTML only (use <p>, <strong>, <em>, <ul>/<ol> with <li>, <code>, <a href>). No markdown syntax, no <script>/<style>/<img>. Include concrete acceptance criteria when sensible.",
+        "- description: simple HTML only (use <p>, <strong>, <em>, <code>, <a href>, and <ul>/<ol> with <li>). No markdown, no <script>/<style>/<img>. It doesn't have to be one linear paragraph — use multiple paragraphs and bullet lists when they make it clearer (context, rationale, acceptance criteria, edge cases), but don't pad a simple task; a sentence or two is fine. Keep implementation steps in the checklist, not here, and don't restate the checklist items.",
+        "- checklist: the actionable implementation steps as short plain-text strings (no HTML), each a single concrete subtask. These are distinct from the description. Use [] when the issue needs no breakdown; the aggressive-scope variant may include more steps.",
         "- Only use labelIds from the list above. If none fit, use [].",
+        "- assigneeId: only a member id from the list above when the message clearly names who should own it. Otherwise null. Never invent ids.",
+        "- dueAt: an absolute calendar day in YYYY-MM-DD format when the message implies a deadline (resolve relative dates like 'next Friday' against today's date). Otherwise null.",
         "- confidence = how confident you are this is a real, well-scoped issue.",
         "- Do not include commentary. Return only the JSON object.",
       ]
@@ -405,12 +442,14 @@ export const taskRouter = createTRPCRouter({
       }
 
       const validLabels = new Set(labels.map((l) => l.id));
+      const validMembers = new Set(members.map((m) => m.id));
       const issues = result.data.issues.map((issue) => ({
         ...issue,
-        variants: issue.variants.map((v) => ({
-          ...v,
-          labelIds: v.labelIds.filter((id) => validLabels.has(id)),
-        })),
+        labelIds: issue.labelIds.filter((id) => validLabels.has(id)),
+        assigneeId:
+          issue.assigneeId && validMembers.has(issue.assigneeId)
+            ? issue.assigneeId
+            : null,
       }));
 
       return { issues };
@@ -444,11 +483,23 @@ export const taskRouter = createTRPCRouter({
         .from(label)
         .where(eq(label.boardId, input.boardId));
 
+      const members = await ctx.db
+        .select({ id: projectMember.userId, name: userTable.name })
+        .from(projectMember)
+        .innerJoin(board, eq(board.projectId, projectMember.projectId))
+        .innerJoin(userTable, eq(userTable.id, projectMember.userId))
+        .where(eq(board.id, input.boardId));
+
       const priorities = taskPriority.enumValues.join(", ");
       const labelList =
         labels.length > 0
           ? labels.map((l) => `- ${l.id}: ${l.name}`).join("\n")
           : "(no labels defined)";
+      const memberList =
+        members.length > 0
+          ? members.map((m) => `- ${m.id}: ${m.name}`).join("\n")
+          : "(no members defined)";
+      const today = new Date().toISOString().slice(0, 10);
 
       const system = [
         "You are a task editor for a kanban board. Polish a single rough task into one clear, well-scoped task. Never split it into multiple tasks.",
@@ -456,13 +507,18 @@ export const taskRouter = createTRPCRouter({
         proj.systemPrompt ? `Project context:\n${proj.systemPrompt}` : "",
         `Available labels (use exact ids, never invent):\n${labelList}`,
         `Available priorities: ${priorities}`,
+        `Project members (use exact ids, never invent):\n${memberList}`,
+        `Today's date is ${today}.`,
         "Output JSON matching this shape exactly:",
-        `{"title":string,"description":string,"priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[]}`,
+        `{"title":string,"description":string,"priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[],"assigneeId":string|null,"dueAt":string|null,"checklist":string[]}`,
         "Rules:",
         "- Keep it a single task. Rewrite the title as a clear imperative under 80 chars.",
-        "- description: simple HTML only (use <p>, <strong>, <em>, <ul>/<ol> with <li>, <code>, <a href>). No markdown syntax, no <script>/<style>/<img>. Flesh out the description with concrete detail and acceptance criteria when sensible, while preserving the user's intent.",
+        "- description: simple HTML only (use <p>, <strong>, <em>, <code>, <a href>, and <ul>/<ol> with <li>). No markdown, no <script>/<style>/<img>. It doesn't have to be one linear paragraph — use multiple paragraphs and bullet lists when they make it clearer (context, rationale, acceptance criteria, edge cases), but don't pad a simple task; a sentence or two is fine. Keep implementation steps in the checklist, not here, and don't restate the checklist items.",
         "- Only use labelIds from the list above. If none fit, use [].",
         "- Pick the most fitting priority.",
+        "- checklist: OPTIONAL plain-text subtasks (the implementation steps). Only include items when the task naturally breaks into concrete steps; each item is a short imperative (no numbering, no HTML). If the task is atomic or steps would be noise, return [].",
+        "- assigneeId: only a member id from the list above when the input clearly names who should own it. Otherwise null. Never invent ids.",
+        "- dueAt: an absolute calendar day in YYYY-MM-DD format when the input implies a deadline (resolve relative dates like 'next Friday' against today's date). Otherwise null.",
         "- Do not include commentary. Return only the JSON object.",
       ]
         .filter(Boolean)
@@ -506,9 +562,14 @@ export const taskRouter = createTRPCRouter({
       }
 
       const validLabels = new Set(labels.map((l) => l.id));
+      const validMembers = new Set(members.map((m) => m.id));
       return {
         ...result.data,
         labelIds: result.data.labelIds.filter((id) => validLabels.has(id)),
+        assigneeId:
+          result.data.assigneeId && validMembers.has(result.data.assigneeId)
+            ? result.data.assigneeId
+            : null,
       };
     }),
 
@@ -523,6 +584,9 @@ export const taskRouter = createTRPCRouter({
               description: z.string().max(10_000).optional(),
               priority: priorityEnum.optional(),
               labelIds: z.array(z.string()).optional(),
+              assigneeId: z.string().nullable().optional(),
+              dueAt: z.date().nullable().optional(),
+              checklist: z.array(z.string().min(1).max(280)).max(20).optional(),
             }),
           )
           .min(1)
@@ -582,6 +646,8 @@ export const taskRouter = createTRPCRouter({
           priority: t.priority ?? ("none" as const),
           position: pos,
           reporterId: ctx.session.user.id,
+          assigneeId: t.assigneeId ?? null,
+          dueAt: t.dueAt ?? null,
         };
       });
 
@@ -600,10 +666,38 @@ export const taskRouter = createTRPCRouter({
         await ctx.db.insert(taskLabel).values(labelRows).onConflictDoNothing();
       }
 
+      const checklistRows: {
+        taskId: string;
+        text: string;
+        position: number;
+      }[] = [];
+      inserted.forEach((row, i) => {
+        const items = input.tasks[i]?.checklist ?? [];
+        items.forEach((text, j) => {
+          checklistRows.push({
+            taskId: row.id,
+            text,
+            position: (j + 1) * POSITION_STEP,
+          });
+        });
+      });
+      if (checklistRows.length > 0) {
+        await ctx.db.insert(checklistItem).values(checklistRows);
+      }
+
       bus.emitBoard(input.boardId, {
         scope: "task",
         ids: inserted.map((r) => r.id),
       });
+      const checklistTaskIds = Array.from(
+        new Set(checklistRows.map((r) => r.taskId)),
+      );
+      if (checklistTaskIds.length > 0) {
+        bus.emitBoard(input.boardId, {
+          scope: "checklist",
+          ids: checklistTaskIds,
+        });
+      }
 
       for (const row of inserted) {
         await recordActivity(ctx.db, {
@@ -613,6 +707,24 @@ export const taskRouter = createTRPCRouter({
           verb: "task.created",
           payload: { title: row.title },
         });
+      }
+
+      const assignmentNotifications: Parameters<typeof createNotifications>[1] =
+        [];
+      for (const row of inserted) {
+        if (row.assigneeId && row.assigneeId !== ctx.session.user.id) {
+          assignmentNotifications.push({
+            userId: row.assigneeId,
+            actorId: ctx.session.user.id,
+            type: "task.assigned",
+            boardId: input.boardId,
+            taskId: row.id,
+            data: { title: row.title },
+          });
+        }
+      }
+      if (assignmentNotifications.length > 0) {
+        await createNotifications(ctx.db, assignmentNotifications);
       }
 
       return { count: inserted.length, ids: inserted.map((r) => r.id) };

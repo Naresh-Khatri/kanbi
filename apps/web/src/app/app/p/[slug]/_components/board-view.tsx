@@ -143,6 +143,7 @@ export function BoardView({
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
+  const [aiDraftColumnId, setAiDraftColumnId] = useState<string | null>(null);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
   const aiImportToken = useAppShell((s) => s.aiImportToken);
   const lastCreateTaskToken = useRef(createTaskToken);
@@ -159,6 +160,7 @@ export function BoardView({
     if (aiImportToken === lastAiImportToken.current) return;
     lastAiImportToken.current = aiImportToken;
     if (columns.length > 0 && canWrite) {
+      setAiDraftColumnId(null);
       setAiDraftOpen(true);
     }
   }, [aiImportToken, columns.length, canWrite]);
@@ -168,6 +170,7 @@ export function BoardView({
     (e) => {
       if (!canWrite || columns.length === 0) return;
       e.preventDefault();
+      setAiDraftColumnId(null);
       setAiDraftOpen(true);
     },
     { enableOnFormTags: false },
@@ -599,9 +602,11 @@ export function BoardView({
         <AiDraftDialog
           boardId={boardId}
           columns={columns}
+          initialColumnId={aiDraftColumnId}
           labels={labels}
           onOpenChange={setAiDraftOpen}
           open={aiDraftOpen}
+          projectId={projectId}
         />
       ) : null}
     </main>
@@ -788,7 +793,12 @@ function ColumnHeader({
   useEffect(() => () => cancelClose(), []);
 
   function applySort(mode: ColumnSortMode, dir: ColumnSortDir = sortDir) {
-    setSort.mutate({ boardId, columnId: column.id, sortMode: mode, sortDir: dir });
+    setSort.mutate({
+      boardId,
+      columnId: column.id,
+      sortMode: mode,
+      sortDir: dir,
+    });
   }
 
   return (
@@ -852,96 +862,96 @@ function ColumnHeader({
           ) : null}
         </div>
       )}
-        {canWrite ? (
-          <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              onMouseEnter={cancelClose}
-              onMouseLeave={scheduleClose}
-            >
-              <DropdownMenuItem onSelect={() => setRenaming(true)}>
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <span>Sort by</span>
-                  <ChevronRight className="ml-2 h-3.5 w-3.5 opacity-60" />
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent
-                  onMouseEnter={cancelClose}
-                  onMouseLeave={scheduleClose}
-                >
-                  {SORT_MODES.map((m) => {
-                    const isActive = sortMode === m;
-                    return (
-                      <DropdownMenuItem
-                        className={
-                          isActive
-                            ? "bg-sky-400/15 text-sky-200 focus:bg-sky-400/25"
-                            : undefined
-                        }
-                        key={m}
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          if (isActive) {
-                            applySort(m, sortDir === "asc" ? "desc" : "asc");
-                          } else {
-                            applySort(m, "asc");
-                          }
-                        }}
-                      >
-                        <span className="flex-1">{SORT_LABELS[m]}</span>
-                        {isActive ? (
-                          sortDir === "asc" ? (
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          ) : (
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          )
-                        ) : null}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                  {sorted ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          applySort("manual");
-                        }}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        <span>Clear sort</span>
-                      </DropdownMenuItem>
-                    </>
-                  ) : null}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                destructive
-                onSelect={() => {
-                  if (taskCount > 0) {
-                    setConfirmDelete(true);
-                  } else {
-                    void remove({
-                      kind: "column",
-                      id: column.id,
-                      name: column.name,
-                    });
-                  }
-                }}
+      {canWrite ? (
+        <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon" variant="ghost">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+          >
+            <DropdownMenuItem onSelect={() => setRenaming(true)}>
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <span>Sort by</span>
+                <ChevronRight className="ml-2 h-3.5 w-3.5 opacity-60" />
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent
+                onMouseEnter={cancelClose}
+                onMouseLeave={scheduleClose}
               >
-                Delete column
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+                {SORT_MODES.map((m) => {
+                  const isActive = sortMode === m;
+                  return (
+                    <DropdownMenuItem
+                      className={
+                        isActive
+                          ? "bg-sky-400/15 text-sky-200 focus:bg-sky-400/25"
+                          : undefined
+                      }
+                      key={m}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        if (isActive) {
+                          applySort(m, sortDir === "asc" ? "desc" : "asc");
+                        } else {
+                          applySort(m, "asc");
+                        }
+                      }}
+                    >
+                      <span className="flex-1">{SORT_LABELS[m]}</span>
+                      {isActive ? (
+                        sortDir === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        )
+                      ) : null}
+                    </DropdownMenuItem>
+                  );
+                })}
+                {sorted ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        applySort("manual");
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>Clear sort</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              destructive
+              onSelect={() => {
+                if (taskCount > 0) {
+                  setConfirmDelete(true);
+                } else {
+                  void remove({
+                    kind: "column",
+                    id: column.id,
+                    name: column.name,
+                  });
+                }
+              }}
+            >
+              Delete column
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
       <Dialog onOpenChange={setConfirmDelete} open={confirmDelete}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
