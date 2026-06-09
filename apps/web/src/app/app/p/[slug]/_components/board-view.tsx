@@ -40,6 +40,14 @@ import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -73,6 +81,7 @@ import {
 import { PRIORITY_META, type Priority, PriorityIcon } from "./priority";
 import { QuickAddTaskDialog } from "./quick-add-task-dialog";
 import { TaskDetailSheet } from "./task-detail-sheet";
+import { useUndoableBoardDelete } from "./use-undoable-board-delete";
 
 type BoardData = RouterOutputs["board"]["get"];
 type TaskRow = BoardData["tasks"][number];
@@ -734,10 +743,8 @@ function ColumnHeader({
     },
     onError: (e) => toast.error(e.message),
   });
-  const remove = api.column.delete.useMutation({
-    onSuccess: () => utils.board.get.invalidate({ boardId }),
-    onError: (e) => toast.error(e.message),
-  });
+  const remove = useUndoableBoardDelete(boardId);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const setSort = api.column.setSort.useMutation({
     onMutate: async (vars) => {
       await utils.board.get.cancel({ boardId });
@@ -918,13 +925,53 @@ function ColumnHeader({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 destructive
-                onSelect={() => remove.mutate({ boardId, columnId: column.id })}
+                onSelect={() => {
+                  if (taskCount > 0) {
+                    setConfirmDelete(true);
+                  } else {
+                    void remove({
+                      kind: "column",
+                      id: column.id,
+                      name: column.name,
+                    });
+                  }
+                }}
               >
                 Delete column
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
+      <Dialog onOpenChange={setConfirmDelete} open={confirmDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete &ldquo;{column.name}&rdquo;?</DialogTitle>
+            <DialogDescription>
+              This column has {taskCount} {taskCount === 1 ? "task" : "tasks"}.
+              Deleting it removes {taskCount === 1 ? "it" : "them"} too. You can
+              undo for a few seconds.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setConfirmDelete(false)} variant="ghost">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmDelete(false);
+                void remove({
+                  kind: "column",
+                  id: column.id,
+                  name: column.name,
+                });
+              }}
+              variant="destructive"
+            >
+              Delete column
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1010,10 +1057,7 @@ function TaskCard({
   onOpen: () => void;
   assignee: { name: string; image: string | null } | null;
 }) {
-  const utils = api.useUtils();
-  const remove = api.task.delete.useMutation({
-    onSuccess: () => utils.board.get.invalidate({ boardId }),
-  });
+  const remove = useUndoableBoardDelete(boardId);
   return (
     <div
       className="group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20"
@@ -1035,7 +1079,9 @@ function TaskCard({
           <DropdownMenuContent align="end">
             <DropdownMenuItem
               destructive
-              onSelect={() => remove.mutate({ boardId, taskId: task.id })}
+              onSelect={() =>
+                void remove({ kind: "task", id: task.id, name: task.title })
+              }
             >
               Delete
             </DropdownMenuItem>

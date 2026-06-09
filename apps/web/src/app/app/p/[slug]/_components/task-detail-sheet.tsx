@@ -43,6 +43,7 @@ import {
   type Priority,
   PriorityIcon,
 } from "./priority";
+import { useUndoableBoardDelete } from "./use-undoable-board-delete";
 
 type BoardData = RouterOutputs["board"]["get"];
 type TaskRow = BoardData["tasks"][number];
@@ -117,12 +118,7 @@ function TaskDetail({
     onSuccess: () => utils.board.get.invalidate({ boardId }),
     onError: (e) => toast.error(e.message),
   });
-  const remove = api.task.delete.useMutation({
-    onSuccess: async () => {
-      onClose();
-      await utils.board.get.invalidate({ boardId });
-    },
-  });
+  const remove = useUndoableBoardDelete(boardId);
   const members = api.project.members.useQuery(
     { projectId },
     { enabled: canWrite },
@@ -240,7 +236,12 @@ function TaskDetail({
       {canWrite ? (
         <div className="mt-4 flex justify-end">
           <Button
-            onClick={() => remove.mutate({ boardId, taskId: task.id })}
+            onClick={() =>
+              void remove(
+                { kind: "task", id: task.id, name: task.title },
+                onClose,
+              )
+            }
             variant="destructive"
           >
             <Trash2 className="h-4 w-4" /> Delete task
