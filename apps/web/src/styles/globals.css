@@ -134,9 +134,10 @@
   }
 }
 
-/* Tiptap placeholder (shown on the first empty paragraph while editing). */
-.tiptap p.is-editor-empty:first-child::before,
-.ProseMirror p.is-editor-empty:first-child::before {
+/* Tiptap placeholder: the extension tags the empty node with `is-editor-empty`
+   and a `data-placeholder` attribute; render that text via ::before. */
+.tiptap .is-editor-empty::before,
+.ProseMirror .is-editor-empty::before {
   content: attr(data-placeholder);
   color: oklch(1 0 0 / 35%);
   float: left;
