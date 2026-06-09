@@ -133,3 +133,13 @@
     @apply font-sans;
   }
 }
+
+/* Tiptap placeholder (shown on the first empty paragraph while editing). */
+.tiptap p.is-editor-empty:first-child::before,
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: oklch(1 0 0 / 35%);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

@@ -44,6 +44,13 @@ const draftResponseSchema = z.object({
   issues: z.array(draftIssueSchema).max(10),
 });
 
+const enhanceResponseSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(10_000).default(""),
+  priority: priorityEnum.default("none"),
+  labelIds: z.array(z.string()).default([]),
+});
+
 export const taskRouter = createTRPCRouter({
   create: boardProcedure
     .input(
@@ -407,6 +414,102 @@ export const taskRouter = createTRPCRouter({
       }));
 
       return { issues };
+    }),
+
+  enhance: boardProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(500),
+        description: z.string().max(10_000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+
+      const projectRow = await ctx.db
+        .select({
+          name: project.name,
+          description: project.description,
+          systemPrompt: project.systemPrompt,
+        })
+        .from(board)
+        .innerJoin(project, eq(project.id, board.projectId))
+        .where(eq(board.id, input.boardId))
+        .limit(1);
+      const proj = projectRow[0];
+      if (!proj) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const labels = await ctx.db
+        .select({ id: label.id, name: label.name })
+        .from(label)
+        .where(eq(label.boardId, input.boardId));
+
+      const priorities = taskPriority.enumValues.join(", ");
+      const labelList =
+        labels.length > 0
+          ? labels.map((l) => `- ${l.id}: ${l.name}`).join("\n")
+          : "(no labels defined)";
+
+      const system = [
+        "You are a task editor for a kanban board. Polish a single rough task into one clear, well-scoped task. Never split it into multiple tasks.",
+        `Project: ${proj.name}${proj.description ? ` — ${proj.description}` : ""}`,
+        proj.systemPrompt ? `Project context:\n${proj.systemPrompt}` : "",
+        `Available labels (use exact ids, never invent):\n${labelList}`,
+        `Available priorities: ${priorities}`,
+        "Output JSON matching this shape exactly:",
+        `{"title":string,"description":string,"priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[]}`,
+        "Rules:",
+        "- Keep it a single task. Rewrite the title as a clear imperative under 80 chars.",
+        "- description: simple HTML only (use <p>, <strong>, <em>, <ul>/<ol> with <li>, <code>, <a href>). No markdown syntax, no <script>/<style>/<img>. Flesh out the description with concrete detail and acceptance criteria when sensible, while preserving the user's intent.",
+        "- Only use labelIds from the list above. If none fit, use [].",
+        "- Pick the most fitting priority.",
+        "- Do not include commentary. Return only the JSON object.",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      const userContent = [
+        `Title: ${input.title}`,
+        input.description ? `Description (HTML): ${input.description}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const groq = getGroq();
+      const completion = await groq.chat.completions.create({
+        model: GROQ_DRAFT_MODEL,
+        temperature: 0.5,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userContent },
+        ],
+      });
+
+      const raw = completion.choices[0]?.message?.content ?? "";
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "AI returned invalid JSON",
+        });
+      }
+
+      const result = enhanceResponseSchema.safeParse(parsed);
+      if (!result.success) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "AI response did not match expected shape",
+        });
+      }
+
+      const validLabels = new Set(labels.map((l) => l.id));
+      return {
+        ...result.data,
+        labelIds: result.data.labelIds.filter((id) => validLabels.has(id)),
+      };
     }),
 
   createMany: boardProcedure

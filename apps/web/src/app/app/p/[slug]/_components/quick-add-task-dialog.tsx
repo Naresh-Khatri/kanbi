@@ -5,6 +5,7 @@ import {
   Check,
   Image as ImageIcon,
   Paperclip,
+  Sparkles,
   Tag,
   User as UserIcon,
   X,
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import {
@@ -125,8 +127,33 @@ export function QuickAddTaskDialog({
   const setLabel = api.label.setOnTask.useMutation();
   const createUploadUrl = api.attachment.createUploadUrl.useMutation();
   const createAttachment = api.attachment.create.useMutation();
+  const enhance = api.task.enhance.useMutation();
 
   const [submitting, setSubmitting] = useState(false);
+
+  async function handleEnhance() {
+    if (!title.trim() || enhance.isPending) return;
+    try {
+      const res = await enhance.mutateAsync({
+        boardId,
+        title: title.trim(),
+        description: isEmptyHtml(description) ? undefined : description,
+      });
+      setTitle(res.title);
+      setDescription(res.description ?? "");
+      setPriority(res.priority);
+      if (res.labelIds.length > 0) {
+        setSelectedLabelIds((prev) => {
+          const next = new Set(prev);
+          for (const id of res.labelIds) next.add(id);
+          return next;
+        });
+      }
+      toast.success("Task enhanced");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -252,19 +279,36 @@ export function QuickAddTaskDialog({
           </DialogHeader>
 
           <div className="flex flex-col gap-3 px-5 py-4">
-            <Input
-              className="border-0 bg-transparent px-0 text-base font-medium focus-visible:ring-0"
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  handleSubmit(e as unknown as React.FormEvent);
-                }
-              }}
-              placeholder="Task title"
-              ref={titleInputRef}
-              value={title}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                className="flex-1 border-0 bg-transparent px-0 text-base font-medium focus-visible:ring-0"
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleSubmit(e as unknown as React.FormEvent);
+                  }
+                }}
+                placeholder="Task title"
+                ref={titleInputRef}
+                value={title}
+              />
+              <button
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-400/30 bg-violet-400/10 px-2.5 py-1 text-xs text-violet-200 transition hover:border-violet-400/50 hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!title.trim() || enhance.isPending}
+                onClick={handleEnhance}
+                title="Rewrite the title and description with AI"
+                type="button"
+              >
+                <Sparkles
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    enhance.isPending && "animate-pulse",
+                  )}
+                />
+                {enhance.isPending ? "Enhancing…" : "Enhance"}
+              </button>
+            </div>
             <RichTextEditor
               minHeight="72px"
               onChange={setDescription}
@@ -321,7 +365,17 @@ export function QuickAddTaskDialog({
               </MetaChip>
 
               <MetaChip
-                icon={<UserIcon className="h-3.5 w-3.5" />}
+                icon={
+                  currentMember ? (
+                    <UserAvatar
+                      image={currentMember.image}
+                      name={currentMember.name}
+                      size={16}
+                    />
+                  ) : (
+                    <UserIcon className="h-3.5 w-3.5" />
+                  )
+                }
                 label={currentMember ? currentMember.name : "Assignee"}
               >
                 <AssigneeMenu
@@ -538,11 +592,15 @@ function AssigneeMenu({
   return (
     <>
       <DropdownMenuItem onSelect={() => onChange(null)}>
+        <span className="flex h-5 w-5 items-center justify-center">
+          <UserIcon className="h-3.5 w-3.5 text-white/50" />
+        </span>
         Unassigned
         {value === null ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
       </DropdownMenuItem>
       {members.map((m) => (
         <DropdownMenuItem key={m.userId} onSelect={() => onChange(m.userId)}>
+          <UserAvatar image={m.image} name={m.name} size={20} />
           {m.name}
           {value === m.userId ? (
             <Check className="ml-auto h-3.5 w-3.5" />
