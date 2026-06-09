@@ -20,9 +20,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input, Textarea } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import {
+  isRichTextEmpty,
+  RichTextContent,
+  RichTextEditor,
+} from "@/components/ui/rich-text-editor";
 import {
   Sheet,
   SheetContent,
@@ -829,7 +833,7 @@ function CommentsPanel({
                 </span>
                 <span>{new Date(c.createdAt).toLocaleString()}</span>
               </div>
-              <p className="whitespace-pre-wrap">{c.body}</p>
+              <RichTextContent value={c.body} />
             </div>
           </li>
         ))}
@@ -839,19 +843,21 @@ function CommentsPanel({
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!body.trim()) return;
-            create.mutate({ boardId, taskId, body: body.trim() });
+            if (isRichTextEmpty(body)) return;
+            create.mutate({ boardId, taskId, body });
           }}
         >
-          <Textarea
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Leave a comment…"
-            rows={2}
-            value={body}
-          />
+          <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
+            <RichTextEditor
+              minHeight="44px"
+              onChange={setBody}
+              placeholder="Leave a comment…"
+              value={body}
+            />
+          </div>
           <div className="flex justify-end">
             <Button
-              disabled={!body.trim() || create.isPending}
+              disabled={isRichTextEmpty(body) || create.isPending}
               size="sm"
               type="submit"
             >

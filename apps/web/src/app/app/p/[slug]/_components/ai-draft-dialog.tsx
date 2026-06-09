@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import {
@@ -442,12 +443,14 @@ function IssueCard({
               placeholder="Task title"
               value={variant.title}
             />
-            <Textarea
-              className="min-h-[60px] text-xs"
-              onChange={(e) => onVariantEdit({ description: e.target.value })}
-              placeholder="Description (markdown supported)…"
-              value={variant.description}
-            />
+            <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
+              <RichTextEditor
+                minHeight="60px"
+                onChange={(html) => onVariantEdit({ description: html })}
+                placeholder="Add a description…"
+                value={variant.description}
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <PriorityChip
                 onChange={(priority) => onVariantEdit({ priority })}

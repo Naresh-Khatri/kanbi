@@ -19,6 +19,28 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/** Shared prose styling so the editor and the read-only renderer look identical. */
+const RICH_TEXT_PROSE = cn(
+  "prose prose-invert prose-sm max-w-none",
+  "prose-headings:my-2 prose-li:my-0 prose-ol:my-1 prose-p:my-1 prose-ul:my-1",
+  "prose-code:rounded prose-code:bg-white/10 prose-code:px-1 prose-code:py-0.5 prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
+  "prose-blockquote:border-l-white/20 prose-blockquote:text-white/70",
+  "prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline",
+);
+
+/**
+ * True when rich-text HTML carries no visible content (e.g. an empty `<p></p>`
+ * emitted by the editor). Use this to guard submits instead of `html.trim()`.
+ */
+export function isRichTextEmpty(html: string): boolean {
+  return (
+    html
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;|&#160;/g, "")
+      .trim().length === 0
+  );
+}
+
 interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
@@ -50,14 +72,7 @@ export function RichTextEditor({
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: cn(
-          "prose prose-invert prose-sm max-w-none focus:outline-none",
-          "prose-headings:my-2 prose-li:my-0 prose-ol:my-1 prose-p:my-1 prose-ul:my-1",
-          "prose-code:rounded prose-code:bg-white/10 prose-code:px-1 prose-code:py-0.5 prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
-          "prose-blockquote:border-l-white/20 prose-blockquote:text-white/70",
-          "prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline",
-          className,
-        ),
+        class: cn(RICH_TEXT_PROSE, "focus:outline-none", className),
         style: `min-height: ${minHeight};`,
       },
     },
@@ -202,4 +217,42 @@ function ToolbarButton({
 
 function Divider() {
   return <div className="mx-0.5 h-4 w-px bg-white/10" />;
+}
+
+/**
+ * Read-only renderer for rich-text HTML produced by {@link RichTextEditor}.
+ * Parses the HTML through the same ProseMirror schema (so only known nodes /
+ * marks survive — no `dangerouslySetInnerHTML`, no XSS) and applies identical
+ * prose styling. Use this anywhere stored rich text is displayed.
+ */
+export function RichTextContent({
+  value,
+  className,
+}: {
+  value: string;
+  className?: string;
+}) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        link: { openOnClick: true, autolink: true },
+      }),
+    ],
+    content: value,
+    editable: false,
+    immediatelyRender: false,
+    editorProps: {
+      attributes: { class: cn(RICH_TEXT_PROSE, className) },
+    },
+  });
+
+  React.useEffect(() => {
+    if (!editor) return;
+    if (editor.getHTML() !== value)
+      editor.commands.setContent(value, { emitUpdate: false });
+  }, [editor, value]);
+
+  if (!editor) return null;
+
+  return <EditorContent editor={editor} />;
 }
