@@ -75,6 +75,10 @@ export function BoardView({
   const { columns, tasks, labels, taskLabels, access } = data;
   const canWrite = access.canWrite;
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  useEffect(() => {
+    const taskId = new URLSearchParams(window.location.search).get("task");
+    if (taskId) setOpenTaskId(taskId);
+  }, []);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);

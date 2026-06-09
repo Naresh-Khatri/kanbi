@@ -2,17 +2,19 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MoreHorizontal } from "lucide-react";
+import { Link2, MoreHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import type { MemberInfo, TaskRow } from "./board-types";
+import { copyTaskLink } from "../copy-task-link";
 import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
 
@@ -121,6 +123,10 @@ export function TaskCard({
             align="end"
             onClick={(e) => e.stopPropagation()}
           >
+            <DropdownMenuItem onSelect={() => copyTaskLink(task.id)}>
+              <Link2 className="h-3.5 w-3.5" /> Copy link
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               destructive
               onSelect={() =>

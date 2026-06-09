@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Check,
   Flag,
+  Link2,
   Loader2,
   Paperclip,
   Tag,
@@ -37,6 +38,7 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { copyTaskLink } from "./copy-task-link";
 import {
   PRIORITIES,
   PRIORITY_META,
@@ -142,12 +144,21 @@ function TaskDetail({
             value={title}
           />
         </SheetTitle>
-        <SheetDescription>
-          Updated{" "}
-          {task.updatedAt
-            ? new Date(task.updatedAt).toLocaleString()
-            : new Date(task.createdAt).toLocaleString()}
-        </SheetDescription>
+        <div className="flex items-center justify-between gap-2">
+          <SheetDescription>
+            Updated{" "}
+            {task.updatedAt
+              ? new Date(task.updatedAt).toLocaleString()
+              : new Date(task.createdAt).toLocaleString()}
+          </SheetDescription>
+          <button
+            className="inline-flex items-center gap-1.5 text-xs text-white/50 transition-colors hover:text-white"
+            onClick={() => copyTaskLink(task.id)}
+            type="button"
+          >
+            <Link2 className="h-3.5 w-3.5" /> Copy link
+          </button>
+        </div>
       </SheetHeader>
 
       <div className="grid grid-cols-[110px_1fr] gap-y-3 text-sm">
