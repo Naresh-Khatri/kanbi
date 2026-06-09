@@ -11,6 +11,7 @@ import {
   User as UserIcon,
   X,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -96,6 +97,40 @@ function formatDueLabel(value: string) {
     day: "numeric",
     ...(sameYear ? {} : { year: "numeric" }),
   });
+}
+
+/**
+ * Animates its height to fit its content, so swapping content of a different
+ * size (e.g. switching variants) glides instead of snapping. Overflow is only
+ * clipped mid-animation so editor popovers aren't cut off while idle.
+ */
+function AnimateHeight({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | "auto">("auto");
+  const [overflow, setOverflow] = useState<"hidden" | "visible">("visible");
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setHeight(el.offsetHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <motion.div
+      animate={{ height }}
+      initial={false}
+      onAnimationComplete={() => setOverflow("visible")}
+      onAnimationStart={() => setOverflow("hidden")}
+      style={{ overflow }}
+      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+    >
+      <div ref={ref}>{children}</div>
+    </motion.div>
+  );
 }
 
 export function AiDraftDialog({
@@ -555,8 +590,8 @@ function IssueCard({
               the content below belongs to the selected variant. */}
           <div className="mx-4 border-t border-white/5" />
 
-          <div className="flex flex-col gap-2.5 px-4 pt-3 pb-3">
-            {multiVariant ? (
+          {multiVariant ? (
+            <div className="px-4 pt-3">
               <div className="inline-flex w-fit items-center gap-0.5 rounded-lg border border-white/10 bg-black/20 p-0.5">
                 {issue.variants.map((v, i) => (
                   <button
@@ -574,26 +609,36 @@ function IssueCard({
                   </button>
                 ))}
               </div>
-            ) : null}
-            <Input
-              className="border-0 bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
-              onChange={(e) => onVariantEdit({ title: e.target.value })}
-              placeholder="Task title"
-              value={variant.title}
-            />
-            <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
-              <RichTextEditor
-                minHeight="60px"
-                onChange={(html) => onVariantEdit({ description: html })}
-                placeholder="Add context and acceptance criteria…"
-                value={variant.description}
+            </div>
+          ) : null}
+
+          <AnimateHeight>
+            <div
+              className={cn(
+                "flex flex-col gap-2.5 px-4 pb-3",
+                multiVariant ? "pt-2.5" : "pt-3",
+              )}
+            >
+              <Input
+                className="border-0 bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
+                onChange={(e) => onVariantEdit({ title: e.target.value })}
+                placeholder="Task title"
+                value={variant.title}
+              />
+              <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
+                <RichTextEditor
+                  minHeight="60px"
+                  onChange={(html) => onVariantEdit({ description: html })}
+                  placeholder="Add context and acceptance criteria…"
+                  value={variant.description}
+                />
+              </div>
+              <ChecklistField
+                items={variant.checklist}
+                onChange={(checklist) => onVariantEdit({ checklist })}
               />
             </div>
-            <ChecklistField
-              items={variant.checklist}
-              onChange={(checklist) => onVariantEdit({ checklist })}
-            />
-          </div>
+          </AnimateHeight>
         </>
       )}
     </div>
