@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { BoardView } from "@/app/app/p/[slug]/_components/board-view";
+import { BoardView } from "@/app/app/p/[slug]/_components/board/board-view";
 import { resolveProject } from "@/app/app/p/[slug]/_lib/resolve-project";
 
 export default async function ProjectPage({
