@@ -71,6 +71,7 @@ export function BoardView({
   const [data] = api.board.get.useSuspenseQuery({ boardId });
   const membersQuery = api.project.members.useQuery({ projectId });
   const members = membersQuery.data ?? [];
+  const onlineIds = api.realtime.presence.useQuery({ boardId }).data ?? [];
   const membersById = useMemo(() => {
     const map = new Map<string, MemberInfo>();
     for (const m of members) {
@@ -147,6 +148,10 @@ export function BoardView({
     { boardId },
     {
       onData: (evt) => {
+        if (evt.scope === "presence") {
+          utils.realtime.presence.invalidate({ boardId });
+          return;
+        }
         if (evt.scope === "comment") {
           utils.comment.list.invalidate();
           utils.activity.list.invalidate();
@@ -671,6 +676,7 @@ export function BoardView({
         labels={labels}
         members={members}
         onChange={setFilters}
+        onlineIds={onlineIds}
         onOpenArchive={() => setArchiveOpen(true)}
         onOpenDigest={() => setDigestOpen(true)}
         ref={searchInputRef}

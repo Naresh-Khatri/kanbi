@@ -147,6 +147,7 @@ export const BoardToolbar = forwardRef<
     onChange: (next: BoardFilters) => void;
     labels: BoardLabel[];
     members: BoardMember[];
+    onlineIds: string[];
     visibleCount: number;
     totalCount: number;
     archivedCount: number;
@@ -159,6 +160,7 @@ export const BoardToolbar = forwardRef<
     onChange,
     labels,
     members,
+    onlineIds,
     visibleCount,
     totalCount,
     archivedCount,
@@ -330,6 +332,7 @@ export const BoardToolbar = forwardRef<
       ) : null}
 
       <div className="ml-auto flex items-center gap-2">
+        <PresenceStack members={members} onlineIds={onlineIds} />
         {active ? (
           <span className="text-xs text-white/60">
             {hidden > 0 ? `${hidden} hidden` : "Showing all"}
@@ -362,6 +365,40 @@ export const BoardToolbar = forwardRef<
     </div>
   );
 });
+
+/** Overlapping avatars of members who currently have the board open. */
+function PresenceStack({
+  members,
+  onlineIds,
+}: {
+  members: BoardMember[];
+  onlineIds: string[];
+}) {
+  const online = members.filter((m) => onlineIds.includes(m.userId));
+  if (online.length === 0) return null;
+  const shown = online.slice(0, 4);
+  const extra = online.length - shown.length;
+  return (
+    <div
+      className="flex items-center"
+      title={`${online.length} online — ${online.map((m) => m.name).join(", ")}`}
+    >
+      <div className="flex -space-x-1.5">
+        {shown.map((m) => (
+          <span
+            className="rounded-full ring-1 ring-emerald-400/70 ring-offset-2 ring-offset-zinc-950"
+            key={m.userId}
+          >
+            <UserAvatar image={m.image} name={m.name} size={22} />
+          </span>
+        ))}
+      </div>
+      {extra > 0 ? (
+        <span className="ml-2 text-[10px] text-white/50">+{extra}</span>
+      ) : null}
+    </div>
+  );
+}
 
 function FilterChip({
   icon,
