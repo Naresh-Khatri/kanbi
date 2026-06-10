@@ -62,6 +62,7 @@ type DigestHighlightLine = {
   actor: string | null;
   action: string;
   task: string | null;
+  taskId?: string | null;
 };
 
 function highlightToText(h: DigestHighlightLine) {
@@ -82,15 +83,22 @@ export async function sendDigestEmail(
 ) {
   const url = `${appUrl()}/app/p/${opts.slug}`;
   const subject = `Weekly digest — ${opts.boardName}`;
-  const lines = opts.highlights.map(highlightToText);
-  const bullets = lines.map((h) => `• ${h}`).join("\n");
+  const bullets = opts.highlights
+    .map((h) => `• ${highlightToText(h)}`)
+    .join("\n");
   const text = `${opts.headline}\n\n${opts.summary}${
     bullets ? `\n\n${bullets}` : ""
   }\n\nOpen the board: ${url}`;
   const highlightsHtml =
-    lines.length > 0
-      ? `<ul style="color:#bbb;padding-left:18px;margin:16px 0;">${lines
-          .map((h) => `<li style="margin:4px 0;">${h}</li>`)
+    opts.highlights.length > 0
+      ? `<ul style="color:#bbb;padding-left:18px;margin:16px 0;">${opts.highlights
+          .map((h) => {
+            const line = highlightToText(h);
+            const body = h.taskId
+              ? `<a href="${url}?task=${h.taskId}" style="color:#cbd5e1;text-decoration:none;">${line}</a>`
+              : line;
+            return `<li style="margin:4px 0;">${body}</li>`;
+          })
           .join("")}</ul>`
       : "";
   const html = layout(

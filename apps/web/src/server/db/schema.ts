@@ -360,11 +360,20 @@ export type DigestStats = {
   contributors: number;
 };
 
+export type DigestCategory =
+  | "shipped"
+  | "progress"
+  | "created"
+  | "discussion"
+  | "other";
+
 /** One notable item, split so the UI can render the actor + task distinctly. */
 export type DigestHighlight = {
   actor: string | null;
   action: string;
   task: string | null;
+  taskId: string | null;
+  category: DigestCategory;
 };
 
 /** A contributor in the period, kept so the UI can show their avatar. */
@@ -376,6 +385,8 @@ export type DigestContent = {
   highlights: DigestHighlight[];
   stats: DigestStats;
   people: DigestPerson[];
+  /** Per-day event counts across the window, oldest → newest. */
+  activity: number[];
 };
 
 export const digest = createTable(

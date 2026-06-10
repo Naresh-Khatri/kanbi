@@ -3,16 +3,14 @@ import "server-only";
 import { and, desc, eq, gte } from "drizzle-orm";
 
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
-import {
-  type DigestEvent,
-  generateDigest,
-  toDigestContent,
-} from "@/server/ai/digest";
+import { type DigestEvent, generateDigest } from "@/server/ai/digest";
 import type { db as Database } from "@/server/db";
 import {
   activity,
   board,
   boardColumn,
+  type DigestContent,
+  type DigestHighlight,
   type DigestPerson,
   type DigestStats,
   digest,
@@ -22,6 +20,8 @@ import {
 } from "@/server/db/schema";
 
 export const DIGEST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DIGEST_DAYS = 7;
 
 export type StoredDigest = typeof digest.$inferSelect;
 
@@ -59,6 +59,7 @@ export async function generateBoardDigest(
       createdAt: activity.createdAt,
       actorId: activity.actorId,
       actorName: userTable.name,
+      taskId: activity.taskId,
       taskTitle: task.title,
     })
     .from(activity)
@@ -79,9 +80,20 @@ export async function generateBoardDigest(
   };
   const contributors = new Map<string, string>();
   const events: DigestEvent[] = [];
+  // Resolve a highlight's task title back to an id so the UI can deep-link.
+  const taskIdByTitle = new Map<string, string>();
+  const daily = new Array<number>(DIGEST_DAYS).fill(0);
 
   for (const r of rows) {
     contributors.set(r.actorId, r.actorName);
+    if (r.taskId && r.taskTitle) {
+      taskIdByTitle.set(r.taskTitle.trim().toLowerCase(), r.taskId);
+    }
+    const dayIndex = Math.min(
+      DIGEST_DAYS - 1,
+      Math.max(0, Math.floor((r.createdAt.getTime() - since.getTime()) / DAY_MS)),
+    );
+    daily[dayIndex] = (daily[dayIndex] ?? 0) + 1;
     const payload = (r.payload ?? {}) as Record<string, unknown>;
     let detail: string | null = null;
 
@@ -132,14 +144,28 @@ export async function generateBoardDigest(
     events,
   });
 
+  const highlights: DigestHighlight[] = draft.highlights.map((h) => ({
+    actor: h.actor,
+    action: h.action,
+    task: h.task,
+    taskId: h.task
+      ? (taskIdByTitle.get(h.task.trim().toLowerCase()) ?? null)
+      : null,
+    category: h.category,
+  }));
+
+  const content: DigestContent = {
+    headline: draft.headline,
+    summary: draft.summary,
+    highlights,
+    stats,
+    people,
+    activity: daily,
+  };
+
   const inserted = await db
     .insert(digest)
-    .values({
-      boardId,
-      periodStart: since,
-      periodEnd: now,
-      content: toDigestContent(draft, stats, people),
-    })
+    .values({ boardId, periodStart: since, periodEnd: now, content })
     .returning();
 
   return inserted[0]!;

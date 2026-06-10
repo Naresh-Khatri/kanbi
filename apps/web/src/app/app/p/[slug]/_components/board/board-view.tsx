@@ -715,6 +715,7 @@ export function BoardView({
         canWrite={canWrite}
         members={members}
         onOpenChange={setDigestOpen}
+        onOpenTask={handleOpenTask}
         open={digestOpen}
       />
       {columns.length > 0 ? (

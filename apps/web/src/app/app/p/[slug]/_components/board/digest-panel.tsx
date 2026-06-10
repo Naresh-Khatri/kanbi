@@ -21,34 +21,92 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import type { DigestHighlight } from "@/server/db/schema";
+import { cn } from "@/lib/utils";
+import type { DigestCategory, DigestHighlight } from "@/server/db/schema";
 import { api } from "@/trpc/react";
 
 type Member = { userId: string; name: string | null; image: string | null };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const STAT_DEFS = [
-  { key: "created", label: "created", Icon: Plus },
-  { key: "moved", label: "moved", Icon: ArrowRight },
-  { key: "completed", label: "completed", Icon: CheckCircle2 },
-  { key: "comments", label: "comments", Icon: MessageSquare },
+  { key: "created", label: "created", Icon: Plus, accent: false },
+  { key: "moved", label: "moved", Icon: ArrowRight, accent: false },
+  { key: "completed", label: "completed", Icon: CheckCircle2, accent: true },
+  { key: "comments", label: "comments", Icon: MessageSquare, accent: false },
 ] as const;
+
+const GROUPS: { category: DigestCategory; label: string }[] = [
+  { category: "shipped", label: "Shipped" },
+  { category: "progress", label: "In progress" },
+  { category: "created", label: "Created" },
+  { category: "discussion", label: "Discussion" },
+  { category: "other", label: "Also notable" },
+];
 
 function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function shortDate(value: Date | string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function periodLabel(start: Date | string, end: Date | string) {
-  const fmt = (d: Date | string) =>
-    new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return `${fmt(start)} – ${fmt(end)}`;
+  return `${shortDate(start)} – ${shortDate(end)}`;
+}
+
+function relativeTime(value: Date | string) {
+  const diff = Date.now() - new Date(value).getTime();
+  const m = Math.round(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
 }
 
 function normalizeHighlights(raw: unknown): DigestHighlight[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((h) =>
     typeof h === "string"
-      ? { actor: null, action: h, task: null }
-      : (h as DigestHighlight),
+      ? { actor: null, action: h, task: null, taskId: null, category: "other" }
+      : {
+          actor: h.actor ?? null,
+          action: h.action ?? "",
+          task: h.task ?? null,
+          taskId: h.taskId ?? null,
+          category: (h.category ?? "other") as DigestCategory,
+        },
+  );
+}
+
+/** Tiny per-day activity bar chart for the window. */
+function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
+  const max = Math.max(1, ...data);
+  const startMs = new Date(start).getTime();
+  return (
+    <div className="flex h-7 items-end gap-1">
+      {data.map((v, i) => {
+        const day = new Date(startMs + i * DAY_MS);
+        const label = day.toLocaleDateString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        });
+        return (
+          <div
+            className="flex-1 rounded-sm bg-white/15 transition-colors hover:bg-white/25"
+            key={i}
+            style={{ height: `${Math.max(6, (v / max) * 100)}%` }}
+            title={`${label}: ${v} update${v === 1 ? "" : "s"}`}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -83,18 +141,64 @@ function FormattedSummary({ text, names }: { text: string; names: string[] }) {
   return <p className="text-sm leading-relaxed text-white/70">{nodes}</p>;
 }
 
+function HighlightRow({
+  highlight: h,
+  image,
+  onOpen,
+}: {
+  highlight: DigestHighlight;
+  image: string | null;
+  onOpen?: () => void;
+}) {
+  const inner = (
+    <>
+      {h.actor ? (
+        <UserAvatar className="mt-0.5" image={image} name={h.actor} size={22} />
+      ) : (
+        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/25" />
+      )}
+      <p className="text-sm leading-relaxed text-white/55">
+        {h.actor ? (
+          <span className="font-medium text-white/90">{h.actor} </span>
+        ) : null}
+        {h.action}
+        {h.task ? (
+          <span className="font-medium text-white/90"> “{h.task}”</span>
+        ) : null}
+      </p>
+    </>
+  );
+
+  if (onOpen) {
+    return (
+      <li>
+        <button
+          className="-mx-2 flex w-full items-start gap-2.5 rounded-md px-2 py-1 text-left transition hover:bg-white/5"
+          onClick={onOpen}
+          type="button"
+        >
+          {inner}
+        </button>
+      </li>
+    );
+  }
+  return <li className="flex items-start gap-2.5 py-1">{inner}</li>;
+}
+
 export function DigestPanel({
   boardId,
   open,
   onOpenChange,
   canWrite,
   members,
+  onOpenTask,
 }: {
   boardId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   canWrite: boolean;
   members: Member[];
+  onOpenTask?: (taskId: string) => void;
 }) {
   const utils = api.useUtils();
   const latest = api.digest.latest.useQuery({ boardId }, { enabled: open });
@@ -103,23 +207,34 @@ export function DigestPanel({
     onError: (e) => toast.error(e.message),
   });
 
-  const { idToImage, nameToImage, memberNames } = useMemo(() => {
-    const idToImage = new Map<string, string | null>();
+  const { nameToImage, memberNames } = useMemo(() => {
     const nameToImage = new Map<string, string | null>();
     const memberNames: string[] = [];
     for (const m of members) {
-      idToImage.set(m.userId, m.image);
       if (m.name) {
         nameToImage.set(m.name.toLowerCase(), m.image);
         memberNames.push(m.name);
       }
     }
-    return { idToImage, nameToImage, memberNames };
+    return { nameToImage, memberNames };
   }, [members]);
+  const imageById = useMemo(
+    () => new Map(members.map((m) => [m.userId, m.image])),
+    [members],
+  );
 
   const digest = latest.data;
-  const highlights = digest ? normalizeHighlights(digest.content.highlights) : [];
+  const highlights = digest
+    ? normalizeHighlights(digest.content.highlights)
+    : [];
   const people = digest?.content.people ?? [];
+  const activity = digest?.content.activity ?? [];
+
+  const groups = GROUPS.map((g) => ({
+    ...g,
+    items: highlights.filter((h) => h.category === g.category),
+  })).filter((g) => g.items.length > 0);
+  const showLabels = groups.length > 1;
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -152,16 +267,33 @@ export function DigestPanel({
             </h2>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {STAT_DEFS.map(({ key, label, Icon }) => {
+              {STAT_DEFS.map(({ key, label, Icon, accent }) => {
                 const value = digest.content.stats[key];
                 if (!value) return null;
                 return (
                   <span
-                    className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-xs text-white/60"
+                    className={cn(
+                      "flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs",
+                      accent
+                        ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-200/70"
+                        : "border-white/10 bg-white/[0.03] text-white/60",
+                    )}
                     key={key}
                   >
-                    <Icon className="h-3 w-3 text-white/40" />
-                    <span className="font-medium text-white/80">{value}</span>
+                    <Icon
+                      className={cn(
+                        "h-3 w-3",
+                        accent ? "text-emerald-300/80" : "text-white/40",
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "font-medium",
+                        accent ? "text-emerald-200/90" : "text-white/80",
+                      )}
+                    >
+                      {value}
+                    </span>
                     {label}
                   </span>
                 );
@@ -172,7 +304,7 @@ export function DigestPanel({
                     {people.slice(0, 5).map((p) => (
                       <UserAvatar
                         className="ring-2 ring-[#0f1016]"
-                        image={idToImage.get(p.id) ?? null}
+                        image={imageById.get(p.id) ?? null}
                         key={p.id}
                         name={p.name}
                         size={18}
@@ -189,39 +321,52 @@ export function DigestPanel({
               ) : null}
             </div>
 
+            {activity.some((v) => v > 0) ? (
+              <Sparkline data={activity} start={digest.periodStart} />
+            ) : null}
+
             <FormattedSummary names={memberNames} text={digest.content.summary} />
 
-            {highlights.length > 0 ? (
-              <ul className="flex flex-col gap-2.5 border-t border-white/5 pt-4">
-                {highlights.map((h, i) => (
-                  <li className="flex items-start gap-2.5" key={i}>
-                    {h.actor ? (
-                      <UserAvatar
-                        className="mt-0.5"
-                        image={nameToImage.get(h.actor.toLowerCase()) ?? null}
-                        name={h.actor}
-                        size={22}
-                      />
-                    ) : (
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/25" />
-                    )}
-                    <p className="text-sm leading-relaxed text-white/55">
-                      {h.actor ? (
-                        <span className="font-medium text-white/90">
-                          {h.actor}{" "}
-                        </span>
-                      ) : null}
-                      {h.action}
-                      {h.task ? (
-                        <span className="font-medium text-white/90">
-                          {" "}
-                          “{h.task}”
-                        </span>
-                      ) : null}
-                    </p>
-                  </li>
+            {groups.length > 0 ? (
+              <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
+                {groups.map((g) => (
+                  <div className="flex flex-col gap-1.5" key={g.category}>
+                    {showLabels ? (
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium tracking-wide uppercase",
+                          g.category === "shipped"
+                            ? "text-emerald-300/70"
+                            : "text-white/35",
+                        )}
+                      >
+                        {g.label}
+                      </span>
+                    ) : null}
+                    <ul className="flex flex-col gap-1">
+                      {g.items.map((h, i) => (
+                        <HighlightRow
+                          highlight={h}
+                          image={
+                            h.actor
+                              ? (nameToImage.get(h.actor.toLowerCase()) ?? null)
+                              : null
+                          }
+                          key={i}
+                          onOpen={
+                            h.taskId && onOpenTask
+                              ? () => {
+                                  onOpenTask(h.taskId!);
+                                  onOpenChange(false);
+                                }
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : null}
           </div>
         ) : (
@@ -233,23 +378,28 @@ export function DigestPanel({
           </div>
         )}
 
-        {canWrite ? (
-          <div className="flex justify-end">
-            <Button
-              disabled={generate.isPending}
-              onClick={() => generate.mutate({ boardId })}
-              size="sm"
-              variant={digest ? "ghost" : "default"}
-            >
-              {generate.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : digest ? (
-                <RefreshCw className="h-3.5 w-3.5" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              {digest ? "Regenerate" : "Generate this week"}
-            </Button>
+        {digest || canWrite ? (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-xs text-white/35">
+              {digest ? `Generated ${relativeTime(digest.createdAt)}` : ""}
+            </span>
+            {canWrite ? (
+              <Button
+                disabled={generate.isPending}
+                onClick={() => generate.mutate({ boardId })}
+                size="sm"
+                variant={digest ? "ghost" : "default"}
+              >
+                {generate.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : digest ? (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {digest ? "Regenerate" : "Generate this week"}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </DialogContent>
