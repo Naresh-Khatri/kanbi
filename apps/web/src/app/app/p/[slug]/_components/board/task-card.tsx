@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Archive, Link2, MoreHorizontal } from "lucide-react";
 import { motion } from "motion/react";
-import { toast } from "sonner";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,10 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { api } from "@/trpc/react";
+import { cn } from "@/lib/utils";
 import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
 import { copyTaskLink } from "../copy-task-link";
 import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
+import { useArchiveTask } from "../use-archive-task";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
 
 export function SortableTaskCard({
@@ -29,6 +30,7 @@ export function SortableTaskCard({
   assignee,
   labels,
   showDropIndicatorBefore,
+  focused,
 }: {
   boardId: string;
   task: TaskRow;
@@ -38,6 +40,7 @@ export function SortableTaskCard({
   assignee: MemberInfo | null;
   labels: LabelInfo[];
   showDropIndicatorBefore: boolean;
+  focused: boolean;
 }) {
   const sortable = useSortable({
     id: task.id,
@@ -70,6 +73,7 @@ export function SortableTaskCard({
         <TaskCard
           assignee={assignee}
           boardId={boardId}
+          focused={focused}
           labels={labels}
           onOpen={onOpen}
           task={task}
@@ -101,56 +105,33 @@ export function TaskCard({
   onOpen,
   assignee,
   labels,
+  focused = false,
 }: {
   boardId: string;
   task: TaskRow;
   onOpen: () => void;
   assignee: MemberInfo | null;
   labels: LabelInfo[];
+  focused?: boolean;
 }) {
-  const utils = api.useUtils();
   const remove = useUndoableBoardDelete(boardId);
-  const setArchived = api.task.archive.useMutation({
-    onMutate: async (vars) => {
-      await utils.board.get.cancel({ boardId });
-      const previous = utils.board.get.getData({ boardId });
-      utils.board.get.setData({ boardId }, (old) =>
-        old
-          ? {
-              ...old,
-              tasks: old.tasks.map((t) =>
-                t.id === vars.taskId
-                  ? { ...t, archivedAt: vars.archived ? new Date() : null }
-                  : t,
-              ),
-            }
-          : old,
-      );
-      return { previous };
-    },
-    onError: (e, _v, ctx) => {
-      if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
-      toast.error(e.message);
-    },
-    onSettled: () => utils.board.get.invalidate({ boardId }),
-  });
+  const archiveTask = useArchiveTask(boardId);
+  const ref = useRef<HTMLDivElement>(null);
   const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
   const overflowCount = labels.length - visibleLabels.length;
 
-  function archive() {
-    setArchived.mutate({ boardId, taskId: task.id, archived: true });
-    toast(`Archived "${task.title}"`, {
-      action: {
-        label: "Undo",
-        onClick: () =>
-          setArchived.mutate({ boardId, taskId: task.id, archived: false }),
-      },
-    });
-  }
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [focused]);
+
   return (
     <div
-      className="group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20"
+      className={cn(
+        "group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20",
+        focused && "border-sky-400/60 ring-2 ring-sky-400/50",
+      )}
       onClick={onOpen}
+      ref={ref}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm leading-snug">{task.title}</p>
@@ -173,7 +154,11 @@ export function TaskCard({
             <DropdownMenuItem onSelect={() => copyTaskLink(task.id)}>
               <Link2 className="h-3.5 w-3.5" /> Copy link
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={archive}>
+            <DropdownMenuItem
+              onSelect={() =>
+                archiveTask({ id: task.id, title: task.title })
+              }
+            >
               <Archive className="h-3.5 w-3.5" /> Archive
             </DropdownMenuItem>
             <DropdownMenuSeparator />

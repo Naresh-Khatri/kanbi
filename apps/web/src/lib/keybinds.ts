@@ -21,6 +21,11 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
   },
   {
     title: "Board",
-    entries: [{ keys: "/", description: "Focus task search" }],
+    entries: [
+      { keys: "/", description: "Focus task search" },
+      { keys: "↑ ↓ ← →", description: "Move between cards" },
+      { keys: "Enter / e", description: "Open focused card" },
+      { keys: "x", description: "Archive focused card" },
+    ],
   },
 ];

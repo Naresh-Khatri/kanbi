@@ -50,6 +50,7 @@ import type {
 } from "./board-types";
 import { celebrate } from "./celebrate";
 import { QuickAddTaskDialog } from "../quick-add-task-dialog";
+import { useArchiveTask } from "../use-archive-task";
 import { SortableColumn } from "./sortable-column";
 import { StatsBar } from "./stats-bar";
 import { TaskCardPreview } from "./task-card";
@@ -84,6 +85,8 @@ export function BoardView({
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
+  const archiveTask = useArchiveTask(boardId);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [aiDraftColumnId, setAiDraftColumnId] = useState<string | null>(null);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
@@ -487,6 +490,140 @@ export function BoardView({
     return { total, done, overdue, unassigned, highPriority };
   }, [columns, tasks]);
 
+  function handleOpenTask(taskId: string) {
+    setFocusedTaskId(taskId);
+    setOpenTaskId(taskId);
+  }
+
+  // Card-level keyboard navigation. The hotkey handlers read the latest board
+  // state through a ref, so the bindings can stay stable and the handlers don't
+  // capture stale columns/tasks.
+  const navColumns = useMemo(
+    () =>
+      sortedColumns.map((c) => ({
+        id: c.id,
+        taskIds: (tasksByColumn.get(c.id) ?? []).map((t) => t.id),
+      })),
+    [sortedColumns, tasksByColumn],
+  );
+  const navActive = !openTask && !quickAddOpen && !aiDraftOpen && !archiveOpen;
+  const kbRef = useRef({
+    navColumns,
+    focusedTaskId,
+    active: navActive,
+    canWrite,
+    tasks,
+    archive: archiveTask,
+  });
+  kbRef.current = {
+    navColumns,
+    focusedTaskId,
+    active: navActive,
+    canWrite,
+    tasks,
+    archive: archiveTask,
+  };
+
+  function moveFocus(dir: "up" | "down" | "left" | "right") {
+    const { navColumns: cols, focusedTaskId: fid } = kbRef.current;
+    const firstNonEmpty = cols.find((c) => c.taskIds.length > 0);
+    if (!firstNonEmpty) return;
+    let ci = fid ? cols.findIndex((c) => c.taskIds.includes(fid)) : -1;
+    if (ci === -1) {
+      setFocusedTaskId(firstNonEmpty.taskIds[0] ?? null);
+      return;
+    }
+    let ti = cols[ci]!.taskIds.indexOf(fid!);
+    if (dir === "down") {
+      ti = Math.min(ti + 1, cols[ci]!.taskIds.length - 1);
+    } else if (dir === "up") {
+      ti = Math.max(ti - 1, 0);
+    } else {
+      const step = dir === "right" ? 1 : -1;
+      let nci = ci + step;
+      while (nci >= 0 && nci < cols.length && cols[nci]!.taskIds.length === 0) {
+        nci += step;
+      }
+      if (nci < 0 || nci >= cols.length) return;
+      ci = nci;
+      ti = Math.min(ti, cols[ci]!.taskIds.length - 1);
+    }
+    const next = cols[ci]?.taskIds[ti];
+    if (next) setFocusedTaskId(next);
+  }
+
+  function archiveFocused() {
+    const { focusedTaskId: fid, canWrite: cw, tasks: ts, navColumns: cols } =
+      kbRef.current;
+    if (!fid || !cw) return;
+    const target = ts.find((t) => t.id === fid);
+    if (!target) return;
+    const col = cols.find((c) => c.taskIds.includes(fid));
+    let nextFocus: string | null = null;
+    if (col) {
+      const idx = col.taskIds.indexOf(fid);
+      nextFocus = col.taskIds[idx + 1] ?? col.taskIds[idx - 1] ?? null;
+    }
+    kbRef.current.archive({ id: target.id, title: target.title });
+    setFocusedTaskId(nextFocus);
+  }
+
+  const cardKeyOpts = { enableOnFormTags: false } as const;
+  useHotkeys(
+    "down",
+    (e) => {
+      if (!kbRef.current.active) return;
+      e.preventDefault();
+      moveFocus("down");
+    },
+    cardKeyOpts,
+  );
+  useHotkeys(
+    "up",
+    (e) => {
+      if (!kbRef.current.active) return;
+      e.preventDefault();
+      moveFocus("up");
+    },
+    cardKeyOpts,
+  );
+  useHotkeys(
+    "right",
+    (e) => {
+      if (!kbRef.current.active) return;
+      e.preventDefault();
+      moveFocus("right");
+    },
+    cardKeyOpts,
+  );
+  useHotkeys(
+    "left",
+    (e) => {
+      if (!kbRef.current.active) return;
+      e.preventDefault();
+      moveFocus("left");
+    },
+    cardKeyOpts,
+  );
+  useHotkeys(
+    "enter, e",
+    (e) => {
+      if (!kbRef.current.active || !kbRef.current.focusedTaskId) return;
+      e.preventDefault();
+      handleOpenTask(kbRef.current.focusedTaskId);
+    },
+    cardKeyOpts,
+  );
+  useHotkeys(
+    "x",
+    (e) => {
+      if (!kbRef.current.active || !kbRef.current.focusedTaskId) return;
+      e.preventDefault();
+      archiveFocused();
+    },
+    cardKeyOpts,
+  );
+
   return (
     <main className="flex h-[calc(100vh-57px)] flex-col">
       <StatsBar stats={stats} />
@@ -523,6 +660,7 @@ export function BoardView({
                   dropTarget={
                     dropTarget?.columnId === col.id ? dropTarget : null
                   }
+                  focusedTaskId={focusedTaskId}
                   key={col.id}
                   labelsByTask={cardLabelsByTask}
                   membersById={membersById}
@@ -530,7 +668,7 @@ export function BoardView({
                     setQuickAddColumnId(id);
                     setQuickAddOpen(true);
                   }}
-                  onOpenTask={setOpenTaskId}
+                  onOpenTask={handleOpenTask}
                   tasks={tasksByColumn.get(col.id) ?? []}
                 />
               ))}

@@ -33,6 +33,7 @@ export function SortableColumn({
   onAddTask,
   membersById,
   labelsByTask,
+  focusedTaskId,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -43,6 +44,7 @@ export function SortableColumn({
   onAddTask: (columnId: string) => void;
   membersById: Map<string, MemberInfo>;
   labelsByTask: Map<string, LabelInfo[]>;
+  focusedTaskId: string | null;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -93,6 +95,7 @@ export function SortableColumn({
                   boardId={boardId}
                   canWrite={canWrite}
                   columnId={column.id}
+                  focused={focusedTaskId === t.id}
                   key={t.id}
                   labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
                   onOpen={() => onOpenTask(t.id)}
