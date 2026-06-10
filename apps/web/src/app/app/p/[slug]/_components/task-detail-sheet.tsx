@@ -3,17 +3,19 @@
 import {
   CalendarDays,
   Check,
-  Flag,
   Link2,
   Loader2,
   Paperclip,
   Pencil,
+  Plus,
   Settings2,
+  SquareKanban,
   Tag,
   Trash2,
   User as UserIcon,
+  X,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -58,6 +61,7 @@ import { useUndoableBoardDelete } from "./use-undoable-board-delete";
 
 type BoardData = RouterOutputs["board"]["get"];
 type TaskRow = BoardData["tasks"][number];
+type ColumnRow = BoardData["columns"][number];
 type LabelRow = BoardData["labels"][number];
 type PendingUpload = {
   id: string;
@@ -72,6 +76,8 @@ export function TaskDetailSheet({
   task,
   boardId,
   projectId,
+  columns,
+  tasks,
   labels,
   taskLabels,
   canWrite,
@@ -81,6 +87,8 @@ export function TaskDetailSheet({
   task: TaskRow | null;
   boardId: string;
   projectId: string;
+  columns: ColumnRow[];
+  tasks: TaskRow[];
   labels: LabelRow[];
   taskLabels: BoardData["taskLabels"];
   canWrite: boolean;
@@ -92,11 +100,13 @@ export function TaskDetailSheet({
           <TaskDetail
             boardId={boardId}
             canWrite={canWrite}
+            columns={columns}
             labels={labels}
             onClose={() => onOpenChange(false)}
             projectId={projectId}
             task={task}
             taskLabels={taskLabels.filter((tl) => tl.taskId === task.id)}
+            tasks={tasks}
           />
         ) : null}
       </SheetContent>
@@ -108,6 +118,8 @@ function TaskDetail({
   task,
   boardId,
   projectId,
+  columns,
+  tasks,
   labels,
   taskLabels,
   canWrite,
@@ -116,6 +128,8 @@ function TaskDetail({
   task: TaskRow;
   boardId: string;
   projectId: string;
+  columns: ColumnRow[];
+  tasks: TaskRow[];
   labels: LabelRow[];
   taskLabels: BoardData["taskLabels"];
   canWrite: boolean;
@@ -129,7 +143,28 @@ function TaskDetail({
     onSuccess: () => utils.board.get.invalidate({ boardId }),
     onError: (e) => toast.error(e.message),
   });
+  const move = api.task.move.useMutation({
+    onSuccess: () => utils.board.get.invalidate({ boardId }),
+    onError: (e) => toast.error(e.message),
+  });
+  const changeColumn = (toColumnId: string) => {
+    if (toColumnId === task.columnId) return;
+    const last = tasks
+      .filter((t) => t.columnId === toColumnId)
+      .reduce<TaskRow | null>(
+        (max, t) => (!max || t.position > max.position ? t : max),
+        null,
+      );
+    move.mutate({
+      boardId,
+      taskId: task.id,
+      toColumnId,
+      before: last ? last.position : null,
+      after: null,
+    });
+  };
   const remove = useUndoableBoardDelete(boardId);
+  const me = api.user.me.useQuery();
   const members = api.project.members.useQuery(
     { projectId },
     { enabled: canWrite },
@@ -148,39 +183,35 @@ function TaskDetail({
 
   return (
     <div className="flex flex-col gap-5">
-      <SheetHeader>
+      <CopyLinkButton taskId={task.id} />
+      <SheetHeader className="pr-20">
         <SheetTitle>
-          <Input
-            className="border-0 bg-transparent px-0 text-lg focus-visible:ring-0"
+          <TitleField
             disabled={!canWrite}
-            onBlur={() => {
+            onChange={setTitle}
+            onCommit={() => {
               if (title.trim() && title !== task.title) {
                 update.mutate({ boardId, taskId: task.id, title });
               }
             }}
-            onChange={(e) => setTitle(e.target.value)}
             value={title}
           />
         </SheetTitle>
-        <div className="flex items-center justify-between gap-2">
-          <SheetDescription>
-            Updated{" "}
-            {task.updatedAt
-              ? new Date(task.updatedAt).toLocaleString()
-              : new Date(task.createdAt).toLocaleString()}
-          </SheetDescription>
-          <button
-            className="inline-flex items-center gap-1.5 text-xs text-white/50 transition-colors hover:text-white"
-            onClick={() => copyTaskLink(task.id)}
-            type="button"
-          >
-            <Link2 className="h-3.5 w-3.5" /> Copy link
-          </button>
-        </div>
+        <SheetDescription>
+          Updated{" "}
+          {task.updatedAt
+            ? new Date(task.updatedAt).toLocaleString()
+            : new Date(task.createdAt).toLocaleString()}
+        </SheetDescription>
       </SheetHeader>
 
-      <div className="grid grid-cols-[110px_1fr] gap-y-3 text-sm">
-        <MetaLabel icon={<Flag className="h-3.5 w-3.5" />}>Priority</MetaLabel>
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-1 border-y border-white/[0.06] py-2.5">
+        <StatusMenu
+          canWrite={canWrite}
+          columns={columns}
+          onChange={changeColumn}
+          value={task.columnId}
+        />
         <PriorityMenu
           canWrite={canWrite}
           onChange={(p) =>
@@ -188,40 +219,22 @@ function TaskDetail({
           }
           value={task.priority as Priority}
         />
-
-        <MetaLabel icon={<UserIcon className="h-3.5 w-3.5" />}>
-          Assignee
-        </MetaLabel>
         <AssigneeMenu
           canWrite={canWrite}
+          currentUserId={me.data?.id ?? null}
           members={members.data ?? []}
           onChange={(id) =>
             update.mutate({ boardId, taskId: task.id, assigneeId: id })
           }
           value={task.assigneeId}
         />
-
-        <MetaLabel icon={<CalendarDays className="h-3.5 w-3.5" />}>
-          Due
-        </MetaLabel>
-        <Input
-          className="max-w-[200px]"
-          disabled={!canWrite}
-          onChange={(e) => {
-            const v = e.target.value;
-            update.mutate({
-              boardId,
-              taskId: task.id,
-              dueAt: v ? new Date(v) : null,
-            });
-          }}
-          type="date"
-          value={
-            task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : ""
+        <DueControl
+          canWrite={canWrite}
+          onChange={(d) =>
+            update.mutate({ boardId, taskId: task.id, dueAt: d })
           }
+          value={task.dueAt}
         />
-
-        <MetaLabel icon={<Tag className="h-3.5 w-3.5" />}>Labels</MetaLabel>
         <LabelsPicker
           activeLabelIds={activeLabelIds}
           boardId={boardId}
@@ -287,18 +300,183 @@ function TaskDetail({
   );
 }
 
-function MetaLabel({
-  children,
-  icon,
+// Shared Linear-style "property" trigger: borderless, icon-led, quiet until hover.
+const PROP_BTN =
+  "inline-flex h-8 max-w-full items-center gap-1.5 rounded-md px-2 text-sm whitespace-nowrap text-white/85 transition hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none disabled:pointer-events-none data-[state=open]:bg-white/[0.06]";
+const PROP_ICON = "h-4 w-4 shrink-0 text-white/45";
+const PROP_PLACEHOLDER = "text-white/45";
+
+function formatDue(value: Date | string) {
+  const d = new Date(value);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+function DueControl({
+  value,
+  onChange,
+  canWrite,
 }: {
-  children: React.ReactNode;
-  icon: React.ReactNode;
+  value: Date | string | null;
+  onChange: (d: Date | null) => void;
+  canWrite: boolean;
 }) {
+  const dateRef = useRef<HTMLInputElement>(null);
+  const has = value != null;
+  const openPicker = () => {
+    const el = dateRef.current;
+    if (!el) return;
+    try {
+      el.showPicker();
+    } catch {
+      el.focus();
+    }
+  };
   return (
-    <div className="flex items-center gap-1.5 pt-1.5 text-xs tracking-wide text-white/70 uppercase">
-      {icon}
-      {children}
+    <div className="relative inline-flex items-center">
+      <button
+        className={PROP_BTN}
+        disabled={!canWrite}
+        onClick={openPicker}
+        type="button"
+      >
+        <CalendarDays className={PROP_ICON} />
+        <span className={cn("truncate", !has && PROP_PLACEHOLDER)}>
+          {has ? formatDue(value) : "Due date"}
+        </span>
+      </button>
+      {has && canWrite ? (
+        <button
+          aria-label="Clear due date"
+          className="-ml-1 rounded p-1 text-white/40 transition hover:bg-white/10 hover:text-white"
+          onClick={() => onChange(null)}
+          type="button"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      ) : null}
+      <input
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0"
+        disabled={!canWrite}
+        onChange={(e) =>
+          onChange(e.target.value ? new Date(e.target.value) : null)
+        }
+        ref={dateRef}
+        tabIndex={-1}
+        type="date"
+        value={has ? new Date(value).toISOString().slice(0, 10) : ""}
+      />
     </div>
+  );
+}
+
+function TitleField({
+  value,
+  onChange,
+  onCommit,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  disabled: boolean;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  // Re-fit whenever the value changes (typing, or switching tasks).
+  useEffect(resize, [value]);
+  return (
+    <textarea
+      className="w-full resize-none overflow-hidden border-0 bg-transparent px-0 text-xl leading-snug font-semibold text-white placeholder:text-white/40 focus-visible:outline-none disabled:cursor-default disabled:opacity-100"
+      disabled={disabled}
+      onBlur={onCommit}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      ref={ref}
+      rows={1}
+      value={value}
+    />
+  );
+}
+
+function CopyLinkButton({ taskId }: { taskId: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  return (
+    <button
+      aria-label="Copy link to this task"
+      className="absolute top-[10px] right-[44px] z-10 inline-flex h-7 w-7 items-center justify-center rounded-md text-white/45 transition hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.06] focus-visible:outline-none"
+      onClick={() => {
+        copyTaskLink(taskId);
+        setCopied(true);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => setCopied(false), 1500);
+      }}
+      title={copied ? "Copied" : "Copy link"}
+      type="button"
+    >
+      {copied ? (
+        <Check className="h-4 w-4 text-emerald-400" />
+      ) : (
+        <Link2 className="h-4 w-4" />
+      )}
+    </button>
+  );
+}
+
+function StatusMenu({
+  value,
+  columns,
+  onChange,
+  canWrite,
+}: {
+  value: string;
+  columns: ColumnRow[];
+  onChange: (columnId: string) => void;
+  canWrite: boolean;
+}) {
+  const current = columns.find((c) => c.id === value);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className={PROP_BTN} disabled={!canWrite} type="button">
+          <SquareKanban className="h-4 w-4 shrink-0 text-white/60" />
+          <span className={cn("truncate", !current && PROP_PLACEHOLDER)}>
+            {current ? current.name : "No status"}
+          </span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {columns.map((c) => (
+          <DropdownMenuItem key={c.id} onSelect={() => onChange(c.id)}>
+            <SquareKanban className="h-3.5 w-3.5 text-white/50" />
+            {c.name}
+            {value === c.id ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -314,10 +492,14 @@ function PriorityMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button disabled={!canWrite} size="sm" variant="outline">
-          <PriorityIcon className="h-3.5 w-3.5" priority={value} />
-          {PRIORITY_META[value].label}
-        </Button>
+        <button className={PROP_BTN} disabled={!canWrite} type="button">
+          <PriorityIcon className="h-4 w-4 shrink-0" priority={value} />
+          <span
+            className={cn("truncate", value === "none" && PROP_PLACEHOLDER)}
+          >
+            {value === "none" ? "Priority" : PRIORITY_META[value].label}
+          </span>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {PRIORITIES.map((p) => (
@@ -335,30 +517,45 @@ function PriorityMenu({
 function AssigneeMenu({
   value,
   members,
+  currentUserId,
   onChange,
   canWrite,
 }: {
   value: string | null;
   members: RouterOutputs["project"]["members"];
+  currentUserId: string | null;
   onChange: (id: string | null) => void;
   canWrite: boolean;
 }) {
   const current = members.find((m) => m.userId === value);
+  const canSelfAssign = !!currentUserId && value !== currentUserId;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button disabled={!canWrite} size="sm" variant="outline">
+        <button className={PROP_BTN} disabled={!canWrite} type="button">
           {current ? (
             <>
-              <UserAvatar image={current.image} name={current.name} size={18} />
-              {current.name}
+              <UserAvatar image={current.image} name={current.name} size={20} />
+              <span className="truncate">{current.name}</span>
             </>
           ) : (
-            "Unassigned"
+            <>
+              <UserIcon className={PROP_ICON} />
+              <span className={PROP_PLACEHOLDER}>Assignee</span>
+            </>
           )}
-        </Button>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
+        {canSelfAssign ? (
+          <>
+            <DropdownMenuItem onSelect={() => onChange(currentUserId)}>
+              <UserIcon className="h-3.5 w-3.5" />
+              Assign to me
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem onSelect={() => onChange(null)}>
           Unassigned
           {value === null ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
@@ -391,8 +588,15 @@ function LabelsPicker({
   canWrite: boolean;
 }) {
   const utils = api.useUtils();
-  const [name, setName] = useState("");
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [managing, setManaging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [open]);
   const toggle = api.label.setOnTask.useMutation({
     onSuccess: () => utils.board.get.invalidate({ boardId }),
   });
@@ -406,78 +610,130 @@ function LabelsPicker({
           on: true,
         });
       }
-      setName("");
+      setQuery("");
       await utils.board.get.invalidate({ boardId });
     },
   });
 
+  const active = labels.filter((l) => activeLabelIds.has(l.id));
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? labels.filter((l) => l.name.toLowerCase().includes(q))
+    : labels;
+  const canCreate =
+    q.length > 0 && !labels.some((l) => l.name.toLowerCase() === q);
+
+  const createLabel = () => {
+    if (!canCreate) return;
+    create.mutate({ boardId, name: query.trim(), color: pickColor() });
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {labels.map((l) => {
-        const on = activeLabelIds.has(l.id);
-        return (
+    <>
+      <DropdownMenu onOpenChange={setOpen} open={open}>
+        <DropdownMenuTrigger asChild>
           <button
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition",
-              on
-                ? "border-transparent text-black"
-                : "border-white/10 text-white/70 hover:border-white/20",
-            )}
+            className="inline-flex min-h-8 max-w-full flex-wrap items-center gap-x-2.5 gap-y-1 rounded-md px-2 py-1 text-sm text-white/85 transition hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none disabled:pointer-events-none data-[state=open]:bg-white/[0.06]"
             disabled={!canWrite}
-            key={l.id}
-            onClick={() =>
-              toggle.mutate({
-                boardId,
-                taskId,
-                labelId: l.id,
-                on: !on,
-              })
-            }
-            style={on ? { background: l.color } : undefined}
             type="button"
           >
-            {l.name}
+            {active.length > 0 ? (
+              active.map((l) => (
+                <span className="inline-flex items-center gap-1.5" key={l.id}>
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: l.color }}
+                  />
+                  {l.name}
+                </span>
+              ))
+            ) : (
+              <>
+                <Tag className={PROP_ICON} />
+                <span className={PROP_PLACEHOLDER}>Label</span>
+              </>
+            )}
           </button>
-        );
-      })}
-      {canWrite ? (
-        <form
-          className="inline-flex items-center gap-1"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!name.trim()) return;
-            create.mutate({
-              boardId,
-              name: name.trim(),
-              color: pickColor(),
-            });
-          }}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-0"
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <Input
-            className="h-6 w-24 text-xs"
-            onChange={(e) => setName(e.target.value)}
-            placeholder="+ new"
-            value={name}
-          />
-        </form>
-      ) : null}
-      {canWrite && labels.length > 0 ? (
-        <button
-          aria-label="Manage labels"
-          className="inline-flex h-6 items-center gap-1 rounded-full border border-white/10 px-2 text-xs text-white/50 transition hover:border-white/20 hover:text-white"
-          onClick={() => setManaging(true)}
-          type="button"
-        >
-          <Settings2 className="h-3 w-3" /> Edit
-        </button>
-      ) : null}
+          <div className="border-b border-white/10 p-1.5">
+            <Input
+              className="h-7 text-xs"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  createLabel();
+                }
+              }}
+              placeholder="Search or create…"
+              ref={inputRef}
+              value={query}
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {filtered.map((l) => {
+              const on = activeLabelIds.has(l.id);
+              return (
+                <button
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition hover:bg-white/10"
+                  key={l.id}
+                  onClick={() =>
+                    toggle.mutate({ boardId, taskId, labelId: l.id, on: !on })
+                  }
+                  type="button"
+                >
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-full"
+                    style={{ background: l.color }}
+                  />
+                  <span className="flex-1 truncate">{l.name}</span>
+                  {on ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
+                </button>
+              );
+            })}
+            {canCreate ? (
+              <button
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-white/70 transition hover:bg-white/10"
+                onClick={createLabel}
+                type="button"
+              >
+                <Plus className="h-3.5 w-3.5 shrink-0" />
+                Create “{query.trim()}”
+              </button>
+            ) : null}
+            {filtered.length === 0 && !canCreate ? (
+              <p className="px-2 py-1.5 text-xs text-white/40">
+                No labels yet.
+              </p>
+            ) : null}
+          </div>
+          <div className="border-t border-white/10 p-1">
+            <button
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-white/60 transition hover:bg-white/10 hover:text-white"
+              onClick={() => {
+                setOpen(false);
+                setManaging(true);
+              }}
+              type="button"
+            >
+              <Settings2 className="h-3.5 w-3.5 shrink-0" /> Manage labels
+            </button>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <ManageLabelsDialog
         boardId={boardId}
         labels={labels}
         onOpenChange={setManaging}
         open={managing}
       />
-    </div>
+    </>
   );
 }
 

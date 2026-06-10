@@ -556,8 +556,12 @@ export function BoardView({
   }
 
   function archiveFocused() {
-    const { focusedTaskId: fid, canWrite: cw, tasks: ts, navColumns: cols } =
-      kbRef.current;
+    const {
+      focusedTaskId: fid,
+      canWrite: cw,
+      tasks: ts,
+      navColumns: cols,
+    } = kbRef.current;
     if (!fid || !cw) return;
     const target = ts.find((t) => t.id === fid);
     if (!target) return;
@@ -693,6 +697,7 @@ export function BoardView({
       <TaskDetailSheet
         boardId={boardId}
         canWrite={canWrite}
+        columns={columns}
         labels={labels}
         onOpenChange={(o) => {
           if (!o) setOpenTaskId(null);
@@ -701,6 +706,7 @@ export function BoardView({
         projectId={projectId}
         task={openTask}
         taskLabels={taskLabels}
+        tasks={tasks}
       />
       <ArchivePanel
         boardId={boardId}
