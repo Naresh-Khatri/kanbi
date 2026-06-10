@@ -33,6 +33,7 @@ import {
 import { api } from "@/trpc/react";
 import { AddColumn } from "./add-column";
 import { ArchivePanel } from "./archive-panel";
+import { DigestPanel } from "./digest-panel";
 import { AiDraftDialog } from "../ai-draft-dialog";
 import {
   type BoardFilters,
@@ -85,6 +86,7 @@ export function BoardView({
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [digestOpen, setDigestOpen] = useState(false);
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
   const archiveTask = useArchiveTask(boardId);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
@@ -506,7 +508,8 @@ export function BoardView({
       })),
     [sortedColumns, tasksByColumn],
   );
-  const navActive = !openTask && !quickAddOpen && !aiDraftOpen && !archiveOpen;
+  const navActive =
+    !openTask && !quickAddOpen && !aiDraftOpen && !archiveOpen && !digestOpen;
   const kbRef = useRef({
     navColumns,
     focusedTaskId,
@@ -634,6 +637,7 @@ export function BoardView({
         members={members}
         onChange={setFilters}
         onOpenArchive={() => setArchiveOpen(true)}
+        onOpenDigest={() => setDigestOpen(true)}
         ref={searchInputRef}
         totalCount={totalCount}
         visibleCount={visibleCount}
@@ -705,6 +709,12 @@ export function BoardView({
         onOpenChange={setArchiveOpen}
         open={archiveOpen}
         tasks={archivedTasks}
+      />
+      <DigestPanel
+        boardId={boardId}
+        canWrite={canWrite}
+        onOpenChange={setDigestOpen}
+        open={digestOpen}
       />
       {columns.length > 0 ? (
         <QuickAddTaskDialog

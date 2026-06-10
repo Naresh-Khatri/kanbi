@@ -348,6 +348,39 @@ export const activity = createTable(
   (t) => [index("activity_board_created_idx").on(t.boardId, t.createdAt)],
 );
 
+// ── Digests (AI weekly summaries mined from the activity log) ────────────────
+
+export type DigestStats = {
+  created: number;
+  updated: number;
+  moved: number;
+  completed: number;
+  comments: number;
+  contributors: number;
+};
+
+export type DigestContent = {
+  headline: string;
+  summary: string;
+  highlights: string[];
+  stats: DigestStats;
+};
+
+export const digest = createTable(
+  "digest",
+  {
+    id: id(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    content: jsonb("content").$type<DigestContent>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("digest_board_created_idx").on(t.boardId, t.createdAt)],
+);
+
 // ── Notifications ───────────────────────────────────────────────────────────
 
 export const notification = createTable(

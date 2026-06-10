@@ -6,6 +6,7 @@ import {
   Check,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Tag,
   User,
   X,
@@ -150,6 +151,7 @@ export const BoardToolbar = forwardRef<
     totalCount: number;
     archivedCount: number;
     onOpenArchive: () => void;
+    onOpenDigest: () => void;
   }
 >(function BoardToolbar(
   {
@@ -161,6 +163,7 @@ export const BoardToolbar = forwardRef<
     totalCount,
     archivedCount,
     onOpenArchive,
+    onOpenDigest,
   },
   searchRef,
 ) {
@@ -332,6 +335,15 @@ export const BoardToolbar = forwardRef<
             {hidden > 0 ? `${hidden} hidden` : "Showing all"}
           </span>
         ) : null}
+        <Button
+          className="h-8 gap-1.5 text-white/70 hover:text-white"
+          onClick={onOpenDigest}
+          size="sm"
+          variant="ghost"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Digest</span>
+        </Button>
         {archivedCount > 0 ? (
           <Button
             className="h-8 gap-1.5 text-white/70 hover:text-white"
