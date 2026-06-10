@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Archive,
   CalendarClock,
   Check,
   Search,
@@ -147,9 +148,20 @@ export const BoardToolbar = forwardRef<
     members: BoardMember[];
     visibleCount: number;
     totalCount: number;
+    archivedCount: number;
+    onOpenArchive: () => void;
   }
 >(function BoardToolbar(
-  { filters, onChange, labels, members, visibleCount, totalCount },
+  {
+    filters,
+    onChange,
+    labels,
+    members,
+    visibleCount,
+    totalCount,
+    archivedCount,
+    onOpenArchive,
+  },
   searchRef,
 ) {
   const active = hasActiveFilters(filters);
@@ -304,20 +316,37 @@ export const BoardToolbar = forwardRef<
       </FilterChip>
 
       {active ? (
-        <>
+        <Button
+          className="h-8 text-white/70 hover:text-white"
+          onClick={() => onChange(EMPTY_FILTERS)}
+          size="sm"
+          variant="ghost"
+        >
+          Clear
+        </Button>
+      ) : null}
+
+      <div className="ml-auto flex items-center gap-2">
+        {active ? (
+          <span className="text-xs text-white/60">
+            {hidden > 0 ? `${hidden} hidden` : "Showing all"}
+          </span>
+        ) : null}
+        {archivedCount > 0 ? (
           <Button
-            className="h-8 text-white/70 hover:text-white"
-            onClick={() => onChange(EMPTY_FILTERS)}
+            className="h-8 gap-1.5 text-white/70 hover:text-white"
+            onClick={onOpenArchive}
             size="sm"
             variant="ghost"
           >
-            Clear
+            <Archive className="h-3.5 w-3.5" />
+            <span>Archive</span>
+            <span className="rounded bg-white/10 px-1 text-[10px]">
+              {archivedCount}
+            </span>
           </Button>
-          <span className="ml-auto text-xs text-white/60">
-            {hidden > 0 ? `${hidden} hidden` : "Showing all"}
-          </span>
-        </>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 });

@@ -32,6 +32,7 @@ import {
 } from "@/lib/task-sort";
 import { api } from "@/trpc/react";
 import { AddColumn } from "./add-column";
+import { ArchivePanel } from "./archive-panel";
 import { AiDraftDialog } from "../ai-draft-dialog";
 import {
   type BoardFilters,
@@ -82,6 +83,7 @@ export function BoardView({
   }, []);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [aiDraftColumnId, setAiDraftColumnId] = useState<string | null>(null);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
@@ -226,6 +228,21 @@ export function BoardView({
     }
     return map;
   }, [labels, taskLabels]);
+
+  const archivedTasks = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.archivedAt)
+        .sort(
+          (a, b) =>
+            (b.archivedAt?.getTime() ?? 0) - (a.archivedAt?.getTime() ?? 0),
+        ),
+    [tasks],
+  );
+  const columnNameById = useMemo(
+    () => new Map(columns.map((c) => [c.id, c.name])),
+    [columns],
+  );
 
   const filtersActive = hasActiveFilters(filters);
 
@@ -474,10 +491,12 @@ export function BoardView({
     <main className="flex h-[calc(100vh-57px)] flex-col">
       <StatsBar stats={stats} />
       <BoardToolbar
+        archivedCount={archivedTasks.length}
         filters={filters}
         labels={labels}
         members={members}
         onChange={setFilters}
+        onOpenArchive={() => setArchiveOpen(true)}
         ref={searchInputRef}
         totalCount={totalCount}
         visibleCount={visibleCount}
@@ -540,6 +559,14 @@ export function BoardView({
         projectId={projectId}
         task={openTask}
         taskLabels={taskLabels}
+      />
+      <ArchivePanel
+        boardId={boardId}
+        canWrite={canWrite}
+        columnNameById={columnNameById}
+        onOpenChange={setArchiveOpen}
+        open={archiveOpen}
+        tasks={archivedTasks}
       />
       {columns.length > 0 ? (
         <QuickAddTaskDialog

@@ -2,8 +2,9 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Link2, MoreHorizontal } from "lucide-react";
+import { Archive, Link2, MoreHorizontal } from "lucide-react";
 import { motion } from "motion/react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { api } from "@/trpc/react";
 import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
 import { copyTaskLink } from "../copy-task-link";
 import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
@@ -106,9 +108,45 @@ export function TaskCard({
   assignee: MemberInfo | null;
   labels: LabelInfo[];
 }) {
+  const utils = api.useUtils();
   const remove = useUndoableBoardDelete(boardId);
+  const setArchived = api.task.archive.useMutation({
+    onMutate: async (vars) => {
+      await utils.board.get.cancel({ boardId });
+      const previous = utils.board.get.getData({ boardId });
+      utils.board.get.setData({ boardId }, (old) =>
+        old
+          ? {
+              ...old,
+              tasks: old.tasks.map((t) =>
+                t.id === vars.taskId
+                  ? { ...t, archivedAt: vars.archived ? new Date() : null }
+                  : t,
+              ),
+            }
+          : old,
+      );
+      return { previous };
+    },
+    onError: (e, _v, ctx) => {
+      if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
+      toast.error(e.message);
+    },
+    onSettled: () => utils.board.get.invalidate({ boardId }),
+  });
   const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
   const overflowCount = labels.length - visibleLabels.length;
+
+  function archive() {
+    setArchived.mutate({ boardId, taskId: task.id, archived: true });
+    toast(`Archived "${task.title}"`, {
+      action: {
+        label: "Undo",
+        onClick: () =>
+          setArchived.mutate({ boardId, taskId: task.id, archived: false }),
+      },
+    });
+  }
   return (
     <div
       className="group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20"
@@ -134,6 +172,9 @@ export function TaskCard({
           >
             <DropdownMenuItem onSelect={() => copyTaskLink(task.id)}>
               <Link2 className="h-3.5 w-3.5" /> Copy link
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={archive}>
+              <Archive className="h-3.5 w-3.5" /> Archive
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
