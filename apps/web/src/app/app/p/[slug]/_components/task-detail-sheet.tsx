@@ -13,7 +13,7 @@ import {
   Trash2,
   User as UserIcon,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ import {
   RichTextContent,
   RichTextEditor,
 } from "@/components/ui/rich-text-editor";
+import type { MentionItem } from "@/components/ui/rich-text-mention";
 import {
   Sheet,
   SheetContent,
@@ -133,6 +134,15 @@ function TaskDetail({
     { projectId },
     { enabled: canWrite },
   );
+  const mentionItems = useMemo(
+    () =>
+      (members.data ?? []).map((m) => ({
+        id: m.userId,
+        label: m.name,
+        image: m.image,
+      })),
+    [members.data],
+  );
 
   const activeLabelIds = new Set(taskLabels.map((tl) => tl.labelId));
 
@@ -226,6 +236,7 @@ function TaskDetail({
         <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
           <RichTextEditor
             disabled={!canWrite}
+            mentions={mentionItems}
             minHeight="120px"
             onBlur={() => {
               if (description !== (task.description ?? "")) {
@@ -249,7 +260,12 @@ function TaskDetail({
         canWrite={canWrite}
         taskId={task.id}
       />
-      <CommentsPanel boardId={boardId} canWrite={canWrite} taskId={task.id} />
+      <CommentsPanel
+        boardId={boardId}
+        canWrite={canWrite}
+        mentions={mentionItems}
+        taskId={task.id}
+      />
       <ActivityPanel boardId={boardId} taskId={task.id} />
 
       {canWrite ? (
@@ -948,10 +964,12 @@ function CommentsPanel({
   boardId,
   taskId,
   canWrite,
+  mentions,
 }: {
   boardId: string;
   taskId: string;
   canWrite: boolean;
+  mentions: MentionItem[];
 }) {
   const utils = api.useUtils();
   const me = api.user.me.useQuery();
@@ -974,6 +992,7 @@ function CommentsPanel({
             canManage={canWrite && me.data?.id === c.authorId}
             comment={c}
             key={c.id}
+            mentions={mentions}
             taskId={taskId}
           />
         ))}
@@ -989,6 +1008,7 @@ function CommentsPanel({
         >
           <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
             <RichTextEditor
+              mentions={mentions}
               minHeight="44px"
               onChange={setBody}
               placeholder="Leave a comment…"
@@ -1015,11 +1035,13 @@ function CommentItem({
   boardId,
   taskId,
   canManage,
+  mentions,
 }: {
   comment: RouterOutputs["comment"]["list"][number];
   boardId: string;
   taskId: string;
   canManage: boolean;
+  mentions: MentionItem[];
 }) {
   const utils = api.useUtils();
   const [editing, setEditing] = useState(false);
@@ -1084,6 +1106,7 @@ function CommentItem({
           >
             <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
               <RichTextEditor
+                mentions={mentions}
                 minHeight="44px"
                 onChange={setDraft}
                 placeholder="Edit comment…"

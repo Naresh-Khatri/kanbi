@@ -18,6 +18,11 @@ import {
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import {
+  createMentionExtension,
+  type MentionItem,
+  mentionRenderExtension,
+} from "./rich-text-mention";
 
 /** Shared prose styling so the editor and the read-only renderer look identical. */
 const RICH_TEXT_PROSE = cn(
@@ -49,6 +54,8 @@ interface RichTextEditorProps {
   disabled?: boolean;
   className?: string;
   minHeight?: string;
+  /** When provided, enables @-mention autocomplete against these members. */
+  mentions?: MentionItem[];
 }
 
 export function RichTextEditor({
@@ -59,13 +66,28 @@ export function RichTextEditor({
   disabled,
   className,
   minHeight = "72px",
+  mentions,
 }: RichTextEditorProps) {
+  // Keep mention items fresh (members load async) without re-creating the
+  // editor: the extension reads through this ref each query.
+  const enableMentions = mentions !== undefined;
+  const mentionsRef = React.useRef<MentionItem[]>(mentions ?? []);
+  mentionsRef.current = mentions ?? [];
+  const mentionExtension = React.useMemo(
+    () =>
+      enableMentions
+        ? createMentionExtension(() => mentionsRef.current)
+        : null,
+    [enableMentions],
+  );
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         link: { openOnClick: false, autolink: true },
       }),
       Placeholder.configure({ placeholder }),
+      ...(mentionExtension ? [mentionExtension] : []),
     ],
     content: value,
     editable: !disabled,
@@ -237,6 +259,7 @@ export function RichTextContent({
       StarterKit.configure({
         link: { openOnClick: true, autolink: true },
       }),
+      mentionRenderExtension,
     ],
     content: value,
     editable: false,
