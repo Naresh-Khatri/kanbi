@@ -69,21 +69,6 @@ function relativeTime(value: Date | string) {
   return `${Math.round(h / 24)}d ago`;
 }
 
-function normalizeHighlights(raw: unknown): DigestHighlight[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((h) =>
-    typeof h === "string"
-      ? { actor: null, action: h, task: null, taskId: null, category: "other" }
-      : {
-          actor: h.actor ?? null,
-          action: h.action ?? "",
-          task: h.task ?? null,
-          taskId: h.taskId ?? null,
-          category: (h.category ?? "other") as DigestCategory,
-        },
-  );
-}
-
 /** Tiny per-day activity bar chart for the window. */
 function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
   const max = Math.max(1, ...data);
@@ -224,11 +209,9 @@ export function DigestPanel({
   );
 
   const digest = latest.data;
-  const highlights = digest
-    ? normalizeHighlights(digest.content.highlights)
-    : [];
-  const people = digest?.content.people ?? [];
-  const activity = digest?.content.activity ?? [];
+  const highlights = digest ? digest.content.highlights : [];
+  const people = digest ? digest.content.people : [];
+  const activity = digest ? digest.content.activity : [];
 
   const groups = GROUPS.map((g) => ({
     ...g,
