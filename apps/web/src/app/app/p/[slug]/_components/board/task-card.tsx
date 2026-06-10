@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import type { MemberInfo, TaskRow } from "./board-types";
+import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
 import { copyTaskLink } from "../copy-task-link";
 import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
@@ -25,6 +25,7 @@ export function SortableTaskCard({
   canWrite,
   onOpen,
   assignee,
+  labels,
   showDropIndicatorBefore,
 }: {
   boardId: string;
@@ -33,6 +34,7 @@ export function SortableTaskCard({
   canWrite: boolean;
   onOpen: () => void;
   assignee: MemberInfo | null;
+  labels: LabelInfo[];
   showDropIndicatorBefore: boolean;
 }) {
   const sortable = useSortable({
@@ -66,6 +68,7 @@ export function SortableTaskCard({
         <TaskCard
           assignee={assignee}
           boardId={boardId}
+          labels={labels}
           onOpen={onOpen}
           task={task}
         />
@@ -88,18 +91,24 @@ export function TaskCardPreview({ task }: { task: TaskRow }) {
   );
 }
 
+const MAX_VISIBLE_LABELS = 2;
+
 export function TaskCard({
   boardId,
   task,
   onOpen,
   assignee,
+  labels,
 }: {
   boardId: string;
   task: TaskRow;
   onOpen: () => void;
   assignee: MemberInfo | null;
+  labels: LabelInfo[];
 }) {
   const remove = useUndoableBoardDelete(boardId);
+  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
+  const overflowCount = labels.length - visibleLabels.length;
   return (
     <div
       className="group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20"
@@ -138,6 +147,24 @@ export function TaskCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {labels.length > 0 ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          {visibleLabels.map((l) => (
+            <span
+              className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
+              key={l.id}
+              style={{ borderColor: `${l.color}55`, color: l.color }}
+            >
+              {l.name}
+            </span>
+          ))}
+          {overflowCount > 0 ? (
+            <span className="inline-flex items-center rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] tracking-wide text-white/60">
+              +{overflowCount}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mt-2 flex items-center justify-between gap-2">
         {task.priority !== "none" ? (
           <div

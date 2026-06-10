@@ -11,9 +11,17 @@ import { Plus } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ColumnRow, DropTarget, MemberInfo, TaskRow } from "./board-types";
+import type {
+  ColumnRow,
+  DropTarget,
+  LabelInfo,
+  MemberInfo,
+  TaskRow,
+} from "./board-types";
 import { ColumnHeader } from "./column-header";
 import { DropIndicator, SortableTaskCard } from "./task-card";
+
+const EMPTY_LABELS: LabelInfo[] = [];
 
 export function SortableColumn({
   boardId,
@@ -24,6 +32,7 @@ export function SortableColumn({
   onOpenTask,
   onAddTask,
   membersById,
+  labelsByTask,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -33,6 +42,7 @@ export function SortableColumn({
   onOpenTask: (taskId: string) => void;
   onAddTask: (columnId: string) => void;
   membersById: Map<string, MemberInfo>;
+  labelsByTask: Map<string, LabelInfo[]>;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -84,6 +94,7 @@ export function SortableColumn({
                   canWrite={canWrite}
                   columnId={column.id}
                   key={t.id}
+                  labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
                   onOpen={() => onOpenTask(t.id)}
                   showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
                   task={t}

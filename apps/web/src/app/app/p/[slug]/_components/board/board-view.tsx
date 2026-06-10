@@ -43,6 +43,7 @@ import {
 import type {
   ActiveDrag,
   DropTarget,
+  LabelInfo,
   MemberInfo,
   TaskRow,
 } from "./board-types";
@@ -212,6 +213,19 @@ export function BoardView({
     }
     return map;
   }, [taskLabels]);
+
+  const cardLabelsByTask = useMemo(() => {
+    const byId = new Map(labels.map((l) => [l.id, l]));
+    const map = new Map<string, LabelInfo[]>();
+    for (const tl of taskLabels) {
+      const l = byId.get(tl.labelId);
+      if (!l) continue;
+      const list = map.get(tl.taskId) ?? [];
+      list.push({ id: l.id, name: l.name, color: l.color });
+      map.set(tl.taskId, list);
+    }
+    return map;
+  }, [labels, taskLabels]);
 
   const filtersActive = hasActiveFilters(filters);
 
@@ -491,6 +505,7 @@ export function BoardView({
                     dropTarget?.columnId === col.id ? dropTarget : null
                   }
                   key={col.id}
+                  labelsByTask={cardLabelsByTask}
                   membersById={membersById}
                   onAddTask={(id) => {
                     setQuickAddColumnId(id);

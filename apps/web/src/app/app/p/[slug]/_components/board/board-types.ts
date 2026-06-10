@@ -15,3 +15,4 @@ export type DropTarget = {
 } | null;
 
 export type MemberInfo = { name: string; image: string | null };
+export type LabelInfo = { id: string; name: string; color: string };
