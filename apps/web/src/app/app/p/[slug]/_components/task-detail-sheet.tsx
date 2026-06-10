@@ -8,6 +8,7 @@ import {
   Loader2,
   Paperclip,
   Pencil,
+  Settings2,
   Tag,
   Trash2,
   User as UserIcon,
@@ -15,7 +16,13 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -369,6 +376,7 @@ function LabelsPicker({
 }) {
   const utils = api.useUtils();
   const [name, setName] = useState("");
+  const [managing, setManaging] = useState(false);
   const toggle = api.label.setOnTask.useMutation({
     onSuccess: () => utils.board.get.invalidate({ boardId }),
   });
@@ -388,7 +396,7 @@ function LabelsPicker({
   });
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       {labels.map((l) => {
         const on = activeLabelIds.has(l.id);
         return (
@@ -437,20 +445,143 @@ function LabelsPicker({
           />
         </form>
       ) : null}
+      {canWrite && labels.length > 0 ? (
+        <button
+          aria-label="Manage labels"
+          className="inline-flex h-6 items-center gap-1 rounded-full border border-white/10 px-2 text-xs text-white/50 transition hover:border-white/20 hover:text-white"
+          onClick={() => setManaging(true)}
+          type="button"
+        >
+          <Settings2 className="h-3 w-3" /> Edit
+        </button>
+      ) : null}
+      <ManageLabelsDialog
+        boardId={boardId}
+        labels={labels}
+        onOpenChange={setManaging}
+        open={managing}
+      />
     </div>
   );
 }
 
+const LABEL_PALETTE = [
+  "#f43f5e",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+];
+
 function pickColor() {
-  const palette = [
-    "#f43f5e",
-    "#f59e0b",
-    "#10b981",
-    "#3b82f6",
-    "#8b5cf6",
-    "#ec4899",
-  ];
-  return palette[Math.floor(Math.random() * palette.length)]!;
+  return LABEL_PALETTE[Math.floor(Math.random() * LABEL_PALETTE.length)]!;
+}
+
+function ManageLabelsDialog({
+  boardId,
+  labels,
+  open,
+  onOpenChange,
+}: {
+  boardId: string;
+  labels: LabelRow[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Manage labels</DialogTitle>
+          <DialogDescription>
+            Rename, recolor, or delete labels. Changes apply across the board.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-2">
+          {labels.length === 0 ? (
+            <p className="text-sm text-white/40">No labels yet.</p>
+          ) : (
+            labels.map((l) => (
+              <ManageLabelRow boardId={boardId} key={l.id} label={l} />
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ManageLabelRow({
+  boardId,
+  label: l,
+}: {
+  boardId: string;
+  label: LabelRow;
+}) {
+  const utils = api.useUtils();
+  const [name, setName] = useState(l.name);
+  const update = api.label.update.useMutation({
+    onSuccess: () => utils.board.get.invalidate({ boardId }),
+    onError: (e) => toast.error(e.message),
+  });
+  const remove = api.label.delete.useMutation({
+    onSuccess: () => utils.board.get.invalidate({ boardId }),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const saveName = () => {
+    const next = name.trim();
+    if (next && next !== l.name) {
+      update.mutate({ boardId, labelId: l.id, name: next });
+    } else {
+      setName(l.name);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
+        {LABEL_PALETTE.map((c) => (
+          <button
+            aria-label={`Set color ${c}`}
+            className={cn(
+              "h-4 w-4 rounded-full border transition",
+              l.color === c ? "border-white" : "border-white/10",
+            )}
+            key={c}
+            onClick={() => update.mutate({ boardId, labelId: l.id, color: c })}
+            style={{ background: c }}
+            type="button"
+          />
+        ))}
+      </div>
+      <Input
+        className="h-7 flex-1 text-sm"
+        onBlur={saveName}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        value={name}
+      />
+      <button
+        aria-label="Delete label"
+        className="rounded p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white"
+        onClick={() => {
+          if (window.confirm(`Delete label "${l.name}"?`)) {
+            remove.mutate({ boardId, labelId: l.id });
+          }
+        }}
+        type="button"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
 }
 
 function ChecklistPanel({
