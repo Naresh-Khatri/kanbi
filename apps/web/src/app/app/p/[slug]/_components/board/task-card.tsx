@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Archive, Link2, MoreHorizontal } from "lucide-react";
+import { Archive, GitBranch, Link2, MoreHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
+import { copyBranchCommand, defaultBranchType } from "../copy-branch-command";
 import { copyTaskLink } from "../copy-task-link";
 import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
 import { useArchiveTask } from "../use-archive-task";
@@ -152,17 +153,23 @@ export function TaskCard({
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem onSelect={() => copyTaskLink(task.id)}>
               <Link2 className="h-3.5 w-3.5" /> Copy link
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() =>
-                archiveTask({ id: task.id, title: task.title })
+                copyBranchCommand({
+                  number: task.number,
+                  title: task.title,
+                  type: defaultBranchType(labels.map((l) => l.name)),
+                })
               }
+            >
+              <GitBranch className="h-3.5 w-3.5" /> Copy git branch
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => archiveTask({ id: task.id, title: task.title })}
             >
               <Archive className="h-3.5 w-3.5" /> Archive
             </DropdownMenuItem>

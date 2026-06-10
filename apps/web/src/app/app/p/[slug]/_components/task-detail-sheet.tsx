@@ -3,6 +3,8 @@
 import {
   CalendarDays,
   Check,
+  Copy,
+  GitBranch,
   Link2,
   Loader2,
   Paperclip,
@@ -53,6 +55,14 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
+import {
+  BRANCH_TYPES,
+  type BranchType,
+  buildBranchName,
+  copyBranchCommand,
+  copyBranchName,
+  defaultBranchType,
+} from "./copy-branch-command";
 import { copyTaskLink } from "./copy-task-link";
 import {
   PRIORITIES,
@@ -258,6 +268,12 @@ function TaskDetail({
           canWrite={canWrite}
           labels={labels}
           taskId={task.id}
+        />
+        <BranchMenu
+          labelNames={labels
+            .filter((l) => activeLabelIds.has(l.id))
+            .map((l) => l.name)}
+          task={task}
         />
       </div>
 
@@ -753,6 +769,70 @@ function LabelsPicker({
         open={managing}
       />
     </>
+  );
+}
+
+// Dev-handoff helper: compose a structured branch name and copy the
+// fetch → sync main → branch command block for starting work on this task.
+function BranchMenu({
+  task,
+  labelNames,
+}: {
+  task: TaskRow;
+  labelNames: string[];
+}) {
+  const [type, setType] = useState<BranchType>(() =>
+    defaultBranchType(labelNames),
+  );
+  const branchArgs = {
+    number: task.number,
+    title: task.title,
+    type,
+  };
+  const branch = buildBranchName(branchArgs);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className={PROP_BTN} type="button">
+          <GitBranch className={PROP_ICON} />
+          <span className="truncate">Branch</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72">
+        <div className="px-2 pt-1.5 pb-2">
+          <p className="text-[10px] tracking-wide text-white/40 uppercase">
+            Branch name
+          </p>
+          <p className="mt-1 font-mono text-xs break-all text-white/80">
+            {branch}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {BRANCH_TYPES.map((t) => (
+              <button
+                className={cn(
+                  "rounded px-1.5 py-0.5 font-mono text-[11px] transition",
+                  t === type
+                    ? "bg-white/15 text-white"
+                    : "bg-white/[0.04] text-white/50 hover:bg-white/10 hover:text-white/80",
+                )}
+                key={t}
+                onClick={() => setType(t)}
+                type="button"
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => copyBranchCommand(branchArgs)}>
+          <Copy className="h-3.5 w-3.5" /> Copy git commands
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => copyBranchName(branchArgs)}>
+          <GitBranch className="h-3.5 w-3.5" /> Copy branch name
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -1414,7 +1494,11 @@ function CommentItem({
             </div>
           </form>
         ) : (
-          <RichTextContent mentions={mentions} tickets={tickets} value={c.body} />
+          <RichTextContent
+            mentions={mentions}
+            tickets={tickets}
+            value={c.body}
+          />
         )}
       </div>
     </li>
