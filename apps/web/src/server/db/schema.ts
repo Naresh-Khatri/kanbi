@@ -124,6 +124,12 @@ export const project = createTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
+    // Jira-style ticket prefix (e.g. "MAR"). Combined with task.number to form a
+    // human ticket id like "MAR-12". Unique per owner, editable in settings.
+    key: text("key").notNull(),
+    // Monotonic counter for issuing per-project ticket numbers. Holds the last
+    // number handed out; bump-and-return atomically when creating tasks.
+    taskCounter: integer("task_counter").notNull().default(0),
     name: text("name").notNull(),
     description: text("description"),
     systemPrompt: text("system_prompt"),
@@ -134,6 +140,7 @@ export const project = createTable(
   },
   (t) => [
     uniqueIndex("project_owner_slug_uq").on(t.ownerId, t.slug),
+    uniqueIndex("project_owner_key_uq").on(t.ownerId, t.key),
     index("project_owner_idx").on(t.ownerId),
   ],
 );
@@ -225,6 +232,9 @@ export const task = createTable(
     columnId: text("column_id")
       .notNull()
       .references(() => boardColumn.id, { onDelete: "cascade" }),
+    // Per-project sequential ticket number (issued from project.taskCounter).
+    // Rendered together with the project key, e.g. "MAR-12".
+    number: integer("number").notNull(),
     position: real("position").notNull(),
     title: text("title").notNull(),
     description: text("description"),
@@ -244,6 +254,7 @@ export const task = createTable(
     index("task_column_position_idx").on(t.columnId, t.position),
     index("task_board_idx").on(t.boardId),
     index("task_assignee_idx").on(t.assigneeId),
+    uniqueIndex("task_board_number_uq").on(t.boardId, t.number),
   ],
 );
 

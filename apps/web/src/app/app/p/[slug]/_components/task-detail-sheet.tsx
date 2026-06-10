@@ -39,7 +39,10 @@ import {
   RichTextContent,
   RichTextEditor,
 } from "@/components/ui/rich-text-editor";
-import type { MentionItem } from "@/components/ui/rich-text-mention";
+import type {
+  MentionItem,
+  TicketMentionItem,
+} from "@/components/ui/rich-text-mention";
 import {
   Sheet,
   SheetContent,
@@ -76,22 +79,26 @@ export function TaskDetailSheet({
   task,
   boardId,
   projectId,
+  projectKey,
   columns,
   tasks,
   labels,
   taskLabels,
   canWrite,
+  tickets,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task: TaskRow | null;
   boardId: string;
   projectId: string;
+  projectKey: string;
   columns: ColumnRow[];
   tasks: TaskRow[];
   labels: LabelRow[];
   taskLabels: BoardData["taskLabels"];
   canWrite: boolean;
+  tickets: TicketMentionItem[];
 }) {
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
@@ -104,9 +111,11 @@ export function TaskDetailSheet({
             labels={labels}
             onClose={() => onOpenChange(false)}
             projectId={projectId}
+            projectKey={projectKey}
             task={task}
             taskLabels={taskLabels.filter((tl) => tl.taskId === task.id)}
             tasks={tasks}
+            tickets={tickets}
           />
         ) : null}
       </SheetContent>
@@ -118,22 +127,26 @@ function TaskDetail({
   task,
   boardId,
   projectId,
+  projectKey,
   columns,
   tasks,
   labels,
   taskLabels,
   canWrite,
   onClose,
+  tickets,
 }: {
   task: TaskRow;
   boardId: string;
   projectId: string;
+  projectKey: string;
   columns: ColumnRow[];
   tasks: TaskRow[];
   labels: LabelRow[];
   taskLabels: BoardData["taskLabels"];
   canWrite: boolean;
   onClose: () => void;
+  tickets: TicketMentionItem[];
 }) {
   const utils = api.useUtils();
   const [title, setTitle] = useState(task.title);
@@ -185,6 +198,9 @@ function TaskDetail({
     <div className="flex flex-col gap-5">
       <CopyLinkButton taskId={task.id} />
       <SheetHeader className="pr-20">
+        <span className="font-mono text-xs text-white/40">
+          {projectKey}-{task.number}
+        </span>
         <SheetTitle>
           <TitleField
             disabled={!canWrite}
@@ -250,6 +266,7 @@ function TaskDetail({
           <RichTextEditor
             disabled={!canWrite}
             mentions={mentionItems}
+            tickets={tickets}
             minHeight="120px"
             onBlur={() => {
               if (description !== (task.description ?? "")) {
@@ -278,6 +295,7 @@ function TaskDetail({
         canWrite={canWrite}
         mentions={mentionItems}
         taskId={task.id}
+        tickets={tickets}
       />
       <ActivityPanel boardId={boardId} taskId={task.id} />
 
@@ -1221,11 +1239,13 @@ function CommentsPanel({
   taskId,
   canWrite,
   mentions,
+  tickets,
 }: {
   boardId: string;
   taskId: string;
   canWrite: boolean;
   mentions: MentionItem[];
+  tickets: TicketMentionItem[];
 }) {
   const utils = api.useUtils();
   const me = api.user.me.useQuery();
@@ -1250,6 +1270,7 @@ function CommentsPanel({
             key={c.id}
             mentions={mentions}
             taskId={taskId}
+            tickets={tickets}
           />
         ))}
       </ul>
@@ -1265,6 +1286,7 @@ function CommentsPanel({
           <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
             <RichTextEditor
               mentions={mentions}
+              tickets={tickets}
               minHeight="44px"
               onChange={setBody}
               placeholder="Leave a comment…"
@@ -1292,12 +1314,14 @@ function CommentItem({
   taskId,
   canManage,
   mentions,
+  tickets,
 }: {
   comment: RouterOutputs["comment"]["list"][number];
   boardId: string;
   taskId: string;
   canManage: boolean;
   mentions: MentionItem[];
+  tickets: TicketMentionItem[];
 }) {
   const utils = api.useUtils();
   const [editing, setEditing] = useState(false);
@@ -1363,6 +1387,7 @@ function CommentItem({
             <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
               <RichTextEditor
                 mentions={mentions}
+                tickets={tickets}
                 minHeight="44px"
                 onChange={setDraft}
                 placeholder="Edit comment…"

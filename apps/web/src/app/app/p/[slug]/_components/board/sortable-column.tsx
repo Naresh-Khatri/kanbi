@@ -34,6 +34,7 @@ export function SortableColumn({
   membersById,
   labelsByTask,
   focusedTaskId,
+  projectKey,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -45,6 +46,7 @@ export function SortableColumn({
   membersById: Map<string, MemberInfo>;
   labelsByTask: Map<string, LabelInfo[]>;
   focusedTaskId: string | null;
+  projectKey: string;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -99,6 +101,7 @@ export function SortableColumn({
                   key={t.id}
                   labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
                   onOpen={() => onOpenTask(t.id)}
+                  projectKey={projectKey}
                   showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
                   task={t}
                 />

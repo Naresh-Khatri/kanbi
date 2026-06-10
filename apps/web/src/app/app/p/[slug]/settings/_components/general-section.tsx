@@ -31,13 +31,16 @@ export function GeneralSection({
 }) {
   const utils = api.useUtils();
   const project = api.project.bySlug.useQuery({ slug }).data;
+  const isOwner = project?.role === "owner";
   const [name, setName] = useState("");
+  const [key, setKey] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!project) return;
     setName(project.name);
+    setKey(project.key);
     setDescription(project.description ?? "");
     setColor(project.color ?? null);
   }, [project]);
@@ -53,9 +56,11 @@ export function GeneralSection({
     onError: (err) => toast.error(err.message),
   });
 
+  const keyChanged = !!project && isOwner && key !== project.key;
   const dirty =
     !!project &&
     (name.trim() !== project.name ||
+      keyChanged ||
       (description.trim() || null) !== (project.description ?? null) ||
       (color ?? null) !== (project.color ?? null));
 
@@ -73,6 +78,7 @@ export function GeneralSection({
           update.mutate({
             projectId,
             name: name.trim() || undefined,
+            key: keyChanged ? key : undefined,
             description: description.trim() ? description.trim() : null,
             color,
           });
@@ -87,6 +93,31 @@ export function GeneralSection({
             required
             value={name}
           />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="settings-key">Ticket key</Label>
+          <Input
+            className="font-mono uppercase"
+            disabled={!isOwner}
+            id="settings-key"
+            maxLength={10}
+            onChange={(e) =>
+              setKey(
+                e.target.value
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9]/g, "")
+                  .slice(0, 10),
+              )
+            }
+            value={key}
+          />
+          <p className="text-xs text-white/40">
+            Prefix for ticket ids like{" "}
+            <span className="font-mono">{key || "KEY"}-123</span>.{" "}
+            {isOwner
+              ? "Renaming it changes how new mentions read; existing ticket numbers keep their value."
+              : "Only the project owner can change this."}
+          </p>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="settings-description">Description</Label>

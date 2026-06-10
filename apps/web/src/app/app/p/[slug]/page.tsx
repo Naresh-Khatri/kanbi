@@ -16,6 +16,7 @@ export default async function ProjectPage({
     <BoardView
       boardId={project.boardId}
       projectId={project.id}
+      projectKey={project.key}
       projectSlug={project.slug}
     />
   );

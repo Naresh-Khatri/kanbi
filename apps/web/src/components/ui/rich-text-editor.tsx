@@ -20,8 +20,11 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
   createMentionExtension,
+  createTicketMentionExtension,
   type MentionItem,
   mentionRenderExtension,
+  type TicketMentionItem,
+  ticketMentionRenderExtension,
 } from "./rich-text-mention";
 
 /** Shared prose styling so the editor and the read-only renderer look identical. */
@@ -56,6 +59,8 @@ interface RichTextEditorProps {
   minHeight?: string;
   /** When provided, enables @-mention autocomplete against these members. */
   mentions?: MentionItem[];
+  /** When provided, enables #-mention autocomplete against these tickets. */
+  tickets?: TicketMentionItem[];
 }
 
 export function RichTextEditor({
@@ -67,9 +72,10 @@ export function RichTextEditor({
   className,
   minHeight = "72px",
   mentions,
+  tickets,
 }: RichTextEditorProps) {
-  // Keep mention items fresh (members load async) without re-creating the
-  // editor: the extension reads through this ref each query.
+  // Keep mention/ticket items fresh (they load async) without re-creating the
+  // editor: each extension reads through its ref on every query.
   const enableMentions = mentions !== undefined;
   const mentionsRef = React.useRef<MentionItem[]>(mentions ?? []);
   mentionsRef.current = mentions ?? [];
@@ -81,6 +87,17 @@ export function RichTextEditor({
     [enableMentions],
   );
 
+  const enableTickets = tickets !== undefined;
+  const ticketsRef = React.useRef<TicketMentionItem[]>(tickets ?? []);
+  ticketsRef.current = tickets ?? [];
+  const ticketExtension = React.useMemo(
+    () =>
+      enableTickets
+        ? createTicketMentionExtension(() => ticketsRef.current)
+        : null,
+    [enableTickets],
+  );
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -88,6 +105,7 @@ export function RichTextEditor({
       }),
       Placeholder.configure({ placeholder }),
       ...(mentionExtension ? [mentionExtension] : []),
+      ...(ticketExtension ? [ticketExtension] : []),
     ],
     content: value,
     editable: !disabled,
@@ -260,6 +278,7 @@ export function RichTextContent({
         link: { openOnClick: true, autolink: true },
       }),
       mentionRenderExtension,
+      ticketMentionRenderExtension,
     ],
     content: value,
     editable: false,

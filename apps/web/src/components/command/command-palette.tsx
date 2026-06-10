@@ -128,11 +128,14 @@ export function CommandPalette() {
                       router.push(`/app/p/${t.projectSlug}?task=${t.id}`),
                     )
                   }
-                  value={`task ${t.title} ${t.projectName} ${t.id}`}
+                  value={`task ${t.projectKey}-${t.number} ${t.title} ${t.projectName} ${t.id}`}
                 >
-                  <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="shrink-0 font-mono text-xs text-white/40">
+                      {t.projectKey}-{t.number}
+                    </span>
                     <span className="truncate">{t.title}</span>
-                    <span className="shrink-0 text-xs text-white/40">
+                    <span className="ml-auto shrink-0 text-xs text-white/40">
                       {t.projectName}
                     </span>
                   </span>

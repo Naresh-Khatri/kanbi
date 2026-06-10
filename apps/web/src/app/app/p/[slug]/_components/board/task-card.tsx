@@ -31,6 +31,7 @@ export function SortableTaskCard({
   labels,
   showDropIndicatorBefore,
   focused,
+  projectKey,
 }: {
   boardId: string;
   task: TaskRow;
@@ -41,6 +42,7 @@ export function SortableTaskCard({
   labels: LabelInfo[];
   showDropIndicatorBefore: boolean;
   focused: boolean;
+  projectKey: string;
 }) {
   const sortable = useSortable({
     id: task.id,
@@ -76,6 +78,7 @@ export function SortableTaskCard({
           focused={focused}
           labels={labels}
           onOpen={onOpen}
+          projectKey={projectKey}
           task={task}
         />
       </div>
@@ -106,6 +109,7 @@ export function TaskCard({
   assignee,
   labels,
   focused = false,
+  projectKey,
 }: {
   boardId: string;
   task: TaskRow;
@@ -113,6 +117,7 @@ export function TaskCard({
   assignee: MemberInfo | null;
   labels: LabelInfo[];
   focused?: boolean;
+  projectKey: string;
 }) {
   const remove = useUndoableBoardDelete(boardId);
   const archiveTask = useArchiveTask(boardId);
@@ -192,23 +197,26 @@ export function TaskCard({
         </div>
       ) : null}
       <div className="mt-2 flex items-center justify-between gap-2">
-        {task.priority !== "none" ? (
-          <div
-            className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-            style={{
-              borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
-              color: PRIORITY_META[task.priority as Priority].color,
-            }}
-          >
-            <PriorityIcon
-              className="h-3 w-3"
-              priority={task.priority as Priority}
-            />
-            {PRIORITY_META[task.priority as Priority].label}
-          </div>
-        ) : (
-          <span />
-        )}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="font-mono text-[10px] tracking-wide text-white/40">
+            {projectKey}-{task.number}
+          </span>
+          {task.priority !== "none" ? (
+            <div
+              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
+              style={{
+                borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
+                color: PRIORITY_META[task.priority as Priority].color,
+              }}
+            >
+              <PriorityIcon
+                className="h-3 w-3"
+                priority={task.priority as Priority}
+              />
+              {PRIORITY_META[task.priority as Priority].label}
+            </div>
+          ) : null}
+        </div>
         {assignee ? (
           <UserAvatar image={assignee.image} name={assignee.name} size={20} />
         ) : null}

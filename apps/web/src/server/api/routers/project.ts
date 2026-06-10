@@ -1,8 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { shareToken, slugify, slugSuffix } from "@/lib/ids";
+import {
+  deriveProjectKey,
+  normalizeProjectKey,
+  shareToken,
+  slugify,
+  slugSuffix,
+} from "@/lib/ids";
 import {
   assertCanAdmin,
   createTRPCRouter,
@@ -30,6 +36,7 @@ export const projectRouter = createTRPCRouter({
       .selectDistinct({
         id: project.id,
         slug: project.slug,
+        key: project.key,
         name: project.name,
         description: project.description,
         color: project.color,
@@ -61,6 +68,7 @@ export const projectRouter = createTRPCRouter({
         .select({
           id: project.id,
           slug: project.slug,
+          key: project.key,
           name: project.name,
           description: project.description,
           systemPrompt: project.systemPrompt,
@@ -103,6 +111,7 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const base = slugify(input.name) || "project";
+      const baseKey = deriveProjectKey(input.name);
 
       return ctx.db.transaction(async (tx) => {
         let slug = base;
@@ -116,11 +125,25 @@ export const projectRouter = createTRPCRouter({
           slug = `${base}-${slugSuffix()}`;
         }
 
+        // Ticket key is unique per owner; suffix a counter on collision (e.g.
+        // MAR, MAR2, MAR3) the same way slugs disambiguate.
+        let key = baseKey;
+        for (let i = 2; i < 50; i++) {
+          const exists = await tx
+            .select({ id: project.id })
+            .from(project)
+            .where(and(eq(project.ownerId, userId), eq(project.key, key)))
+            .limit(1);
+          if (exists.length === 0) break;
+          key = `${baseKey}${i}`;
+        }
+
         const [row] = await tx
           .insert(project)
           .values({
             ownerId: userId,
             slug,
+            key,
             name: input.name,
             description: input.description,
             systemPrompt: input.systemPrompt,
@@ -159,38 +182,47 @@ export const projectRouter = createTRPCRouter({
         ]);
 
         if (backlog && inProgress) {
-          await tx.insert(task).values([
+          // Seed tickets take the first numbers; keep the counter in sync.
+          const seedTasks = [
             {
               boardId: boardRow.id,
               columnId: backlog.id,
+              number: 1,
               title: "Welcome to your new board",
               description:
                 "Drag tasks between columns, press **C** to quick-add, or click a task to see the full detail panel.",
-              priority: "medium",
+              priority: "medium" as const,
               position: 1,
               reporterId: userId,
             },
             {
               boardId: boardRow.id,
               columnId: backlog.id,
+              number: 2,
               title: "Invite your team",
               description:
                 "Use the Share button in the top right to invite collaborators or create a read-only public link.",
-              priority: "low",
+              priority: "low" as const,
               position: 2,
               reporterId: userId,
             },
             {
               boardId: boardRow.id,
               columnId: inProgress.id,
+              number: 3,
               title: "Try the keyboard shortcuts",
               description:
                 "Press `C` anywhere to quick-add a task. More shortcuts live in the command menu.",
-              priority: "none",
+              priority: "none" as const,
               position: 1,
               reporterId: userId,
             },
-          ]);
+          ];
+          await tx.insert(task).values(seedTasks);
+          await tx
+            .update(project)
+            .set({ taskCounter: seedTasks.length })
+            .where(eq(project.id, row.id));
         }
         return row;
       });
@@ -204,12 +236,60 @@ export const projectRouter = createTRPCRouter({
         systemPrompt: z.string().max(4000).nullable().optional(),
         color: z.string().nullable().optional(),
         icon: z.string().nullable().optional(),
+        key: z.string().min(2).max(10).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.access.canWrite) throw new TRPCError({ code: "FORBIDDEN" });
-      const { projectId, ...rest } = input;
-      await ctx.db.update(project).set(rest).where(eq(project.id, projectId));
+      const { projectId, key, ...rest } = input;
+
+      let normalizedKey: string | undefined;
+      if (key !== undefined) {
+        // The key is the project's identity across every existing ticket id, so
+        // gate changes on admin (owner) and guard the per-owner unique index.
+        if (!ctx.access.canAdmin) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the project owner can change the ticket key",
+          });
+        }
+        normalizedKey = normalizeProjectKey(key);
+        if (!/^[A-Z][A-Z0-9]{1,9}$/.test(normalizedKey)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Key must be 2–10 letters or digits and start with a letter",
+          });
+        }
+        const [proj] = await ctx.db
+          .select({ ownerId: project.ownerId })
+          .from(project)
+          .where(eq(project.id, projectId))
+          .limit(1);
+        if (!proj) throw new TRPCError({ code: "NOT_FOUND" });
+        const clash = await ctx.db
+          .select({ id: project.id })
+          .from(project)
+          .where(
+            and(
+              eq(project.ownerId, proj.ownerId),
+              eq(project.key, normalizedKey),
+              ne(project.id, projectId),
+            ),
+          )
+          .limit(1);
+        if (clash.length > 0) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "That key is already used by another of your projects",
+          });
+        }
+      }
+
+      await ctx.db
+        .update(project)
+        .set(normalizedKey ? { ...rest, key: normalizedKey } : rest)
+        .where(eq(project.id, projectId));
     }),
 
   delete: projectProcedure.mutation(async ({ ctx, input }) => {

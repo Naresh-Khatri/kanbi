@@ -1,7 +1,18 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 
+import type { db as Database } from "@/server/db";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
 import { recordActivity } from "@/server/activity/record";
@@ -71,6 +82,32 @@ const enhanceResponseSchema = z.object({
   checklist: z.array(z.string().min(1).max(280)).max(20).default([]),
 });
 
+/**
+ * Atomically issue `count` consecutive ticket numbers for a board's project and
+ * return them alongside the project key. A single `UPDATE … RETURNING` bumps the
+ * counter under a row lock, so concurrent creators never collide; the unique
+ * index on (board_id, number) is the final backstop. A failed insert afterwards
+ * just leaves a gap in the sequence, which is fine (Jira behaves the same way).
+ */
+async function reserveTaskNumbers(
+  db: typeof Database,
+  boardId: string,
+  count: number,
+): Promise<{ key: string; numbers: number[] }> {
+  const [row] = await db
+    .update(project)
+    .set({ taskCounter: sql`${project.taskCounter} + ${count}` })
+    .from(board)
+    .where(and(eq(board.id, boardId), eq(board.projectId, project.id)))
+    .returning({ key: project.key, counter: project.taskCounter });
+  if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+  const start = row.counter - count + 1;
+  return {
+    key: row.key,
+    numbers: Array.from({ length: count }, (_, i) => start + i),
+  };
+}
+
 export const taskRouter = createTRPCRouter({
   create: boardProcedure
     .input(
@@ -101,11 +138,14 @@ export const taskRouter = createTRPCRouter({
         .where(eq(task.columnId, input.columnId))
         .orderBy(asc(task.position));
 
+      const { numbers } = await reserveTaskNumbers(ctx.db, input.boardId, 1);
+
       const [row] = await ctx.db
         .insert(task)
         .values({
           boardId: input.boardId,
           columnId: input.columnId,
+          number: numbers[0]!,
           title: input.title,
           description: input.description,
           priority: input.priority ?? "none",
@@ -361,9 +401,11 @@ export const taskRouter = createTRPCRouter({
         .selectDistinct({
           id: task.id,
           title: task.title,
+          number: task.number,
           updatedAt: task.updatedAt,
           boardId: task.boardId,
           projectSlug: project.slug,
+          projectKey: project.key,
           projectName: project.name,
         })
         .from(task)
@@ -678,12 +720,19 @@ export const taskRouter = createTRPCRouter({
         for (const r of rows) validLabels.add(r.id);
       }
 
-      const values = input.tasks.map((t) => {
+      const { numbers } = await reserveTaskNumbers(
+        ctx.db,
+        input.boardId,
+        input.tasks.length,
+      );
+
+      const values = input.tasks.map((t, i) => {
         const pos = endPositions.get(t.columnId) ?? 1_000_000;
         endPositions.set(t.columnId, pos + 1_000_000);
         return {
           boardId: input.boardId,
           columnId: t.columnId,
+          number: numbers[i]!,
           title: t.title,
           description: t.description,
           priority: t.priority ?? ("none" as const),

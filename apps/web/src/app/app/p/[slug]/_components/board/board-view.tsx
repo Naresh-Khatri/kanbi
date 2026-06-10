@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
+import { OPEN_TASK_EVENT } from "@/components/ui/rich-text-mention";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionBetween } from "@/lib/position";
 import {
@@ -60,9 +61,11 @@ import { TaskDetailSheet } from "../task-detail-sheet";
 export function BoardView({
   boardId,
   projectId,
+  projectKey,
 }: {
   boardId: string;
   projectId: string;
+  projectKey: string;
   projectSlug: string;
 }) {
   const [data] = api.board.get.useSuspenseQuery({ boardId });
@@ -82,6 +85,18 @@ export function BoardView({
   useEffect(() => {
     const taskId = new URLSearchParams(window.location.search).get("task");
     if (taskId) setOpenTaskId(taskId);
+  }, []);
+  // Clicking a "#KEY-123" ticket chip in any read-only render dispatches this
+  // event; open that task here (chips are scoped to the current project).
+  useEffect(() => {
+    function onOpenTask(e: Event) {
+      const id = (e as CustomEvent<{ taskId: string }>).detail?.taskId;
+      if (!id) return;
+      setFocusedTaskId(id);
+      setOpenTaskId(id);
+    }
+    window.addEventListener(OPEN_TASK_EVENT, onOpenTask);
+    return () => window.removeEventListener(OPEN_TASK_EVENT, onOpenTask);
   }, []);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddColumnId, setQuickAddColumnId] = useState<string | null>(null);
@@ -220,6 +235,19 @@ export function BoardView({
     }
     return map;
   }, [taskLabels]);
+
+  // Mentionable tickets for the editors in the task sheet — current project only.
+  const ticketItems = useMemo(
+    () =>
+      tasks
+        .filter((t) => !t.archivedAt)
+        .map((t) => ({
+          id: t.id,
+          label: `${projectKey}-${t.number}`,
+          title: t.title,
+        })),
+    [tasks, projectKey],
+  );
 
   const cardLabelsByTask = useMemo(() => {
     const byId = new Map(labels.map((l) => [l.id, l]));
@@ -677,6 +705,7 @@ export function BoardView({
                     setQuickAddOpen(true);
                   }}
                   onOpenTask={handleOpenTask}
+                  projectKey={projectKey}
                   tasks={tasksByColumn.get(col.id) ?? []}
                 />
               ))}
@@ -704,9 +733,11 @@ export function BoardView({
         }}
         open={!!openTask}
         projectId={projectId}
+        projectKey={projectKey}
         task={openTask}
         taskLabels={taskLabels}
         tasks={tasks}
+        tickets={ticketItems}
       />
       <ArchivePanel
         boardId={boardId}
