@@ -58,6 +58,38 @@ export async function sendPasswordResetEmail(to: string, url: string) {
   await sendMail({ to, subject, text, html });
 }
 
+export async function sendDigestEmail(
+  to: string,
+  opts: {
+    boardName: string;
+    slug: string;
+    headline: string;
+    summary: string;
+    highlights: string[];
+  },
+) {
+  const url = `${appUrl()}/app/p/${opts.slug}`;
+  const subject = `Weekly digest — ${opts.boardName}`;
+  const bullets = opts.highlights.map((h) => `• ${h}`).join("\n");
+  const text = `${opts.headline}\n\n${opts.summary}${
+    bullets ? `\n\n${bullets}` : ""
+  }\n\nOpen the board: ${url}`;
+  const highlightsHtml =
+    opts.highlights.length > 0
+      ? `<ul style="color:#bbb;padding-left:18px;margin:16px 0;">${opts.highlights
+          .map((h) => `<li style="margin:4px 0;">${h}</li>`)
+          .join("")}</ul>`
+      : "";
+  const html = layout(
+    opts.headline,
+    `<p style="color:#bbb;">${opts.summary}</p>
+     ${highlightsHtml}
+     <p style="margin:20px 0;">${button(url, "Open board")}</p>
+     <p style="color:#777;font-size:12px;">You're getting this because weekly digests are on for ${opts.boardName}. Turn them off in the project's settings.</p>`,
+  );
+  await sendMail({ to, subject, text, html });
+}
+
 export async function sendProjectInviteEmail(
   to: string,
   opts: { token: string; projectName: string; inviterName?: string | null },

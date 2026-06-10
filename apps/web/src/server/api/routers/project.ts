@@ -480,4 +480,34 @@ export const projectRouter = createTRPCRouter({
           ),
         );
     }),
+
+  /** The current member's own notification preferences for this project. */
+  notificationPrefs: projectProcedure.query(async ({ ctx, input }) => {
+    const [row] = await ctx.db
+      .select({ digestEmail: projectMember.digestEmail })
+      .from(projectMember)
+      .where(
+        and(
+          eq(projectMember.projectId, input.projectId),
+          eq(projectMember.userId, ctx.session.user.id),
+        ),
+      )
+      .limit(1);
+    return { digestEmail: row?.digestEmail ?? false };
+  }),
+
+  setDigestEmail: projectProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(projectMember)
+        .set({ digestEmail: input.enabled })
+        .where(
+          and(
+            eq(projectMember.projectId, input.projectId),
+            eq(projectMember.userId, ctx.session.user.id),
+          ),
+        );
+      return { digestEmail: input.enabled };
+    }),
 });

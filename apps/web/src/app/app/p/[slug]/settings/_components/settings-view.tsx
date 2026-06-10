@@ -7,6 +7,7 @@ import { AiContextSection } from "./ai-context-section";
 import { DangerZoneSection } from "./danger-zone-section";
 import { GeneralSection } from "./general-section";
 import { MembersSection } from "./members-section";
+import { NotificationsSection } from "./notifications-section";
 import { SharingSection } from "./sharing-section";
 
 const SECTIONS = [
@@ -14,6 +15,7 @@ const SECTIONS = [
   { id: "ai", label: "AI context" },
   { id: "members", label: "Members" },
   { id: "sharing", label: "Sharing" },
+  { id: "notifications", label: "Notifications" },
   { id: "danger", label: "Danger zone" },
 ] as const;
 
@@ -74,6 +76,7 @@ export function SettingsView({ slug }: { slug: string }) {
           boardId={project.boardId}
           isOwner={isOwner}
         />
+        <NotificationsSection projectId={project.id} />
         <DangerZoneSection
           isOwner={isOwner}
           projectId={project.id}

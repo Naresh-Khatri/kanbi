@@ -1,0 +1,1 @@
+ALTER TABLE "kanbi_project_member" ADD COLUMN "digest_email" boolean DEFAULT false NOT NULL;

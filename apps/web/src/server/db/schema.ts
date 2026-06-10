@@ -148,6 +148,7 @@ export const projectMember = createTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     role: projectRole("role").notNull().default("viewer"),
+    digestEmail: boolean("digest_email").notNull().default(false),
     invitedAt: createdAt(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   },
