@@ -23,6 +23,13 @@ function startOfTodayMs() {
   return d.getTime();
 }
 
+function shortDate(value: Date | string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function MyWork() {
   const [data] = api.user.myWork.useSuspenseQuery();
 
@@ -61,7 +68,7 @@ export function MyWork() {
           Nothing assigned to you right now. Enjoy the calm.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="flex flex-col gap-4">
           <TaskSection
             danger
             icon={<AlertTriangle className="h-4 w-4" />}
@@ -85,6 +92,33 @@ export function MyWork() {
   );
 }
 
+function SectionShell({
+  title,
+  count,
+  icon,
+  danger,
+  children,
+}: {
+  title: string;
+  count: number;
+  icon: React.ReactNode;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="flex items-center gap-2">
+        <span className={cn("text-white/60", danger && "text-red-400/80")}>
+          {icon}
+        </span>
+        <h2 className="text-sm font-medium">{title}</h2>
+        <span className="text-xs text-white/40">{count}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function TaskSection({
   title,
   tasks,
@@ -98,17 +132,10 @@ function TaskSection({
 }) {
   if (tasks.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-      <div className="flex items-center gap-2">
-        <span className={cn("text-white/60", danger && "text-red-400/80")}>
-          {icon}
-        </span>
-        <h2 className="text-sm font-medium">{title}</h2>
-        <span className="text-xs text-white/40">{tasks.length}</span>
-      </div>
-      <ul className="flex flex-col">
+    <SectionShell count={tasks.length} danger={danger} icon={icon} title={title}>
+      <ul className="columns-1 gap-x-6 sm:columns-2 xl:columns-3">
         {tasks.map((t) => (
-          <li key={t.id}>
+          <li className="break-inside-avoid" key={t.id}>
             <Link
               className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-white/5"
               href={`/app/p/${t.projectSlug}?task=${t.id}`}
@@ -125,35 +152,29 @@ function TaskSection({
                     danger && "text-red-400/80",
                   )}
                 >
-                  {new Date(t.dueAt).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {shortDate(t.dueAt)}
                 </span>
               ) : null}
-              <span className="shrink-0 truncate text-xs text-white/40">
+              <span className="max-w-[7rem] shrink-0 truncate text-xs text-white/40">
                 {t.projectName}
               </span>
             </Link>
           </li>
         ))}
       </ul>
-    </div>
+    </SectionShell>
   );
 }
 
 function MentionsSection({ mentions }: { mentions: Mention[] }) {
   if (mentions.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-white/60">
-          <AtSign className="h-4 w-4" />
-        </span>
-        <h2 className="text-sm font-medium">Recently mentioned</h2>
-        <span className="text-xs text-white/40">{mentions.length}</span>
-      </div>
-      <ul className="flex flex-col">
+    <SectionShell
+      count={mentions.length}
+      icon={<AtSign className="h-4 w-4" />}
+      title="Recently mentioned"
+    >
+      <ul className="columns-1 gap-x-6 sm:columns-2">
         {mentions.map((m) => {
           const body = (
             <>
@@ -165,15 +186,12 @@ function MentionsSection({ mentions }: { mentions: Mention[] }) {
                 ) : null}
               </span>
               <span className="shrink-0 text-xs text-white/40">
-                {new Date(m.createdAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                })}
+                {shortDate(m.createdAt)}
               </span>
             </>
           );
           return (
-            <li key={m.id}>
+            <li className="break-inside-avoid" key={m.id}>
               {m.taskId && m.projectSlug ? (
                 <Link
                   className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-white/5"
@@ -190,6 +208,6 @@ function MentionsSection({ mentions }: { mentions: Mention[] }) {
           );
         })}
       </ul>
-    </div>
+    </SectionShell>
   );
 }
