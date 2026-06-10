@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
@@ -10,6 +10,7 @@ import {
   assertCanWrite,
   boardProcedure,
   createTRPCRouter,
+  protectedProcedure,
 } from "@/server/api/trpc";
 import {
   board,
@@ -342,6 +343,48 @@ export const taskRouter = createTRPCRouter({
         .set({ archivedAt: input.archived ? new Date() : null })
         .where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
       bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
+    }),
+
+  // Cross-project task lookup for the command palette (jump-to-task). Scoped to
+  // boards the caller can reach via project ownership or membership.
+  search: protectedProcedure
+    .input(
+      z.object({
+        query: z.string().trim().min(1).max(100),
+        limit: z.number().int().min(1).max(20).default(8),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const term = `%${input.query.replace(/[\\%_]/g, "\\$&")}%`;
+      return ctx.db
+        .selectDistinct({
+          id: task.id,
+          title: task.title,
+          updatedAt: task.updatedAt,
+          boardId: task.boardId,
+          projectSlug: project.slug,
+          projectName: project.name,
+        })
+        .from(task)
+        .innerJoin(board, eq(board.id, task.boardId))
+        .innerJoin(project, eq(project.id, board.projectId))
+        .leftJoin(
+          projectMember,
+          and(
+            eq(projectMember.projectId, project.id),
+            eq(projectMember.userId, userId),
+          ),
+        )
+        .where(
+          and(
+            isNull(task.archivedAt),
+            ilike(task.title, term),
+            or(eq(project.ownerId, userId), eq(projectMember.userId, userId)),
+          ),
+        )
+        .orderBy(desc(task.updatedAt))
+        .limit(input.limit);
     }),
 
   draftFromMessage: boardProcedure

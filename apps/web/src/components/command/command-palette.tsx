@@ -1,7 +1,7 @@
 "use client";
 
 import { Command } from "cmdk";
-import { ArrowRight, Layers, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, Layers, ListTodo, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -22,6 +22,12 @@ export function CommandPalette() {
   const projects = api.project.list.useQuery(undefined, {
     enabled: paletteOpen,
   });
+
+  const trimmed = query.trim();
+  const taskSearch = api.task.search.useQuery(
+    { query: trimmed },
+    { enabled: paletteOpen && trimmed.length >= 2 },
+  );
 
   useEffect(() => {
     if (!paletteOpen) setQuery("");
@@ -103,6 +109,33 @@ export function CommandPalette() {
                   value={`project ${p.name} ${p.slug}`}
                 >
                   {p.name}
+                </PaletteItem>
+              ))}
+            </Command.Group>
+          ) : null}
+
+          {taskSearch.data && taskSearch.data.length > 0 ? (
+            <Command.Group
+              className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
+              heading="Tasks"
+            >
+              {taskSearch.data.map((t) => (
+                <PaletteItem
+                  icon={<ListTodo className="h-4 w-4" />}
+                  key={t.id}
+                  onSelect={() =>
+                    go(() =>
+                      router.push(`/app/p/${t.projectSlug}?task=${t.id}`),
+                    )
+                  }
+                  value={`task ${t.title} ${t.projectName} ${t.id}`}
+                >
+                  <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                    <span className="truncate">{t.title}</span>
+                    <span className="shrink-0 text-xs text-white/40">
+                      {t.projectName}
+                    </span>
+                  </span>
                 </PaletteItem>
               ))}
             </Command.Group>
