@@ -4,10 +4,18 @@ import { Eye } from "lucide-react";
 import { useMemo } from "react";
 
 import { api } from "@/trpc/react";
+import { ShareUnavailable } from "./share-unavailable";
 
 export function PublicBoardView({ token }: { token: string }) {
-  const [data] = api.share.getPublic.useSuspenseQuery({ token });
-  const { board, columns, tasks } = data;
+  // staleTime Infinity: the link is validated on load; don't refetch and risk
+  // flipping to "exhausted" once recordView bumps the counter.
+  const [data] = api.share.getPublic.useSuspenseQuery(
+    { token },
+    { staleTime: Infinity },
+  );
+
+  const columns = data.status === "ok" ? data.columns : [];
+  const tasks = data.status === "ok" ? data.tasks : [];
 
   const tasksByColumn = useMemo(() => {
     const map = new Map<string, typeof tasks>();
@@ -18,6 +26,11 @@ export function PublicBoardView({ token }: { token: string }) {
     }
     return map;
   }, [columns, tasks]);
+
+  if (data.status !== "ok") {
+    return <ShareUnavailable status={data.status} />;
+  }
+  const { board } = data;
 
   return (
     <main className="flex min-h-screen flex-col">

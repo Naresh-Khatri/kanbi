@@ -63,32 +63,23 @@ export const shareRouter = createTRPCRouter({
         .select({
           id: boardShare.id,
           boardId: boardShare.boardId,
+          expiresAt: boardShare.expiresAt,
+          revokedAt: boardShare.revokedAt,
           maxUses: boardShare.maxUses,
           usesCount: boardShare.usesCount,
         })
         .from(boardShare)
-        .where(
-          and(
-            eq(boardShare.token, input.token),
-            isNull(boardShare.revokedAt),
-            or(isNull(boardShare.expiresAt), gt(boardShare.expiresAt, now)),
-          ),
-        )
+        .where(eq(boardShare.token, input.token))
         .limit(1);
       const hit = share[0];
-      if (!hit) throw new TRPCError({ code: "NOT_FOUND" });
-      if (hit.maxUses != null && hit.usesCount >= hit.maxUses) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Share link exhausted",
-        });
+      if (!hit) return { status: "not_found" as const };
+      if (hit.revokedAt) return { status: "revoked" as const };
+      if (hit.expiresAt && hit.expiresAt <= now) {
+        return { status: "expired" as const };
       }
-
-      // Record a view (best-effort; still allow reads if concurrent)
-      await ctx.db
-        .update(boardShare)
-        .set({ usesCount: sql`${boardShare.usesCount} + 1` })
-        .where(eq(boardShare.id, hit.id));
+      if (hit.maxUses != null && hit.usesCount >= hit.maxUses) {
+        return { status: "exhausted" as const };
+      }
 
       const boardRow = await ctx.db
         .select({
@@ -100,7 +91,7 @@ export const shareRouter = createTRPCRouter({
         .innerJoin(project, eq(project.id, board.projectId))
         .where(eq(board.id, hit.boardId))
         .limit(1);
-      if (!boardRow[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!boardRow[0]) return { status: "not_found" as const };
 
       const [columns, tasks, labels, taskLabels] = await Promise.all([
         ctx.db
@@ -122,12 +113,36 @@ export const shareRouter = createTRPCRouter({
       ]);
 
       return {
+        status: "ok" as const,
         board: boardRow[0],
         columns,
         tasks,
         labels,
         taskLabels,
       };
+    }),
+
+  // Count one view, atomically and only while the link is still valid. The
+  // `usesCount < maxUses` guard caps the counter so the visitor who consumes
+  // the final use isn't blocked, and prevents over-counting past the limit.
+  recordView: publicProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      await ctx.db
+        .update(boardShare)
+        .set({ usesCount: sql`${boardShare.usesCount} + 1` })
+        .where(
+          and(
+            eq(boardShare.token, input.token),
+            isNull(boardShare.revokedAt),
+            or(isNull(boardShare.expiresAt), gt(boardShare.expiresAt, now)),
+            or(
+              isNull(boardShare.maxUses),
+              sql`${boardShare.usesCount} < ${boardShare.maxUses}`,
+            ),
+          ),
+        );
     }),
 
   revoke: boardProcedure
