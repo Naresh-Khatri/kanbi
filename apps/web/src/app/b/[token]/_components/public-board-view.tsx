@@ -3,8 +3,11 @@
 import { Eye } from "lucide-react";
 import { useMemo } from "react";
 
-import { api } from "@/trpc/react";
+import { api, type RouterOutputs } from "@/trpc/react";
 import { ShareUnavailable } from "./share-unavailable";
+
+type PublicBoard = Extract<RouterOutputs["share"]["getPublic"], { status: "ok" }>;
+type PublicTask = PublicBoard["tasks"][number];
 
 export function PublicBoardView({ token }: { token: string }) {
   // staleTime Infinity: the link is validated on load; don't refetch and risk
@@ -14,23 +17,21 @@ export function PublicBoardView({ token }: { token: string }) {
     { staleTime: Infinity },
   );
 
-  const columns = data.status === "ok" ? data.columns : [];
-  const tasks = data.status === "ok" ? data.tasks : [];
-
   const tasksByColumn = useMemo(() => {
-    const map = new Map<string, typeof tasks>();
-    for (const c of columns) map.set(c.id, []);
-    for (const t of tasks) {
+    const map = new Map<string, PublicTask[]>();
+    if (data.status !== "ok") return map;
+    for (const c of data.columns) map.set(c.id, []);
+    for (const t of data.tasks) {
       if (t.archivedAt) continue;
       map.get(t.columnId)?.push(t);
     }
     return map;
-  }, [columns, tasks]);
+  }, [data]);
 
   if (data.status !== "ok") {
     return <ShareUnavailable status={data.status} />;
   }
-  const { board } = data;
+  const { board, columns } = data;
 
   return (
     <main className="flex min-h-screen flex-col">
