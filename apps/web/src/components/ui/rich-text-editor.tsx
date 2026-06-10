@@ -20,11 +20,11 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
   createMentionExtension,
+  createMentionRenderExtension,
   createTicketMentionExtension,
+  createTicketRenderExtension,
   type MentionItem,
-  mentionRenderExtension,
   type TicketMentionItem,
-  ticketMentionRenderExtension,
 } from "./rich-text-mention";
 
 /** Shared prose styling so the editor and the read-only renderer look identical. */
@@ -268,18 +268,34 @@ function Divider() {
 export function RichTextContent({
   value,
   className,
+  mentions,
+  tickets,
 }: {
   value: string;
   className?: string;
+  /** Resolves @-mention chips to a hover card with avatar/email. */
+  mentions?: MentionItem[];
+  /** Resolves #-ticket chips to a hover card + click-to-open. */
+  tickets?: TicketMentionItem[];
 }) {
-  const editor = useEditor({
-    extensions: [
+  // Keep hover-card data fresh (it loads async) without recreating the editor.
+  const mentionsRef = React.useRef<MentionItem[]>(mentions ?? []);
+  mentionsRef.current = mentions ?? [];
+  const ticketsRef = React.useRef<TicketMentionItem[]>(tickets ?? []);
+  ticketsRef.current = tickets ?? [];
+  const extensions = React.useMemo(
+    () => [
       StarterKit.configure({
         link: { openOnClick: true, autolink: true },
       }),
-      mentionRenderExtension,
-      ticketMentionRenderExtension,
+      createMentionRenderExtension(() => mentionsRef.current),
+      createTicketRenderExtension(() => ticketsRef.current),
     ],
+    [],
+  );
+
+  const editor = useEditor({
+    extensions,
     content: value,
     editable: false,
     immediatelyRender: false,

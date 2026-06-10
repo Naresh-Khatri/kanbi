@@ -237,17 +237,20 @@ export function BoardView({
   }, [taskLabels]);
 
   // Mentionable tickets for the editors in the task sheet — current project only.
-  const ticketItems = useMemo(
-    () =>
-      tasks
-        .filter((t) => !t.archivedAt)
-        .map((t) => ({
-          id: t.id,
-          label: `${projectKey}-${t.number}`,
-          title: t.title,
-        })),
-    [tasks, projectKey],
-  );
+  // Enriched with status/priority/assignee so chips can show a summary hover card.
+  const ticketItems = useMemo(() => {
+    const colName = new Map(columns.map((c) => [c.id, c.name]));
+    return tasks.map((t) => ({
+      id: t.id,
+      label: `${projectKey}-${t.number}`,
+      title: t.title,
+      status: colName.get(t.columnId),
+      priority: t.priority,
+      assignee: t.assigneeId
+        ? (membersById.get(t.assigneeId)?.name ?? null)
+        : null,
+    }));
+  }, [tasks, projectKey, columns, membersById]);
 
   const cardLabelsByTask = useMemo(() => {
     const byId = new Map(labels.map((l) => [l.id, l]));

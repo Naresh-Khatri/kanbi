@@ -188,6 +188,7 @@ function TaskDetail({
         id: m.userId,
         label: m.name,
         image: m.image,
+        sublabel: m.email,
       })),
     [members.data],
   );
@@ -1413,7 +1414,7 @@ function CommentItem({
             </div>
           </form>
         ) : (
-          <RichTextContent value={c.body} />
+          <RichTextContent mentions={mentions} tickets={tickets} value={c.body} />
         )}
       </div>
     </li>

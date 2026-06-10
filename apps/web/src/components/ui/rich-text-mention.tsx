@@ -1,14 +1,22 @@
 "use client";
 
+import { mergeAttributes } from "@tiptap/core";
+import type { Editor } from "@tiptap/core";
 import Mention from "@tiptap/extension-mention";
-import { Plugin } from "@tiptap/pm/state";
-import { ReactRenderer } from "@tiptap/react";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import {
+  NodeViewWrapper,
+  type NodeViewProps,
+  ReactNodeViewRenderer,
+  ReactRenderer,
+} from "@tiptap/react";
 import type {
   SuggestionKeyDownProps,
   SuggestionOptions,
   SuggestionProps,
 } from "@tiptap/suggestion";
-import { Hash } from "lucide-react";
+import { ArrowUpRight, Hash } from "lucide-react";
+import { HoverCard } from "radix-ui";
 import {
   forwardRef,
   useEffect,
@@ -19,9 +27,23 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 
-export type MentionItem = { id: string; label: string; image: string | null };
+export type MentionItem = {
+  id: string;
+  label: string;
+  image: string | null;
+  /** Secondary line for the hover card (e.g. email). */
+  sublabel?: string | null;
+};
 /** A mentionable ticket: id is the task id, label is the "KEY-123" identifier. */
-export type TicketMentionItem = { id: string; label: string; title: string };
+export type TicketMentionItem = {
+  id: string;
+  label: string;
+  title: string;
+  /** Extra context surfaced in the hover card. */
+  status?: string;
+  priority?: string;
+  assignee?: string | null;
+};
 
 /** Tailwind class applied to a rendered user-mention chip (editor + read-only). */
 const MENTION_CLASS =
@@ -29,6 +51,17 @@ const MENTION_CLASS =
 /** Ticket-mention chip — visually distinct from user mentions, and clickable. */
 const TICKET_CLASS =
   "cursor-pointer rounded bg-violet-500/15 px-1 py-0.5 font-medium text-violet-300 no-underline hover:bg-violet-500/25";
+/** Shared dark hover-card surface. */
+const HOVER_CONTENT_CLASS =
+  "z-[200] w-64 rounded-lg border border-white/10 bg-[#14151c] p-3 text-white shadow-xl";
+
+const PRIORITY_LABEL: Record<string, string> = {
+  urgent: "Urgent",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  none: "",
+};
 
 /** Fired when a ticket chip is clicked in a read-only render; the board view listens. */
 export const OPEN_TASK_EVENT = "kanbi:open-task";
@@ -37,7 +70,156 @@ type SuggestionHandle = {
   onKeyDown: (props: SuggestionKeyDownProps) => boolean;
 };
 
-// ── User @-mentions ──────────────────────────────────────────────────────────
+// ── Hover-card node views ────────────────────────────────────────────────────
+
+/** User-mention chip: "@Name" badge with an avatar/email hover card. */
+function MentionChip({
+  node,
+  getItems,
+}: {
+  node: ProseMirrorNode;
+  getItems: () => MentionItem[];
+}) {
+  const id = (node.attrs.id as string | null) ?? null;
+  const name = (node.attrs.label as string | null) ?? id ?? "";
+  const item = id ? getItems().find((i) => i.id === id) : undefined;
+
+  const chip = (
+    <span className={MENTION_CLASS} data-id={id ?? undefined} data-type="mention">
+      @{name}
+    </span>
+  );
+  if (!item) {
+    return (
+      <NodeViewWrapper as="span" className="inline">
+        {chip}
+      </NodeViewWrapper>
+    );
+  }
+  return (
+    <NodeViewWrapper as="span" className="inline">
+      <HoverCard.Root closeDelay={100} openDelay={150}>
+        <HoverCard.Trigger asChild>{chip}</HoverCard.Trigger>
+        <HoverCard.Portal>
+          <HoverCard.Content
+            className={HOVER_CONTENT_CLASS}
+            side="top"
+            sideOffset={6}
+            style={{ pointerEvents: "auto" }}
+          >
+            <div className="flex items-center gap-2.5">
+              <UserAvatar image={item.image} name={item.label} size={36} />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{item.label}</div>
+                {item.sublabel ? (
+                  <div className="truncate text-xs text-white/50">
+                    {item.sublabel}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </HoverCard.Content>
+        </HoverCard.Portal>
+      </HoverCard.Root>
+    </NodeViewWrapper>
+  );
+}
+
+/** Ticket-mention chip: "KEY-123" badge that opens the task and shows a summary card. */
+function TicketChip({
+  node,
+  editor,
+  getItems,
+}: {
+  node: ProseMirrorNode;
+  editor: Editor;
+  getItems: () => TicketMentionItem[];
+}) {
+  const id = (node.attrs.id as string | null) ?? null;
+  const label = (node.attrs.label as string | null) ?? id ?? "";
+  const item = id ? getItems().find((i) => i.id === id) : undefined;
+
+  const openTask = () => {
+    if (!id) return;
+    window.dispatchEvent(
+      new CustomEvent(OPEN_TASK_EVENT, { detail: { taskId: id } }),
+    );
+  };
+  const onChipClick = () => {
+    // Navigate only from read-only renders; in an editable editor a click should
+    // place the cursor / select the chip (the hover-card CTA stays available).
+    if (editor.isEditable) return;
+    openTask();
+  };
+
+  const chip = (
+    <span
+      className={TICKET_CLASS}
+      data-id={id ?? undefined}
+      data-type="ticket"
+      onClick={onChipClick}
+    >
+      {label}
+    </span>
+  );
+  if (!item) {
+    return (
+      <NodeViewWrapper as="span" className="inline">
+        {chip}
+      </NodeViewWrapper>
+    );
+  }
+
+  const priority =
+    item.priority && item.priority !== "none"
+      ? (PRIORITY_LABEL[item.priority] ?? item.priority)
+      : null;
+  const meta = [item.status, priority, item.assignee].filter(Boolean);
+
+  return (
+    <NodeViewWrapper as="span" className="inline">
+      <HoverCard.Root closeDelay={100} openDelay={150}>
+        <HoverCard.Trigger asChild>{chip}</HoverCard.Trigger>
+        <HoverCard.Portal>
+          <HoverCard.Content
+            className={HOVER_CONTENT_CLASS}
+            side="top"
+            sideOffset={6}
+            style={{ pointerEvents: "auto" }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <span className="font-mono text-xs text-violet-300">
+                {item.label}
+              </span>
+              <span className="text-sm font-medium leading-snug">
+                {item.title}
+              </span>
+              {meta.length > 0 ? (
+                <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/50">
+                  {meta.map((m, i) => (
+                    <span className="flex items-center gap-1.5" key={i}>
+                      {i > 0 ? <span className="text-white/25">·</span> : null}
+                      {m}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+              <button
+                className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+                onClick={openTask}
+                type="button"
+              >
+                <ArrowUpRight className="h-3.5 w-3.5" /> Open task
+              </button>
+            </div>
+          </HoverCard.Content>
+        </HoverCard.Portal>
+      </HoverCard.Root>
+    </NodeViewWrapper>
+  );
+}
+
+// ── User @-mention suggestion list ───────────────────────────────────────────
 
 type MentionListProps = {
   items: MentionItem[];
@@ -100,7 +282,7 @@ const MentionList = forwardRef<SuggestionHandle, MentionListProps>(
   },
 );
 
-// ── Ticket #-mentions ────────────────────────────────────────────────────────
+// ── Ticket #-mention suggestion list ─────────────────────────────────────────
 
 type TicketListProps = {
   items: TicketMentionItem[];
@@ -293,69 +475,84 @@ function buildTicketSuggestion(
 
 // ── Extensions ───────────────────────────────────────────────────────────────
 
+/** Mention node + an avatar/email hover card, parameterized by a live item getter. */
+function userMention(getItems: () => MentionItem[]) {
+  return Mention.extend({
+    addNodeView() {
+      return ReactNodeViewRenderer((props: NodeViewProps) => (
+        <MentionChip getItems={getItems} node={props.node} />
+      ));
+    },
+  });
+}
+
 /** Mention extension with an @-autocomplete dropdown backed by `getItems`. */
 export function createMentionExtension(getItems: () => MentionItem[]) {
-  return Mention.configure({
+  return userMention(getItems).configure({
     HTMLAttributes: { class: MENTION_CLASS },
     suggestion: buildSuggestion(getItems),
   });
 }
 
-/** Render-only user mention node (no autocomplete) for read-only content. */
-export const mentionRenderExtension = Mention.configure({
-  HTMLAttributes: { class: MENTION_CLASS },
-});
+/** Render-only user mention (no autocomplete) for read-only content. */
+export function createMentionRenderExtension(getItems: () => MentionItem[]) {
+  return userMention(getItems).configure({
+    HTMLAttributes: { class: MENTION_CLASS },
+  });
+}
 
 /**
  * A distinct mention node (`data-type="ticket"`) for ticket references. It
- * renders the bare "KEY-123" label (no leading `#`) and, in read-only editors,
- * dispatches an {@link OPEN_TASK_EVENT} on click so the board can open the task.
+ * renders the bare "KEY-123" label (no leading `#`); the node view turns it into
+ * a clickable badge with a summary hover card.
  */
 const TicketMention = Mention.extend({
   name: "ticket",
   renderHTML({ node, HTMLAttributes }) {
     return [
       "span",
-      { ...HTMLAttributes, "data-type": "ticket" },
+      mergeAttributes(
+        { "data-type": "ticket" },
+        this.options.HTMLAttributes,
+        HTMLAttributes,
+      ),
       `${node.attrs.label ?? node.attrs.id}`,
     ];
   },
   renderText({ node }) {
     return `${node.attrs.label ?? node.attrs.id}`;
   },
-  addProseMirrorPlugins() {
-    return [
-      ...(this.parent?.() ?? []),
-      new Plugin({
-        props: {
-          handleClickOn: (view, _pos, node) => {
-            if (node.type.name !== "ticket") return false;
-            const id = node.attrs.id as string | null;
-            // In an editable editor leave the click alone (select/edit); only
-            // navigate from read-only renders.
-            if (!id || view.editable) return false;
-            window.dispatchEvent(
-              new CustomEvent(OPEN_TASK_EVENT, { detail: { taskId: id } }),
-            );
-            return true;
-          },
-        },
-      }),
-    ];
-  },
 });
+
+function ticketMention(getItems: () => TicketMentionItem[]) {
+  return TicketMention.extend({
+    addNodeView() {
+      return ReactNodeViewRenderer((props: NodeViewProps) => (
+        <TicketChip
+          editor={props.editor}
+          getItems={getItems}
+          node={props.node}
+        />
+      ));
+    },
+  });
+}
 
 /** Ticket mention extension with a #-autocomplete dropdown backed by `getItems`. */
 export function createTicketMentionExtension(
   getItems: () => TicketMentionItem[],
 ) {
-  return TicketMention.configure({
+  return ticketMention(getItems).configure({
     HTMLAttributes: { class: TICKET_CLASS },
     suggestion: buildTicketSuggestion(getItems),
   });
 }
 
-/** Render-only ticket mention node (no autocomplete) for read-only content. */
-export const ticketMentionRenderExtension = TicketMention.configure({
-  HTMLAttributes: { class: TICKET_CLASS },
-});
+/** Render-only ticket mention (no autocomplete) for read-only content. */
+export function createTicketRenderExtension(
+  getItems: () => TicketMentionItem[],
+) {
+  return ticketMention(getItems).configure({
+    HTMLAttributes: { class: TICKET_CLASS },
+  });
+}
