@@ -13,6 +13,7 @@ import {
   activity,
   board,
   boardColumn,
+  type DigestPerson,
   type DigestStats,
   digest,
   project,
@@ -76,11 +77,11 @@ export async function generateBoardDigest(
     comments: 0,
     contributors: 0,
   };
-  const contributors = new Set<string>();
+  const contributors = new Map<string, string>();
   const events: DigestEvent[] = [];
 
   for (const r of rows) {
-    contributors.add(r.actorId);
+    contributors.set(r.actorId, r.actorName);
     const payload = (r.payload ?? {}) as Record<string, unknown>;
     let detail: string | null = null;
 
@@ -120,6 +121,9 @@ export async function generateBoardDigest(
     });
   }
   stats.contributors = contributors.size;
+  const people: DigestPerson[] = [...contributors]
+    .slice(0, 12)
+    .map(([id, name]) => ({ id, name }));
 
   const draft = await generateDigest({
     boardName,
@@ -134,7 +138,7 @@ export async function generateBoardDigest(
       boardId,
       periodStart: since,
       periodEnd: now,
-      content: toDigestContent(draft, stats),
+      content: toDigestContent(draft, stats, people),
     })
     .returning();
 

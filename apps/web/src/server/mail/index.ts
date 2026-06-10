@@ -58,6 +58,18 @@ export async function sendPasswordResetEmail(to: string, url: string) {
   await sendMail({ to, subject, text, html });
 }
 
+type DigestHighlightLine = {
+  actor: string | null;
+  action: string;
+  task: string | null;
+};
+
+function highlightToText(h: DigestHighlightLine) {
+  return [h.actor, h.action, h.task ? `"${h.task}"` : null]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export async function sendDigestEmail(
   to: string,
   opts: {
@@ -65,18 +77,19 @@ export async function sendDigestEmail(
     slug: string;
     headline: string;
     summary: string;
-    highlights: string[];
+    highlights: DigestHighlightLine[];
   },
 ) {
   const url = `${appUrl()}/app/p/${opts.slug}`;
   const subject = `Weekly digest — ${opts.boardName}`;
-  const bullets = opts.highlights.map((h) => `• ${h}`).join("\n");
+  const lines = opts.highlights.map(highlightToText);
+  const bullets = lines.map((h) => `• ${h}`).join("\n");
   const text = `${opts.headline}\n\n${opts.summary}${
     bullets ? `\n\n${bullets}` : ""
   }\n\nOpen the board: ${url}`;
   const highlightsHtml =
-    opts.highlights.length > 0
-      ? `<ul style="color:#bbb;padding-left:18px;margin:16px 0;">${opts.highlights
+    lines.length > 0
+      ? `<ul style="color:#bbb;padding-left:18px;margin:16px 0;">${lines
           .map((h) => `<li style="margin:4px 0;">${h}</li>`)
           .join("")}</ul>`
       : "";

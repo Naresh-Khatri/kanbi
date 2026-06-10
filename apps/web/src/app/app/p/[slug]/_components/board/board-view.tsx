@@ -713,6 +713,7 @@ export function BoardView({
       <DigestPanel
         boardId={boardId}
         canWrite={canWrite}
+        members={members}
         onOpenChange={setDigestOpen}
         open={digestOpen}
       />

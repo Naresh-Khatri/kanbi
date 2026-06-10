@@ -360,11 +360,22 @@ export type DigestStats = {
   contributors: number;
 };
 
+/** One notable item, split so the UI can render the actor + task distinctly. */
+export type DigestHighlight = {
+  actor: string | null;
+  action: string;
+  task: string | null;
+};
+
+/** A contributor in the period, kept so the UI can show their avatar. */
+export type DigestPerson = { id: string; name: string };
+
 export type DigestContent = {
   headline: string;
   summary: string;
-  highlights: string[];
+  highlights: DigestHighlight[];
   stats: DigestStats;
+  people: DigestPerson[];
 };
 
 export const digest = createTable(
