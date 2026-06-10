@@ -149,6 +149,7 @@ export function BoardView({
     {
       onData: (evt) => {
         if (evt.scope === "presence") {
+          // Keeps the header team/presence popover live while the board is open.
           utils.realtime.presence.invalidate({ boardId });
           return;
         }

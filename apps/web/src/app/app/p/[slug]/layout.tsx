@@ -3,10 +3,7 @@ import { notFound } from "next/navigation";
 import { AppHeader } from "@/app/app/_components/app-header";
 import { ProjectAiButton } from "@/app/app/p/[slug]/_components/project-ai-button";
 import { ProjectInfo } from "@/app/app/p/[slug]/_components/project-info";
-import { ProjectInvitesBadge } from "@/app/app/p/[slug]/_components/project-invites-badge";
-import { ProjectMembers } from "@/app/app/p/[slug]/_components/project-members";
-import { ProjectRole } from "@/app/app/p/[slug]/_components/project-role";
-import { ProjectSettingsLink } from "@/app/app/p/[slug]/_components/project-settings-link";
+import { ProjectTeamButton } from "@/app/app/p/[slug]/_components/project-team-button";
 import { resolveProject } from "@/app/app/p/[slug]/_lib/resolve-project";
 import { api, HydrateClient } from "@/trpc/server";
 
@@ -36,10 +33,7 @@ export default async function ProjectLayout({
         end={
           <>
             <ProjectAiButton />
-            <ProjectMembers />
-            <ProjectRole />
-            <ProjectInvitesBadge />
-            <ProjectSettingsLink />
+            <ProjectTeamButton />
           </>
         }
         start={<ProjectInfo />}
