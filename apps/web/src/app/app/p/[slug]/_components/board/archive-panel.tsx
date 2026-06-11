@@ -1,5 +1,6 @@
 "use client";
 
+import { formatRelative } from "@kanbi/shared";
 import { ArchiveRestore, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -85,9 +86,7 @@ export function ArchivePanel({
                   <span className="truncate text-xs text-white/40">
                     {columnNameById.get(t.columnId) ?? "—"}
                     {t.archivedAt
-                      ? ` · archived ${new Date(
-                          t.archivedAt,
-                        ).toLocaleDateString()}`
+                      ? ` · archived ${formatRelative(t.archivedAt)}`
                       : ""}
                   </span>
                 </div>

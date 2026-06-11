@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime, formatRelative } from "@kanbi/shared";
 import { Bell, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,18 +26,6 @@ type NotificationAction = {
 };
 
 const POLL_MS = 30_000;
-
-function timeAgo(date: Date) {
-  const s = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d`;
-  return date.toLocaleDateString();
-}
 
 function describe(n: NotificationRow): {
   text: string;
@@ -252,8 +241,11 @@ export function NotificationBell() {
                       <p className="truncate-2 text-sm leading-snug text-white/90">
                         {text}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-white/40">
-                        {timeAgo(createdAt)}
+                      <p
+                        className="mt-0.5 text-[11px] text-white/40"
+                        title={formatDateTime(createdAt)}
+                      >
+                        {formatRelative(createdAt)}
                       </p>
                     </div>
                     {unread ? (

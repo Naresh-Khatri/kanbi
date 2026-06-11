@@ -17,6 +17,7 @@ import {
   User as UserIcon,
   X,
 } from "lucide-react";
+import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -226,9 +227,9 @@ function TaskDetail({
         </SheetTitle>
         <SheetDescription>
           Updated{" "}
-          {task.updatedAt
-            ? new Date(task.updatedAt).toLocaleString()
-            : new Date(task.createdAt).toLocaleString()}
+          <span title={formatDateTime(task.updatedAt ?? task.createdAt)}>
+            {formatRelative(task.updatedAt ?? task.createdAt)}
+          </span>
         </SheetDescription>
       </SheetHeader>
 
@@ -341,16 +342,6 @@ const PROP_BTN =
 const PROP_ICON = "h-4 w-4 shrink-0 text-white/45";
 const PROP_PLACEHOLDER = "text-white/45";
 
-function formatDue(value: Date | string) {
-  const d = new Date(value);
-  const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-  });
-}
-
 function DueControl({
   value,
   onChange,
@@ -381,7 +372,7 @@ function DueControl({
       >
         <CalendarDays className={PROP_ICON} />
         <span className={cn("truncate", !has && PROP_PLACEHOLDER)}>
-          {has ? formatDue(value) : "Due date"}
+          {has ? formatDate(value) : "Due date"}
         </span>
       </button>
       {has && canWrite ? (
@@ -1426,7 +1417,9 @@ function CommentItem({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2 text-xs text-white/40">
           <span className="font-medium text-white/80">{c.authorName}</span>
-          <span>{new Date(c.createdAt).toLocaleString()}</span>
+          <span title={formatDateTime(c.createdAt)}>
+            {formatRelative(c.createdAt)}
+          </span>
           {c.editedAt ? <span className="text-white/30">(edited)</span> : null}
           {canManage && !editing ? (
             <div className="ml-auto flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
@@ -1526,8 +1519,8 @@ function ActivityPanel({
             <UserAvatar image={a.actorImage} name={a.actorName} size={18} />
             <span className="font-medium text-white/80">{a.actorName}</span>
             <span>{formatVerb(a.verb)}</span>
-            <span className="ml-auto">
-              {new Date(a.createdAt).toLocaleString()}
+            <span className="ml-auto" title={formatDateTime(a.createdAt)}>
+              {formatRelative(a.createdAt)}
             </span>
           </li>
         ))}

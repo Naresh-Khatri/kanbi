@@ -17,6 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { formatDate } from "@kanbi/shared";
 import {
   CalendarDays,
   Check,
@@ -683,9 +684,10 @@ export function QuickAddTaskDialog({
 }
 
 function formatDue(iso: string) {
+  // Parse as local midnight so the YYYY-MM-DD value isn't shifted by timezone.
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDate(d);
 }
 
 function ChecklistBullet({ faint }: { faint?: boolean }) {

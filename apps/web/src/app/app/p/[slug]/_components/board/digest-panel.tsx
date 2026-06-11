@@ -9,6 +9,12 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
+import {
+  formatDate,
+  formatDateRange,
+  formatRelative,
+  formatWeekday,
+} from "@kanbi/shared";
 import { useMemo } from "react";
 import { toast } from "sonner";
 
@@ -48,27 +54,6 @@ function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function shortDate(value: Date | string) {
-  return new Date(value).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function periodLabel(start: Date | string, end: Date | string) {
-  return `${shortDate(start)} – ${shortDate(end)}`;
-}
-
-function relativeTime(value: Date | string) {
-  const diff = Date.now() - new Date(value).getTime();
-  const m = Math.round(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
-}
-
 /** Tiny per-day activity bar chart for the window. */
 function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
   const max = Math.max(1, ...data);
@@ -77,11 +62,9 @@ function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
     <div className="flex h-7 items-end gap-1">
       {data.map((v, i) => {
         const day = new Date(startMs + i * DAY_MS);
-        const label = day.toLocaleDateString(undefined, {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        });
+        const label = `${formatWeekday(day)}, ${formatDate(day, {
+          relativeDays: false,
+        })}`;
         return (
           <div
             className="flex-1 rounded-sm bg-white/15 transition-colors hover:bg-white/25"
@@ -230,7 +213,7 @@ export function DigestPanel({
             {digest ? (
               <span className="flex items-center gap-2 tracking-normal normal-case text-white/45">
                 <span className="text-white/20">·</span>
-                {periodLabel(digest.periodStart, digest.periodEnd)}
+                {formatDateRange(digest.periodStart, digest.periodEnd)}
               </span>
             ) : null}
           </DialogTitle>
@@ -364,7 +347,7 @@ export function DigestPanel({
         {digest || canWrite ? (
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className="text-xs text-white/35">
-              {digest ? `Generated ${relativeTime(digest.createdAt)}` : ""}
+              {digest ? `Generated ${formatRelative(digest.createdAt)}` : ""}
             </span>
             {canWrite ? (
               <Button

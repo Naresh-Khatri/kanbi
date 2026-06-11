@@ -14,6 +14,8 @@ import {
   type Priority,
   PriorityIcon,
 } from "@/app/app/p/[slug]/_components/priority";
+import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
+
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
@@ -28,13 +30,6 @@ function startOfTodayMs() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d.getTime();
-}
-
-function shortDate(value: Date | string) {
-  return new Date(value).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
 }
 
 export function MyWork() {
@@ -187,7 +182,7 @@ function TaskRow({ task: t, danger }: { task: Assigned; danger?: boolean }) {
               danger && "text-red-400/80",
             )}
           >
-            {shortDate(t.dueAt)}
+            {formatDate(t.dueAt)}
           </span>
         ) : null}
         <span className="max-w-[7rem] shrink-0 truncate text-xs text-white/40">
@@ -208,8 +203,11 @@ function MentionRow({ mention: m }: { mention: Mention }) {
           <span className="text-white/80"> in “{m.taskTitle}”</span>
         ) : null}
       </span>
-      <span className="shrink-0 text-xs text-white/40">
-        {shortDate(m.createdAt)}
+      <span
+        className="shrink-0 text-xs text-white/40"
+        title={formatDateTime(m.createdAt)}
+      >
+        {formatRelative(m.createdAt)}
       </span>
     </>
   );

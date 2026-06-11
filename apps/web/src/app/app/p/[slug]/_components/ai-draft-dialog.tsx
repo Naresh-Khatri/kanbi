@@ -11,6 +11,7 @@ import {
   User as UserIcon,
   X,
 } from "lucide-react";
+import { formatDate } from "@kanbi/shared";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -90,13 +91,8 @@ const CONFIDENCE_META: Record<
 function formatDueLabel(value: string) {
   const [y, m, d] = value.split("-").map(Number);
   if (!y || !m || !d) return value;
-  const date = new Date(y, m - 1, d);
-  const sameYear = y === new Date().getFullYear();
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-  });
+  // Build from parts so the YYYY-MM-DD value isn't shifted by timezone.
+  return formatDate(new Date(y, m - 1, d));
 }
 
 /**

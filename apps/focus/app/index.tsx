@@ -6,6 +6,7 @@ import {
   View,
 } from "react-native";
 import { Link, Redirect, router } from "expo-router";
+import { formatDate } from "@kanbi/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
@@ -159,7 +160,7 @@ export default function FocusScreen() {
               </Text>
               {active.task.dueAt ? (
                 <Text className="mt-3 text-sm text-zinc-400">
-                  due {new Date(active.task.dueAt).toLocaleString()}
+                  due {formatDate(active.task.dueAt)}
                 </Text>
               ) : null}
             </>

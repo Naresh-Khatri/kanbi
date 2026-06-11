@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Smartphone, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { type PairPayload } from "@kanbi/shared";
+import { formatDateTime, formatRelative, type PairPayload } from "@kanbi/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,9 +163,13 @@ export function DevicesSection() {
                 <p className="text-[11px] text-white/40">
                   <span className="font-mono">{d.tokenPrefix}…</span>
                   {" · "}
-                  {d.lastSeenAt
-                    ? `last seen ${new Date(d.lastSeenAt).toLocaleString()}`
-                    : "never used"}
+                  {d.lastSeenAt ? (
+                    <span title={formatDateTime(d.lastSeenAt)}>
+                      last seen {formatRelative(d.lastSeenAt)}
+                    </span>
+                  ) : (
+                    "never used"
+                  )}
                 </p>
               </div>
               <button

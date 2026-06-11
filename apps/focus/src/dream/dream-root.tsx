@@ -5,6 +5,7 @@ import {
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
+import { formatDate } from "@kanbi/shared";
 
 import { fetchBoardSnapshot, FocusApiError } from "@/lib/trpc";
 import { loadConfig } from "@/lib/storage";
@@ -143,7 +144,7 @@ function DreamSurface() {
               </Text>
               {active.task.dueAt ? (
                 <Text className="mt-3 text-sm text-zinc-400">
-                  due {new Date(active.task.dueAt).toLocaleString()}
+                  due {formatDate(active.task.dueAt)}
                 </Text>
               ) : null}
             </>

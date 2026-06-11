@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@kanbi/shared";
 import { Copy, Link as LinkIcon, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -147,9 +148,7 @@ export function SharingSection({
                       {s.usesCount}
                       {s.maxUses != null ? ` / ${s.maxUses}` : ""} views
                       {s.expiresAt
-                        ? ` · expires ${new Date(
-                            s.expiresAt,
-                          ).toLocaleDateString()}`
+                        ? ` · expires ${formatDate(s.expiresAt)}`
                         : " · no expiry"}
                       {expired ? (
                         <span className="text-red-400/80"> · expired</span>
