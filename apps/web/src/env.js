@@ -8,10 +8,11 @@ export const env = createEnv({
         ? z.string()
         : z.string().optional(),
     BETTER_AUTH_URL: z.string().url().optional(),
-    BETTER_AUTH_GITHUB_CLIENT_ID: z.string(),
-    BETTER_AUTH_GITHUB_CLIENT_SECRET: z.string(),
-    BETTER_AUTH_GOOGLE_CLIENT_ID: z.string(),
-    BETTER_AUTH_GOOGLE_CLIENT_SECRET: z.string(),
+    // Optional: a social provider is enabled only when its id + secret pair is set.
+    BETTER_AUTH_GITHUB_CLIENT_ID: z.string().optional(),
+    BETTER_AUTH_GITHUB_CLIENT_SECRET: z.string().optional(),
+    BETTER_AUTH_GOOGLE_CLIENT_ID: z.string().optional(),
+    BETTER_AUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
@@ -22,19 +23,22 @@ export const env = createEnv({
     R2_SECRET_ACCESS_KEY: z.string().optional(),
     R2_BUCKET: z.string().optional(),
     R2_PUBLIC_BASE_URL: z.string().url().optional(),
-    // SMTP (nodemailer) for transactional email
-    SMTP_HOST: z.string(),
+    // SMTP (nodemailer) for transactional email. Optional: when host/user/
+    // password/from are unset, email sends become no-ops (see server/mail).
+    SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().default(587),
     SMTP_SECURE: z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    SMTP_USER: z.string(),
-    SMTP_PASSWORD: z.string(),
-    SMTP_FROM: z.string(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
+    SMTP_FROM: z.string().optional(),
     CRON_SECRET: z.string().optional(),
     // Groq API key — enables AI task drafting
     GROQ_API_KEY: z.string().optional(),
+    // MCP resource-server URL (OAuth audience). Defaults to <BETTER_AUTH_URL>/api/mcp.
+    MCP_RESOURCE_URL: z.string().url().optional(),
   },
 
   client: {
@@ -65,6 +69,7 @@ export const env = createEnv({
     SMTP_FROM: process.env.SMTP_FROM,
     CRON_SECRET: process.env.CRON_SECRET,
     GROQ_API_KEY: process.env.GROQ_API_KEY,
+    MCP_RESOURCE_URL: process.env.MCP_RESOURCE_URL,
     NEXT_PUBLIC_LAN_HOST: process.env.NEXT_PUBLIC_LAN_HOST,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

@@ -4,12 +4,17 @@ import nodemailer from "nodemailer";
 
 import { env } from "@/env";
 
-const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_SECURE,
-  auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
-});
+// SMTP is optional; build the transport only when it's configured so the app
+// still runs without mail credentials (sends become no-ops below).
+const transporter =
+  env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD
+    ? nodemailer.createTransport({
+        host: env.SMTP_HOST,
+        port: env.SMTP_PORT,
+        secure: env.SMTP_SECURE,
+        auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
+      })
+    : null;
 
 type SendInput = {
   to: string;
@@ -19,13 +24,11 @@ type SendInput = {
 };
 
 async function sendMail({ to, subject, text, html }: SendInput) {
-  await transporter.sendMail({
-    from: env.SMTP_FROM,
-    to,
-    subject,
-    text,
-    html,
-  });
+  if (!transporter || !env.SMTP_FROM) {
+    console.warn(`[mail] SMTP not configured; skipped "${subject}" to ${to}`);
+    return;
+  }
+  await transporter.sendMail({ from: env.SMTP_FROM, to, subject, text, html });
 }
 
 function appUrl() {
