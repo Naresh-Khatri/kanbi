@@ -50,6 +50,13 @@
       "when": 1781078139954,
       "tag": "0006_bitter_meggan",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781252508309,
+      "tag": "0007_mcp_oauth_provider",
+      "breakpoints": true
     }
   ]
 }

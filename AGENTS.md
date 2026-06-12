@@ -72,6 +72,10 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 
 `src/server/ai/groq.ts` (server-only) uses the Groq SDK to draft structured tasks; only active when `GROQ_API_KEY` is set — treat the feature as optional.
 
+### MCP server
+
+`src/server/mcp/` exposes a Model Context Protocol server at `/api/mcp` (Streamable HTTP) so external agents (Claude Code, opencode) can read and write boards. Auth is OAuth 2.1 via `@better-auth/oauth-provider`, registered alongside the `jwt()` plugin in `src/server/better-auth/config.ts`: agents self-register (RFC 7591 DCR), the user consents at `/consent`, and the route (`src/app/api/[transport]/route.ts`) verifies the resulting JWT against the JWKS. Tools wrap existing tRPC procedures through a JWT-to-session bridge (`caller.ts`), so ACLs, validation, and the realtime bus are all reused; per-tool checks gate the `kanbi:read` vs `kanbi:write` scopes. Agent-authored HTML is sanitized server-side (`sanitize.ts`). The `oauth_*` and `jwks` tables are unprefixed (owned by the Better Auth adapter); OAuth discovery docs live under `src/app/.well-known/`, served at both the root and the RFC-path-aware locations. **See `src/server/mcp/README.md`** for connecting agents, the tool/scope reference, and troubleshooting.
+
 ## Design language
 
 **Read `DESIGN.md` before any UI work.** Key rules: dark-only UI; monochrome alpha ladder (`text-white/70`, `border-white/10`, `bg-white/5`) instead of new colors — color is reserved for meaning (priority/status/focus); two dialects — marketing pages get gradients/pill buttons/display type, product pages under `/app` are flat near-black, hairline borders, dense, `rounded-md`; no hover scale/shadow, minimal motion; keyboard-first (shortcuts via `react-hotkeys-hook`).
