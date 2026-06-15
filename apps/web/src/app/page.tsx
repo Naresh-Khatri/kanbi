@@ -1,3 +1,4 @@
+import { ArrowRight, Bot, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -33,6 +34,40 @@ export default async function Home() {
           href="/signup"
         >
           Create account
+        </Link>
+      </div>
+      <div className="grid w-full max-w-xl gap-3 sm:grid-cols-2">
+        <Link
+          className="group rounded-xl border border-white/10 bg-white/5 p-5 text-left transition hover:bg-white/10"
+          href="/docs/focus"
+        >
+          <Smartphone className="h-5 w-5 text-white/70" />
+          <h2 className="mt-3 font-semibold tracking-tight text-white">
+            Focus companion app
+          </h2>
+          <p className="mt-1 text-sm text-white/70">
+            Pair your phone over a QR code and track tasks on the go.
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 text-sm text-white/50 transition group-hover:text-white/80">
+            Get started
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+        <Link
+          className="group rounded-xl border border-white/10 bg-white/5 p-5 text-left transition hover:bg-white/10"
+          href="/docs/mcp"
+        >
+          <Bot className="h-5 w-5 text-white/70" />
+          <h2 className="mt-3 font-semibold tracking-tight text-white">
+            MCP server
+          </h2>
+          <p className="mt-1 text-sm text-white/70">
+            Let AI agents like Claude Code read and write your boards.
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 text-sm text-white/50 transition group-hover:text-white/80">
+            Connect an agent
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
         </Link>
       </div>
     </main>
