@@ -35,7 +35,6 @@ import { api } from "@/trpc/react";
 import { AddColumn } from "./add-column";
 import { ArchivePanel } from "./archive-panel";
 import { DigestPanel } from "./digest-panel";
-import { AiDraftDialog } from "../ai-draft-dialog";
 import {
   type BoardFilters,
   BoardToolbar,
@@ -105,12 +104,8 @@ export function BoardView({
   const [digestOpen, setDigestOpen] = useState(false);
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
   const archiveTask = useArchiveTask(boardId);
-  const [aiDraftOpen, setAiDraftOpen] = useState(false);
-  const [aiDraftColumnId, setAiDraftColumnId] = useState<string | null>(null);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
-  const aiImportToken = useAppShell((s) => s.aiImportToken);
   const lastCreateTaskToken = useRef(createTaskToken);
-  const lastAiImportToken = useRef(aiImportToken);
   useEffect(() => {
     if (createTaskToken === lastCreateTaskToken.current) return;
     lastCreateTaskToken.current = createTaskToken;
@@ -119,26 +114,6 @@ export function BoardView({
       setQuickAddOpen(true);
     }
   }, [createTaskToken, columns.length]);
-  useEffect(() => {
-    if (aiImportToken === lastAiImportToken.current) return;
-    lastAiImportToken.current = aiImportToken;
-    if (columns.length > 0 && canWrite) {
-      setAiDraftColumnId(null);
-      setAiDraftOpen(true);
-    }
-  }, [aiImportToken, columns.length, canWrite]);
-
-  useHotkeys(
-    "shift+v",
-    (e) => {
-      if (!canWrite || columns.length === 0) return;
-      e.preventDefault();
-      setAiDraftColumnId(null);
-      setAiDraftOpen(true);
-    },
-    { enableOnFormTags: false },
-    [canWrite, columns.length],
-  );
 
   const openTask = openTaskId
     ? (tasks.find((t) => t.id === openTaskId) ?? null)
@@ -545,8 +520,10 @@ export function BoardView({
       })),
     [sortedColumns, tasksByColumn],
   );
+  // aiDraftOpen lives in the shell store (read imperatively in nav handlers so
+  // opening the AI dialog never re-renders the board); the rest are local.
   const navActive =
-    !openTask && !quickAddOpen && !aiDraftOpen && !archiveOpen && !digestOpen;
+    !openTask && !quickAddOpen && !archiveOpen && !digestOpen;
   const kbRef = useRef({
     navColumns,
     focusedTaskId,
@@ -616,7 +593,7 @@ export function BoardView({
   useHotkeys(
     "down",
     (e) => {
-      if (!kbRef.current.active) return;
+      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
       moveFocus("down");
     },
@@ -625,7 +602,7 @@ export function BoardView({
   useHotkeys(
     "up",
     (e) => {
-      if (!kbRef.current.active) return;
+      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
       moveFocus("up");
     },
@@ -634,7 +611,7 @@ export function BoardView({
   useHotkeys(
     "right",
     (e) => {
-      if (!kbRef.current.active) return;
+      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
       moveFocus("right");
     },
@@ -643,7 +620,7 @@ export function BoardView({
   useHotkeys(
     "left",
     (e) => {
-      if (!kbRef.current.active) return;
+      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
       moveFocus("left");
     },
@@ -652,7 +629,7 @@ export function BoardView({
   useHotkeys(
     "enter, e",
     (e) => {
-      if (!kbRef.current.active || !kbRef.current.focusedTaskId) return;
+      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active || !kbRef.current.focusedTaskId) return;
       e.preventDefault();
       handleOpenTask(kbRef.current.focusedTaskId);
     },
@@ -661,7 +638,7 @@ export function BoardView({
   useHotkeys(
     "x",
     (e) => {
-      if (!kbRef.current.active || !kbRef.current.focusedTaskId) return;
+      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active || !kbRef.current.focusedTaskId) return;
       e.preventDefault();
       archiveFocused();
     },
@@ -773,17 +750,6 @@ export function BoardView({
           labels={labels}
           onOpenChange={setQuickAddOpen}
           open={quickAddOpen}
-          projectId={projectId}
-        />
-      ) : null}
-      {columns.length > 0 && canWrite ? (
-        <AiDraftDialog
-          boardId={boardId}
-          columns={columns}
-          initialColumnId={aiDraftColumnId}
-          labels={labels}
-          onOpenChange={setAiDraftOpen}
-          open={aiDraftOpen}
           projectId={projectId}
         />
       ) : null}
