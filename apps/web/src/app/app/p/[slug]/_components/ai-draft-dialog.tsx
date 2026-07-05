@@ -21,6 +21,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -64,42 +65,32 @@ type EditableIssue = {
   skip: boolean;
 };
 
+// muted dot per confidence level
 const CONFIDENCE_META: Record<
   EditableIssue["confidence"],
-  { label: string; short: string; dot: string; text: string }
+  { label: string; dot: string }
 > = {
-  high: {
-    label: "High confidence",
-    short: "High",
-    dot: "bg-emerald-400",
-    text: "text-emerald-300/80",
-  },
-  med: {
-    label: "Medium confidence",
-    short: "Medium",
-    dot: "bg-amber-400",
-    text: "text-amber-300/80",
-  },
-  low: {
-    label: "Low confidence",
-    short: "Low",
-    dot: "bg-white/40",
-    text: "text-white/40",
-  },
+  high: { label: "High confidence", dot: "bg-emerald-400/80" },
+  med: { label: "Medium confidence", dot: "bg-amber-400/70" },
+  low: { label: "Low confidence", dot: "bg-white/25" },
+};
+
+// variant depth labels, keyed on explicit `kind` tag (not array position)
+const VARIANT_LABELS: Record<Variant["kind"], string> = {
+  concise: "Concise",
+  medium: "Medium",
+  verbose: "Verbose",
 };
 
 function formatDueLabel(value: string) {
   const [y, m, d] = value.split("-").map(Number);
   if (!y || !m || !d) return value;
-  // Build from parts so the YYYY-MM-DD value isn't shifted by timezone.
+  // build from parts so YYYY-MM-DD isn't shifted by timezone
   return formatDate(new Date(y, m - 1, d));
 }
 
-/**
- * Animates its height to fit its content, so swapping content of a different
- * size (e.g. switching variants) glides instead of snapping. Overflow is only
- * clipped mid-animation so editor popovers aren't cut off while idle.
- */
+// animates height to fit content so swapping variants glides vs snaps.
+// overflow clipped only mid-animation -> idle editor popovers aren't cut off
 function AnimateHeight({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | "auto">("auto");
@@ -159,13 +150,27 @@ export function AiDraftDialog({
 
   const [message, setMessage] = useState("");
   const [issues, setIssues] = useState<EditableIssue[] | null>(null);
-  // "input" shows the message editor; "review" shows the drafted cards. Kept
-  // separate from `issues` so going Back to tweak the message never discards edits.
+  // input = message editor, review = drafted cards. separate from `issues` so
+  // Back to tweak the message never discards edits
   const [view, setView] = useState<"input" | "review">("input");
   const [rawExpanded, setRawExpanded] = useState(false);
   const [columnId, setColumnId] = useState<string | null>(defaultColumnId);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const messageRef = useRef<HTMLTextAreaElement>(null);
+
+  // typed message or drafted issues = work worth guarding on close
+  const isDirty = message.trim().length > 0 || (issues?.length ?? 0) > 0;
+
+  // intercepts every close path (Esc, overlay, X). successful create closes
+  // via onOpenChange directly, bypassing this guard
+  function requestOpenChange(next: boolean) {
+    if (!next && isDirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onOpenChange(next);
+  }
 
   useEffect(() => {
     if (open) {
@@ -174,6 +179,7 @@ export function AiDraftDialog({
       setView("input");
       setRawExpanded(false);
       setColumnId(defaultColumnId);
+      setConfirmDiscard(false);
       setTimeout(() => messageRef.current?.focus(), 30);
     }
   }, [open, defaultColumnId]);
@@ -290,7 +296,7 @@ export function AiDraftDialog({
   const activeCount = issues?.filter((i) => !i.skip).length ?? 0;
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
+    <Dialog onOpenChange={requestOpenChange} open={open}>
       <DialogContent
         className="flex max-h-[85vh] w-full max-w-3xl flex-col gap-0 p-0"
         onKeyDown={(e) => {
@@ -301,9 +307,9 @@ export function AiDraftDialog({
           }
         }}
       >
-        <DialogHeader className="border-b border-white/10 px-5 py-3">
-          <DialogTitle className="flex items-center gap-2 text-sm text-white/80">
-            <Sparkles className="h-4 w-4 text-white/60" />
+        <DialogHeader className="border-b border-white/[0.06] px-5 py-3.5">
+          <DialogTitle className="flex items-center gap-2 text-[13px] font-medium text-white/90">
+            <Sparkles className="h-3.5 w-3.5 text-white/35" />
             Draft tasks from a message
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -316,7 +322,7 @@ export function AiDraftDialog({
             <div className="flex flex-col gap-3 px-5 py-4">
               <Textarea
                 autoFocus
-                className="min-h-[180px] resize-y"
+                className="min-h-[200px] resize-y border-white/[0.08] bg-white/[0.02] text-[13px] leading-relaxed focus-visible:ring-white/20"
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Paste the client message, bug report, or spec here…"
                 ref={messageRef}
@@ -331,7 +337,7 @@ export function AiDraftDialog({
                 message={message}
                 onToggle={() => setRawExpanded((v) => !v)}
               />
-              <div className="flex flex-col gap-3 px-5 py-4">
+              <div className="flex flex-col gap-2.5 px-5 py-4">
                 {issues?.map((issue, i) => (
                   <IssueCard
                     issue={issue}
@@ -353,12 +359,12 @@ export function AiDraftDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
+        <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3">
           {view === "input" ? (
             <>
-              <span className="text-[11px] text-white/40">
-                AI extracts distinct issues, each with a priority, assignee, due
-                date, labels, and a checklist.
+              <span className="max-w-[60%] text-[11px] leading-relaxed text-white/35">
+                Each issue comes with a priority, assignee, due date, labels, and
+                a checklist.
               </span>
               <div className="flex items-center gap-2">
                 {issues ? (
@@ -423,6 +429,37 @@ export function AiDraftDialog({
           )}
         </div>
       </DialogContent>
+
+      <Dialog onOpenChange={setConfirmDiscard} open={confirmDiscard}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Discard draft?</DialogTitle>
+            <DialogDescription>
+              Your message{issues ? " and the tasks drafted from it" : ""} will
+              be lost. This can’t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setConfirmDiscard(false)}
+              type="button"
+              variant="ghost"
+            >
+              Keep editing
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmDiscard(false);
+                onOpenChange(false);
+              }}
+              type="button"
+              variant="destructive"
+            >
+              Discard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
@@ -432,7 +469,7 @@ function SkeletonCards() {
     <div className="flex flex-col gap-3">
       {["a", "b"].map((k) => (
         <div
-          className="animate-pulse rounded-lg border border-white/10 bg-white/[0.02] p-4"
+          className="animate-pulse rounded-xl border border-white/[0.07] bg-white/[0.015] p-4"
           key={k}
         >
           <div className="mb-3 h-3 w-2/3 rounded bg-white/10" />
@@ -455,7 +492,7 @@ function RawPreview({
 }) {
   return (
     <button
-      className="flex items-start gap-2 border-b border-white/10 bg-white/[0.02] px-5 py-2 text-left text-xs text-white/50 transition hover:bg-white/[0.04]"
+      className="flex items-start gap-2 border-b border-white/[0.06] px-5 py-2.5 text-left text-xs text-white/40 transition hover:text-white/60"
       onClick={onToggle}
       type="button"
     >
@@ -501,36 +538,25 @@ function IssueCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-white/[0.02] transition",
+        "rounded-xl border transition-opacity",
         issue.skip
-          ? "border-white/5 opacity-50"
-          : "border-white/10 hover:border-white/20",
+          ? "border-white/[0.05] opacity-45"
+          : "border-white/[0.07] bg-white/[0.015]",
       )}
     >
-      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <span
             aria-hidden
-            className={cn("h-2 w-2 shrink-0 rounded-full", meta.dot)}
-          />
-          <span
-            className={cn(
-              "shrink-0 text-[10px] font-medium tracking-wide uppercase",
-              meta.text,
-            )}
+            className={cn("h-1.5 w-1.5 shrink-0 rounded-full", meta.dot)}
             title={meta.label}
-          >
-            {meta.short}
-          </span>
-          <span aria-hidden className="shrink-0 text-xs text-white/25">
-            ·
-          </span>
-          <span className="truncate text-xs text-white/70">
+          />
+          <span className="truncate text-[13px] font-medium text-white/85">
             {issue.summary}
           </span>
         </div>
         <button
-          className="shrink-0 text-[11px] text-white/50 transition hover:text-white/80"
+          className="shrink-0 text-[11px] text-white/40 transition hover:text-white/75"
           onClick={() => onSkip(!issue.skip)}
           type="button"
         >
@@ -540,7 +566,7 @@ function IssueCard({
 
       {issue.skip || !variant ? null : (
         <>
-          {/* Issue-level attributes — shared across every variant. */}
+          {/* issue-wide attrs, shared across variants */}
           <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2.5">
             <PriorityChip
               onChange={(priority) => onIssueEdit({ priority })}
@@ -582,26 +608,26 @@ function IssueCard({
             ) : null}
           </div>
 
-          {/* The divider marks the boundary: attributes above are issue-wide,
-              the content below belongs to the selected variant. */}
-          <div className="mx-4 border-t border-white/5" />
+          {/* divider = boundary: attrs above are issue-wide, content below is per-variant */}
+          <div className="mx-4 border-t border-white/[0.05]" />
 
           {multiVariant ? (
             <div className="px-4 pt-3">
-              <div className="inline-flex w-fit items-center gap-0.5 rounded-lg border border-white/10 bg-black/20 p-0.5">
+              <div className="inline-flex w-fit items-center gap-0.5 rounded-lg bg-white/[0.03] p-0.5">
                 {issue.variants.map((v, i) => (
                   <button
+                    aria-pressed={i === issue.variantIndex}
                     className={cn(
                       "rounded-md px-3 py-1 text-[11px] font-medium transition",
                       i === issue.variantIndex
-                        ? "bg-white/15 text-white shadow-sm"
-                        : "text-white/45 hover:text-white/80",
+                        ? "bg-white/10 text-white/90"
+                        : "text-white/40 hover:text-white/70",
                     )}
                     key={v.id}
                     onClick={() => onVariantChange(i)}
                     type="button"
                   >
-                    Variant {i + 1}
+                    {VARIANT_LABELS[v.kind] ?? `Variant ${i + 1}`}
                   </button>
                 ))}
               </div>
@@ -609,26 +635,20 @@ function IssueCard({
           ) : null}
 
           <AnimateHeight>
-            <div
-              className={cn(
-                "flex flex-col gap-2.5 px-4 pb-3",
-                multiVariant ? "pt-2.5" : "pt-3",
-              )}
-            >
+            <div className="flex flex-col gap-1 px-4 pt-3 pb-4">
               <Input
-                className="border-0 bg-transparent px-0 text-sm font-medium focus-visible:ring-0"
+                className="h-auto border-0 bg-transparent px-0 py-0 text-[15px] font-medium text-white/90 focus-visible:ring-0"
                 onChange={(e) => onVariantEdit({ title: e.target.value })}
                 placeholder="Task title"
                 value={variant.title}
               />
-              <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
-                <RichTextEditor
-                  minHeight="60px"
-                  onChange={(html) => onVariantEdit({ description: html })}
-                  placeholder="Add context and acceptance criteria…"
-                  value={variant.description}
-                />
-              </div>
+              <RichTextEditor
+                className="text-white/60"
+                minHeight="52px"
+                onChange={(html) => onVariantEdit({ description: html })}
+                placeholder="Add context and acceptance criteria…"
+                value={variant.description}
+              />
               <ChecklistField
                 items={variant.checklist}
                 onChange={(checklist) => onVariantEdit({ checklist })}
@@ -652,7 +672,7 @@ function PriorityChip({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/70 capitalize transition hover:border-white/20 hover:text-white"
+          className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-white/55 capitalize transition hover:bg-white/[0.07] hover:text-white/85"
           type="button"
         >
           <PriorityIcon className="h-3 w-3" priority={value} />
@@ -685,7 +705,7 @@ function LabelsChip({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/70 transition hover:border-white/20 hover:text-white"
+          className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-white/55 transition hover:bg-white/[0.07] hover:text-white/85"
           type="button"
         >
           <Tag className="h-3 w-3" />
@@ -735,7 +755,7 @@ function AssigneeChip({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/70 transition hover:border-white/20 hover:text-white"
+          className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-white/55 transition hover:bg-white/[0.07] hover:text-white/85"
           type="button"
         >
           {current ? (
@@ -788,9 +808,9 @@ function DueDateChip({
   }
 
   return (
-    <span className="relative inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] transition hover:border-white/20">
+    <span className="relative inline-flex items-center rounded-md bg-white/[0.04] transition hover:bg-white/[0.07]">
       <button
-        className="inline-flex items-center gap-1.5 rounded-full py-1 pr-2 pl-2.5 text-[11px] text-white/70 transition hover:text-white"
+        className="inline-flex items-center gap-1.5 rounded-md py-1 pr-1.5 pl-2 text-[11px] text-white/55 transition hover:text-white/85"
         onClick={openPicker}
         type="button"
       >
@@ -848,20 +868,20 @@ function ChecklistField({
   }
 
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-white/10 bg-white/[0.02] p-2.5">
-      <div className="mb-0.5 px-0.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+    <div className="mt-2 flex flex-col gap-1.5 border-t border-white/[0.05] pt-3">
+      <div className="mb-0.5 text-[10px] font-medium tracking-wide text-white/30 uppercase">
         Checklist
       </div>
       {items.map((item, idx) => (
         <div className="group flex items-center gap-2.5" key={`${idx}-${item}`}>
           <span
             aria-hidden
-            className="ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-white/30"
+            className="ml-1 h-1 w-1 shrink-0 rounded-full bg-white/25"
           />
-          <span className="flex-1 text-sm text-white/80">{item}</span>
+          <span className="flex-1 text-[13px] text-white/70">{item}</span>
           <button
             aria-label="Remove item"
-            className="text-white/25 transition hover:text-white/80"
+            className="text-white/20 opacity-0 transition group-hover:opacity-100 hover:text-white/70"
             onClick={() => onChange(items.filter((_, i) => i !== idx))}
             type="button"
           >
@@ -870,10 +890,10 @@ function ChecklistField({
         </div>
       ))}
       <div className="flex items-center gap-2">
-        <Plus className="h-3.5 w-3.5 shrink-0 text-white/30" />
+        <Plus className="h-3 w-3 shrink-0 text-white/25" />
         <Input
           autoFocus
-          className="h-7 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
+          className="h-7 border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {

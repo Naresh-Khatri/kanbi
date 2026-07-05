@@ -50,10 +50,11 @@ const draftDueAtSchema = z
   .nullable()
   .default(null);
 
-// A variant is one way to write the same issue — only the wording and the
-// breakdown differ. Ownership/scheduling attributes live on the issue so they
-// don't silently change when the user flips between variants.
+// variant = same issue, differing wording/breakdown only. ownership+scheduling
+// live on the issue so they don't change when flipping variants.
+// `kind` labels depth explicitly so UI needn't infer from position. catch -> tolerate off-enum tag.
 const draftVariantSchema = z.object({
+  kind: z.enum(["concise", "medium", "verbose"]).catch("medium"),
   title: z.string().min(1).max(200),
   description: z.string().max(10_000).default(""),
   checklist: z.array(z.string().min(1).max(280)).max(20).default([]),
@@ -480,11 +481,11 @@ export const taskRouter = createTRPCRouter({
         `Project members (use exact ids, never invent):\n${memberList}`,
         `Today's date is ${today}.`,
         "Output JSON matching this shape exactly:",
-        `{"issues":[{"summary":string,"confidence":"high"|"med"|"low","priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[],"assigneeId":string|null,"dueAt":string|null,"variants":[{"title":string,"description":string,"checklist":string[]}]}]}`,
+        `{"issues":[{"summary":string,"confidence":"high"|"med"|"low","priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[],"assigneeId":string|null,"dueAt":string|null,"variants":[{"kind":"concise"|"medium"|"verbose","title":string,"description":string,"checklist":string[]}]}]}`,
         "Rules:",
         "- One issue per distinct problem/request. If the message is a single issue, return one.",
         "- priority, labelIds, assigneeId, and dueAt describe the issue as a whole — set them once per issue, NOT per variant.",
-        "- Produce exactly 3 variants per issue: concise, detailed, and aggressive-scope. Variants differ ONLY in title, description, and checklist depth.",
+        "- Produce exactly 3 variants per issue, tagged with `kind` in this order: \"concise\" (tightest title, 1-2 sentence description, minimal or empty checklist), \"medium\" (balanced detail and a practical checklist), and \"verbose\" (fullest description with rationale/acceptance criteria and the most thorough checklist). Variants differ ONLY in title, description, and checklist depth.",
         "- title: imperative, under 80 chars.",
         "- description: simple HTML only (use <p>, <strong>, <em>, <code>, <a href>, and <ul>/<ol> with <li>). No markdown, no <script>/<style>/<img>. It doesn't have to be one linear paragraph — use multiple paragraphs and bullet lists when they make it clearer (context, rationale, acceptance criteria, edge cases), but don't pad a simple task; a sentence or two is fine. Keep implementation steps in the checklist, not here, and don't restate the checklist items.",
         "- checklist: the actionable implementation steps as short plain-text strings (no HTML), each a single concrete subtask. These are distinct from the description. Use [] when the issue needs no breakdown; the aggressive-scope variant may include more steps.",
