@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/ui/logo";
 import { authClient } from "@/server/better-auth/client";
 
 export default function ResetPasswordPage() {
@@ -49,52 +50,64 @@ function ResetPasswordForm() {
 
   if (!token || error) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-6">
-        <h1 className="text-2xl font-semibold">Link expired</h1>
-        <p className="text-sm text-white/60">
-          This reset link is invalid or has expired. Request a new one.
-        </p>
-        <Link className="text-white underline" href="/forgot-password">
-          Send a new link
-        </Link>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
+        <div className="flex w-full max-w-sm flex-col gap-4">
+          <Link className="flex items-center gap-2.5" href="/">
+            <Logo className="h-8 w-8" />
+            <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+          </Link>
+          <h1 className="text-2xl font-semibold">Link expired</h1>
+          <p className="text-sm text-white/60">
+            This reset link is invalid or has expired. Request a new one.
+          </p>
+          <Link className="text-white underline" href="/forgot-password">
+            Send a new link
+          </Link>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Choose a new password</h1>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
+      <div className="flex w-full max-w-sm flex-col gap-6">
+        <Link className="flex items-center gap-2.5" href="/">
+          <Logo className="h-8 w-8" />
+          <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+        </Link>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold">Choose a new password</h1>
+        </div>
+        <form className="flex flex-col gap-3" onSubmit={onSubmit}>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="password">New password</Label>
+            <Input
+              autoComplete="new-password"
+              id="password"
+              minLength={8}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              type="password"
+              value={password}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="confirm">Confirm password</Label>
+            <Input
+              autoComplete="new-password"
+              id="confirm"
+              minLength={8}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              type="password"
+              value={confirm}
+            />
+          </div>
+          <Button disabled={pending} type="submit">
+            {pending ? "Saving…" : "Update password"}
+          </Button>
+        </form>
       </div>
-      <form className="flex flex-col gap-3" onSubmit={onSubmit}>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="password">New password</Label>
-          <Input
-            autoComplete="new-password"
-            id="password"
-            minLength={8}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            type="password"
-            value={password}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="confirm">Confirm password</Label>
-          <Input
-            autoComplete="new-password"
-            id="confirm"
-            minLength={8}
-            onChange={(e) => setConfirm(e.target.value)}
-            required
-            type="password"
-            value={confirm}
-          />
-        </div>
-        <Button disabled={pending} type="submit">
-          {pending ? "Saving…" : "Update password"}
-        </Button>
-      </form>
     </main>
   );
 }
