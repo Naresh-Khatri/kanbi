@@ -2,8 +2,10 @@ import { socialProvidersEnabled } from "@/server/better-auth/config";
 
 import { LoginForm } from "./_components/login-form";
 
-// Server component: reads which social providers are configured (server env)
-// and hands them to the client form so unconfigured providers render no button.
+// per-request -> read providers from RUNTIME env. build has no OAuth secrets
+// (SKIP_ENV_VALIDATION), so a static prerender bakes in "no providers" forever
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   return <LoginForm providers={socialProvidersEnabled} />;
 }
