@@ -1,8 +1,9 @@
 import "server-only";
 
+import { generateObject } from "ai";
 import { z } from "zod";
 
-import { GROQ_DRAFT_MODEL, getGroq } from "@/server/ai/groq";
+import { draftModel } from "@/server/ai/mistral";
 import type { DigestStats } from "@/server/db/schema";
 
 const CATEGORIES = [
@@ -83,21 +84,12 @@ export async function generateDigest(input: {
       ? `Activity log (most recent first):\n${events.map(formatEvent).join("\n")}`
       : "No activity was recorded this period.";
 
-  const groq = getGroq();
-  const completion = await groq.chat.completions.create({
-    model: GROQ_DRAFT_MODEL,
+  const { object } = await generateObject({
+    model: draftModel(),
+    schema: responseSchema,
     temperature: 0.4,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: userContent },
-    ],
+    system,
+    prompt: userContent,
   });
-
-  const raw = completion.choices[0]?.message?.content ?? "";
-  const parsed = responseSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    throw new Error("AI digest response did not match expected shape");
-  }
-  return parsed.data;
+  return object;
 }

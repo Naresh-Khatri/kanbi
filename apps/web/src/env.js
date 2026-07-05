@@ -35,8 +35,8 @@ export const env = createEnv({
     SMTP_PASSWORD: z.string().optional(),
     SMTP_FROM: z.string().optional(),
     CRON_SECRET: z.string().optional(),
-    // Groq API key — enables AI task drafting
-    GROQ_API_KEY: z.string().optional(),
+    // Mistral API key — enables AI task drafting
+    MISTRAL_API_KEY: z.string().optional(),
     // MCP resource-server URL (OAuth audience). Defaults to <BETTER_AUTH_URL>/api/mcp.
     MCP_RESOURCE_URL: z.string().url().optional(),
   },
@@ -68,7 +68,7 @@ export const env = createEnv({
     SMTP_PASSWORD: process.env.SMTP_PASSWORD,
     SMTP_FROM: process.env.SMTP_FROM,
     CRON_SECRET: process.env.CRON_SECRET,
-    GROQ_API_KEY: process.env.GROQ_API_KEY,
+    MISTRAL_API_KEY: process.env.MISTRAL_API_KEY,
     MCP_RESOURCE_URL: process.env.MCP_RESOURCE_URL,
     NEXT_PUBLIC_LAN_HOST: process.env.NEXT_PUBLIC_LAN_HOST,
   },

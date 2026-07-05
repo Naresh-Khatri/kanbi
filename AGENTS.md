@@ -70,7 +70,7 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 
 ### AI
 
-`src/server/ai/groq.ts` (server-only) uses the Groq SDK to draft structured tasks; only active when `GROQ_API_KEY` is set — treat the feature as optional.
+`src/server/ai/mistral.ts` (server-only) uses the Mistral SDK to draft structured tasks; only active when `MISTRAL_API_KEY` is set — treat the feature as optional.
 
 ### MCP server
 

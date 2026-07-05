@@ -27,7 +27,7 @@ kanbi/
 - **Keyboard-first** with a command palette and shortcuts throughout.
 - **Projects** with member invites, roles, and per-project settings; plus
   public read-only shared boards via a share link.
-- **AI task drafting** (optional): paste a client message and let Groq extract
+- **AI task drafting** (optional): paste a client message and let Mistral extract
   actionable issues with title, description, label, and priority.
 - **Focus app**: an Expo companion that pairs to your account over a QR code and
   authenticates with per-device tokens.
@@ -77,7 +77,7 @@ Everything else is optional and gates one feature:
 | `BETTER_AUTH_GITHUB_*` / `BETTER_AUTH_GOOGLE_*` | Social login (each provider needs both its id and secret).                             |
 | `SMTP_*`                                        | Transactional email (password reset, invites, digests); unset means sends are skipped. |
 | `R2_*`                                          | Task attachments (Cloudflare R2 / S3-compatible).                                      |
-| `GROQ_API_KEY`                                  | The AI task drafter.                                                                   |
+| `MISTRAL_API_KEY`                               | The AI task drafter.                                                                   |
 | `CRON_SECRET`                                   | Auth for the `/api/cron/*` endpoints.                                                  |
 | `MCP_RESOURCE_URL`                              | Override the MCP OAuth audience (defaults to `<BETTER_AUTH_URL>/api/mcp`).             |
 

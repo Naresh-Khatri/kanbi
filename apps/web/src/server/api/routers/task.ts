@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { generateObject } from "ai";
 import {
   and,
   asc,
@@ -16,7 +17,7 @@ import type { db as Database } from "@/server/db";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
 import { recordActivity } from "@/server/activity/record";
-import { GROQ_DRAFT_MODEL, getGroq } from "@/server/ai/groq";
+import { draftModel } from "@/server/ai/mistral";
 import {
   assertCanWrite,
   boardProcedure,
@@ -496,30 +497,18 @@ export const taskRouter = createTRPCRouter({
         .filter(Boolean)
         .join("\n\n");
 
-      const groq = getGroq();
-      const completion = await groq.chat.completions.create({
-        model: GROQ_DRAFT_MODEL,
-        temperature: 0.6,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: input.message },
-        ],
-      });
-
-      const raw = completion.choices[0]?.message?.content ?? "";
-      let parsed: unknown;
+      let result;
       try {
-        parsed = JSON.parse(raw);
+        result = (
+          await generateObject({
+            model: draftModel(),
+            schema: draftResponseSchema,
+            temperature: 0.6,
+            system,
+            prompt: input.message,
+          })
+        ).object;
       } catch {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "AI returned invalid JSON",
-        });
-      }
-
-      const result = draftResponseSchema.safeParse(parsed);
-      if (!result.success) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "AI response did not match expected shape",
@@ -528,7 +517,7 @@ export const taskRouter = createTRPCRouter({
 
       const validLabels = new Set(labels.map((l) => l.id));
       const validMembers = new Set(members.map((m) => m.id));
-      const issues = result.data.issues.map((issue) => ({
+      const issues = result.issues.map((issue) => ({
         ...issue,
         labelIds: issue.labelIds.filter((id) => validLabels.has(id)),
         assigneeId:
@@ -616,30 +605,18 @@ export const taskRouter = createTRPCRouter({
         .filter(Boolean)
         .join("\n");
 
-      const groq = getGroq();
-      const completion = await groq.chat.completions.create({
-        model: GROQ_DRAFT_MODEL,
-        temperature: 0.5,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userContent },
-        ],
-      });
-
-      const raw = completion.choices[0]?.message?.content ?? "";
-      let parsed: unknown;
+      let result;
       try {
-        parsed = JSON.parse(raw);
+        result = (
+          await generateObject({
+            model: draftModel(),
+            schema: enhanceResponseSchema,
+            temperature: 0.5,
+            system,
+            prompt: userContent,
+          })
+        ).object;
       } catch {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "AI returned invalid JSON",
-        });
-      }
-
-      const result = enhanceResponseSchema.safeParse(parsed);
-      if (!result.success) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "AI response did not match expected shape",
@@ -649,11 +626,11 @@ export const taskRouter = createTRPCRouter({
       const validLabels = new Set(labels.map((l) => l.id));
       const validMembers = new Set(members.map((m) => m.id));
       return {
-        ...result.data,
-        labelIds: result.data.labelIds.filter((id) => validLabels.has(id)),
+        ...result,
+        labelIds: result.labelIds.filter((id) => validLabels.has(id)),
         assigneeId:
-          result.data.assigneeId && validMembers.has(result.data.assigneeId)
-            ? result.data.assigneeId
+          result.assigneeId && validMembers.has(result.assigneeId)
+            ? result.assigneeId
             : null,
       };
     }),
