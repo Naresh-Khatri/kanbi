@@ -5,7 +5,12 @@ export type TaskRow = BoardData["tasks"][number];
 export type ColumnRow = BoardData["columns"][number];
 
 export type ActiveDrag =
-  | { kind: "task"; task: TaskRow }
+  | {
+      kind: "task";
+      task: TaskRow;
+      assignee: MemberInfo | null;
+      labels: LabelInfo[];
+    }
   | { kind: "column"; column: ColumnRow }
   | null;
 

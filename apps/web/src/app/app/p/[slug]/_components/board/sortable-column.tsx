@@ -8,7 +8,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
-import { AnimatePresence } from "motion/react";
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
@@ -22,8 +22,12 @@ import { ColumnHeader } from "./column-header";
 import { DropIndicator, SortableTaskCard } from "./task-card";
 
 const EMPTY_LABELS: LabelInfo[] = [];
+const SORTABLE_TRANSITION = {
+  duration: 150,
+  easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+};
 
-export function SortableColumn({
+export const SortableColumn = memo(function SortableColumn({
   boardId,
   column,
   tasks,
@@ -52,6 +56,7 @@ export function SortableColumn({
     id: column.id,
     data: { kind: "column" },
     disabled: !canWrite,
+    transition: SORTABLE_TRANSITION,
   });
   const { setNodeRef: setDropRef } = useDroppable({
     id: `col-drop-${column.id}`,
@@ -62,6 +67,7 @@ export function SortableColumn({
     transform: CSS.Translate.toString(sortable.transform),
     transition: sortable.transition,
     opacity: sortable.isDragging ? 0.4 : 1,
+    willChange: sortable.transform ? "transform" : undefined,
   };
 
   return (
@@ -81,40 +87,39 @@ export function SortableColumn({
         taskCount={tasks.length}
       />
       <ScrollArea className="-mx-1 min-h-0 flex-1">
-        <div className="flex flex-col gap-2 px-1 pb-1" ref={setDropRef}>
+        <div
+          className="relative flex min-h-16 flex-col gap-2 px-1 pb-1"
+          ref={setDropRef}
+        >
           <SortableContext
             items={tasks.map((t) => t.id)}
             strategy={verticalListSortingStrategy}
           >
-            <AnimatePresence initial={false}>
-              {tasks.map((t) => (
-                <SortableTaskCard
-                  assignee={
-                    t.assigneeId
-                      ? (membersById.get(t.assigneeId) ?? null)
-                      : null
-                  }
-                  boardId={boardId}
-                  canWrite={canWrite}
-                  columnId={column.id}
-                  focused={focusedTaskId === t.id}
-                  key={t.id}
-                  labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
-                  onOpen={() => onOpenTask(t.id)}
-                  projectKey={projectKey}
-                  showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
-                  task={t}
-                />
-              ))}
-            </AnimatePresence>
+            {tasks.map((t) => (
+              <SortableTaskCard
+                assignee={
+                  t.assigneeId ? (membersById.get(t.assigneeId) ?? null) : null
+                }
+                boardId={boardId}
+                canWrite={canWrite}
+                columnId={column.id}
+                focused={focusedTaskId === t.id}
+                key={t.id}
+                labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
+                onOpenTask={onOpenTask}
+                projectKey={projectKey}
+                showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
+                task={t}
+              />
+            ))}
           </SortableContext>
           {dropTarget &&
           dropTarget.beforeTaskId === null &&
           tasks.length > 0 ? (
-            <DropIndicator />
+            <DropIndicator className="inset-x-1 -bottom-px" />
           ) : null}
           {tasks.length === 0 && dropTarget ? (
-            <div className="h-16 rounded-md border border-dashed border-white/40 bg-white/[0.04]" />
+            <div className="pointer-events-none absolute inset-0 rounded-md border border-dashed border-white/40 bg-white/[0.04]" />
           ) : null}
         </div>
       </ScrollArea>
@@ -130,4 +135,4 @@ export function SortableColumn({
       ) : null}
     </div>
   );
-}
+});

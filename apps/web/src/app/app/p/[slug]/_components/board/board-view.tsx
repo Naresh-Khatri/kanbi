@@ -3,14 +3,17 @@
 import {
   type CollisionDetection,
   closestCenter,
-  closestCorners,
   DndContext,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
+  defaultDropAnimationSideEffects,
   KeyboardSensor,
+  pointerWithin,
   PointerSensor,
+  type DropAnimation,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -19,7 +22,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
@@ -56,6 +59,16 @@ import { useArchiveTask } from "../use-archive-task";
 import { SortableColumn } from "./sortable-column";
 import { TaskCardPreview } from "./task-card";
 import { TaskDetailSheet } from "../task-detail-sheet";
+
+const DROP_ANIMATION: DropAnimation = {
+  duration: 160,
+  easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: {
+      active: { opacity: "0" },
+    },
+  }),
+};
 
 export function BoardView({
   boardId,
@@ -153,22 +166,59 @@ export function BoardView({
     },
   );
 
+  const preappliedTaskMoves = useRef(new Map<string, typeof data>());
+  const preappliedColumnMoves = useRef(new Map<string, typeof data>());
+
+  function applyOptimisticTaskMove(vars: {
+    taskId: string;
+    toColumnId: string;
+    before: number | null;
+    after: number | null;
+  }) {
+    utils.board.get.setData({ boardId }, (old) => {
+      if (!old) return old;
+      const nextPosition = positionBetween(vars.before, vars.after);
+      return {
+        ...old,
+        tasks: old.tasks.map((t) =>
+          t.id === vars.taskId
+            ? {
+                ...t,
+                columnId: vars.toColumnId,
+                position: nextPosition,
+              }
+            : t,
+        ),
+      };
+    });
+  }
+
+  function applyOptimisticColumnMove(vars: {
+    columnId: string;
+    before: number | null;
+    after: number | null;
+  }) {
+    utils.board.get.setData({ boardId }, (old) => {
+      if (!old) return old;
+      const nextPosition = positionBetween(vars.before, vars.after);
+      return {
+        ...old,
+        columns: old.columns.map((c) =>
+          c.id === vars.columnId ? { ...c, position: nextPosition } : c,
+        ),
+      };
+    });
+  }
+
   const moveTask = api.task.move.useMutation({
-    onMutate: async (vars) => {
-      await utils.board.get.cancel({ boardId });
-      const previous = utils.board.get.getData({ boardId });
-      utils.board.get.setData({ boardId }, (old) => {
-        if (!old) return old;
-        const nextPosition = positionBetween(vars.before, vars.after);
-        return {
-          ...old,
-          tasks: old.tasks.map((t) =>
-            t.id === vars.taskId
-              ? { ...t, columnId: vars.toColumnId, position: nextPosition }
-              : t,
-          ),
-        };
-      });
+    onMutate: (vars) => {
+      void utils.board.get.cancel({ boardId });
+      const wasPreapplied = preappliedTaskMoves.current.has(vars.taskId);
+      const previous = wasPreapplied
+        ? preappliedTaskMoves.current.get(vars.taskId)
+        : utils.board.get.getData({ boardId });
+      preappliedTaskMoves.current.delete(vars.taskId);
+      if (!wasPreapplied) applyOptimisticTaskMove(vars);
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
@@ -177,19 +227,14 @@ export function BoardView({
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
   const reorderColumn = api.column.reorder.useMutation({
-    onMutate: async (vars) => {
-      await utils.board.get.cancel({ boardId });
-      const previous = utils.board.get.getData({ boardId });
-      utils.board.get.setData({ boardId }, (old) => {
-        if (!old) return old;
-        const nextPosition = positionBetween(vars.before, vars.after);
-        return {
-          ...old,
-          columns: old.columns.map((c) =>
-            c.id === vars.columnId ? { ...c, position: nextPosition } : c,
-          ),
-        };
-      });
+    onMutate: (vars) => {
+      void utils.board.get.cancel({ boardId });
+      const wasPreapplied = preappliedColumnMoves.current.has(vars.columnId);
+      const previous = wasPreapplied
+        ? preappliedColumnMoves.current.get(vars.columnId)
+        : utils.board.get.getData({ boardId });
+      preappliedColumnMoves.current.delete(vars.columnId);
+      if (!wasPreapplied) applyOptimisticColumnMove(vars);
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
@@ -308,19 +353,61 @@ export function BoardView({
 
   const [active, setActive] = useState<ActiveDrag>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
+  const dropTargetRef = useRef<DropTarget>(null);
 
-  const collisionDetection: CollisionDetection = (args) => {
-    if (active?.kind === "column") {
-      const columnIds = new Set(columns.map((c) => c.id));
+  const updateDropTarget = useCallback((next: DropTarget) => {
+    const previous = dropTargetRef.current;
+    if (
+      previous?.columnId === next?.columnId &&
+      previous?.beforeTaskId === next?.beforeTaskId
+    ) {
+      return;
+    }
+    dropTargetRef.current = next;
+    setDropTarget(next);
+  }, []);
+
+  const columnIds = useMemo(() => new Set(columns.map((c) => c.id)), [columns]);
+
+  const collisionDetection = useCallback<CollisionDetection>(
+    (args) => {
+      if (args.active.data.current?.kind === "column") {
+        return closestCenter({
+          ...args,
+          droppableContainers: args.droppableContainers.filter((d) =>
+            columnIds.has(String(d.id)),
+          ),
+        });
+      }
+
+      // Pointer containment is both cheaper and less jittery than measuring the
+      // distance to every card's four corners. Prefer the card under the pointer,
+      // then its column drop zone. Keyboard dragging falls back to corners.
+      const pointerCollisions = pointerWithin(args);
+      if (pointerCollisions.length > 0) {
+        const task = pointerCollisions.find(
+          ({ data }) => data?.droppableContainer.data.current?.kind === "task",
+        );
+        if (task) return [task];
+
+        const columnDropZone = pointerCollisions.find(
+          ({ data }) =>
+            data?.droppableContainer.data.current?.columnId !== undefined,
+        );
+        if (columnDropZone) return [columnDropZone];
+      }
+
       return closestCenter({
         ...args,
-        droppableContainers: args.droppableContainers.filter((d) =>
-          columnIds.has(String(d.id)),
+        droppableContainers: args.droppableContainers.filter(
+          (d) =>
+            d.data.current?.kind === "task" ||
+            d.data.current?.columnId !== undefined,
         ),
       });
-    }
-    return closestCorners(args);
-  };
+    },
+    [columnIds],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 2 } }),
@@ -330,11 +417,23 @@ export function BoardView({
   );
 
   function onDragStart(e: DragStartEvent) {
+    // Stop a realtime/refetch response from replacing the board while the user
+    // is deciding where to drop.
+    void utils.board.get.cancel({ boardId });
     const id = String(e.active.id);
     const kind = e.active.data.current?.kind as "task" | "column" | undefined;
     if (kind === "task") {
       const t = tasks.find((x) => x.id === id);
-      if (t) setActive({ kind: "task", task: t });
+      if (t) {
+        setActive({
+          kind: "task",
+          task: t,
+          assignee: t.assigneeId
+            ? (membersById.get(t.assigneeId) ?? null)
+            : null,
+          labels: cardLabelsByTask.get(t.id) ?? [],
+        });
+      }
     } else if (kind === "column") {
       const c = columns.find((x) => x.id === id);
       if (c) setActive({ kind: "column", column: c });
@@ -354,21 +453,17 @@ export function BoardView({
     );
   }
 
-  function onDragOver(e: DragOverEvent) {
+  function getTaskDropTarget(
+    e: DragOverEvent | DragMoveEvent | DragEndEvent,
+  ): DropTarget {
     const { active: a, over } = e;
-    if (!over) {
-      setDropTarget(null);
-      return;
-    }
+    if (!over) return null;
     const activeKind = a.data.current?.kind as "task" | "column" | undefined;
-    if (activeKind !== "task") return;
+    if (activeKind !== "task") return null;
     const overKind = over.data.current?.kind as "task" | "column" | undefined;
     const columnId =
       (over.data.current?.columnId as string | undefined) ?? String(over.id);
-    if (!columnId) {
-      setDropTarget(null);
-      return;
-    }
+    if (!columnId) return null;
     let beforeTaskId: string | null = null;
     if (overKind === "task" && String(over.id) !== String(a.id)) {
       if (isDropAfter(a, over)) {
@@ -381,17 +476,26 @@ export function BoardView({
         beforeTaskId = String(over.id);
       }
     }
-    setDropTarget({ columnId, beforeTaskId });
+    return { columnId, beforeTaskId };
+  }
+
+  function onDragMove(e: DragMoveEvent) {
+    updateDropTarget(getTaskDropTarget(e));
+  }
+
+  function onDragOver(e: DragOverEvent) {
+    updateDropTarget(getTaskDropTarget(e));
   }
 
   function onDragCancel() {
     setActive(null);
-    setDropTarget(null);
+    updateDropTarget(null);
   }
 
   function onDragEnd(e: DragEndEvent) {
+    const finalDropTarget = dropTargetRef.current ?? getTaskDropTarget(e);
     setActive(null);
-    setDropTarget(null);
+    updateDropTarget(null);
     const { active: a, over } = e;
     if (!over) return;
     const activeKind = a.data.current?.kind as "task" | "column" | undefined;
@@ -409,19 +513,23 @@ export function BoardView({
       const insertAt = toIdx;
       const before = without[insertAt - 1]?.position ?? null;
       const after = without[insertAt]?.position ?? null;
-      reorderColumn.mutate({
+      const vars = {
         boardId,
         columnId: String(a.id),
         before,
         after,
-      });
+      };
+      const previous = utils.board.get.getData({ boardId });
+      if (previous) {
+        preappliedColumnMoves.current.set(vars.columnId, previous);
+      }
+      applyOptimisticColumnMove(vars);
+      reorderColumn.mutate(vars);
       return;
     }
 
     if (activeKind === "task") {
-      const overKind = over.data.current?.kind as "task" | "column" | undefined;
-      const targetColumnId =
-        (over.data.current?.columnId as string | undefined) ?? String(over.id);
+      const targetColumnId = finalDropTarget?.columnId;
       if (!targetColumnId) return;
 
       const activeTask = tasks.find((t) => t.id === a.id);
@@ -443,35 +551,39 @@ export function BoardView({
       let before: number | null = null;
       let after: number | null = null;
 
-      if (overKind === "task") {
-        const overIdx = columnTasks.findIndex((t) => t.id === over.id);
-        if (overIdx === -1) {
-          before = columnTasks[columnTasks.length - 1]?.position ?? null;
-        } else if (isDropAfter(a, over)) {
-          before = columnTasks[overIdx]?.position ?? null;
-          after = columnTasks[overIdx + 1]?.position ?? null;
-        } else {
-          before = columnTasks[overIdx - 1]?.position ?? null;
-          after = columnTasks[overIdx]?.position ?? null;
-        }
-      } else {
-        before = columnTasks[columnTasks.length - 1]?.position ?? null;
+      let insertAt = columnTasks.length;
+      if (finalDropTarget.beforeTaskId !== null) {
+        const requestedIndex = columnTasks.findIndex(
+          (t) => t.id === finalDropTarget.beforeTaskId,
+        );
+        if (requestedIndex !== -1) insertAt = requestedIndex;
+      }
+      before = columnTasks[insertAt - 1]?.position ?? null;
+      after = columnTasks[insertAt]?.position ?? null;
+
+      if (activeTask.columnId === targetColumnId) {
+        const currentOrder = tasksByColumn.get(targetColumnId) ?? [];
+        const nextOrder = [...columnTasks];
+        nextOrder.splice(insertAt, 0, activeTask);
+        const unchanged = nextOrder.every(
+          (task, index) => task.id === currentOrder[index]?.id,
+        );
+        if (unchanged) return;
       }
 
-      if (
-        activeTask.columnId === targetColumnId &&
-        before === activeTask.position
-      ) {
-        return;
-      }
-
-      moveTask.mutate({
+      const vars = {
         boardId,
         taskId: activeTask.id,
         toColumnId: targetColumnId,
         before,
         after,
-      });
+      };
+      // Apply in the drop event's React batch so DragOverlay measures the new
+      // card position. onMutate reuses this snapshot for rollback.
+      const previous = utils.board.get.getData({ boardId });
+      if (previous) preappliedTaskMoves.current.set(vars.taskId, previous);
+      applyOptimisticTaskMove(vars);
+      moveTask.mutate(vars);
 
       if (activeTask.columnId !== targetColumnId) {
         const targetColumn = columns.find((c) => c.id === targetColumnId);
@@ -487,10 +599,15 @@ export function BoardView({
     [columns],
   );
 
-  function handleOpenTask(taskId: string) {
+  const handleOpenTask = useCallback((taskId: string) => {
     setFocusedTaskId(taskId);
     setOpenTaskId(taskId);
-  }
+  }, []);
+
+  const handleAddTask = useCallback((columnId: string) => {
+    setQuickAddColumnId(columnId);
+    setQuickAddOpen(true);
+  }, []);
 
   // Card-level keyboard navigation. The hotkey handlers read the latest board
   // state through a ref, so the bindings can stay stable and the handlers don't
@@ -657,6 +774,7 @@ export function BoardView({
         collisionDetection={collisionDetection}
         onDragCancel={canWrite ? onDragCancel : undefined}
         onDragEnd={canWrite ? onDragEnd : undefined}
+        onDragMove={canWrite ? onDragMove : undefined}
         onDragOver={canWrite ? onDragOver : undefined}
         onDragStart={canWrite ? onDragStart : undefined}
         sensors={sensors}
@@ -679,10 +797,7 @@ export function BoardView({
                   key={col.id}
                   labelsByTask={cardLabelsByTask}
                   membersById={membersById}
-                  onAddTask={(id) => {
-                    setQuickAddColumnId(id);
-                    setQuickAddOpen(true);
-                  }}
+                  onAddTask={handleAddTask}
                   onOpenTask={handleOpenTask}
                   projectKey={projectKey}
                   tasks={tasksByColumn.get(col.id) ?? []}
@@ -692,9 +807,17 @@ export function BoardView({
             {canWrite ? <AddColumn boardId={boardId} /> : null}
           </div>
         </div>
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay
+          dropAnimation={DROP_ANIMATION}
+          style={{ willChange: "transform" }}
+        >
           {active?.kind === "task" ? (
-            <TaskCardPreview task={active.task} />
+            <TaskCardPreview
+              assignee={active.assignee}
+              labels={active.labels}
+              projectKey={projectKey}
+              task={active.task}
+            />
           ) : active?.kind === "column" ? (
             <div className="w-72 rounded-xl bg-white/[0.06] p-3 shadow-xl">
               <div className="text-sm font-medium">{active.column.name}</div>

@@ -10,8 +10,7 @@ import {
   Sun,
   Timer,
 } from "lucide-react";
-import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,12 +30,17 @@ import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
 import { useArchiveTask } from "../use-archive-task";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
 
-export function SortableTaskCard({
+const SORTABLE_TRANSITION = {
+  duration: 150,
+  easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+};
+
+export const SortableTaskCard = memo(function SortableTaskCard({
   boardId,
   task,
   columnId,
   canWrite,
-  onOpen,
+  onOpenTask,
   assignee,
   labels,
   showDropIndicatorBefore,
@@ -47,7 +51,7 @@ export function SortableTaskCard({
   task: TaskRow;
   columnId: string;
   canWrite: boolean;
-  onOpen: () => void;
+  onOpenTask: (taskId: string) => void;
   assignee: MemberInfo | null;
   labels: LabelInfo[];
   showDropIndicatorBefore: boolean;
@@ -58,25 +62,25 @@ export function SortableTaskCard({
     id: task.id,
     data: { kind: "task", columnId },
     disabled: !canWrite,
+    transition: SORTABLE_TRANSITION,
   });
 
   const style = {
     transform: CSS.Translate.toString(sortable.transform),
     transition: sortable.transition,
-    opacity: sortable.isDragging ? 0.3 : 1,
+    opacity: sortable.isDragging ? 0 : 1,
+    willChange: sortable.transform ? "transform" : undefined,
   };
 
+  const onOpen = useCallback(() => onOpenTask(task.id), [onOpenTask, task.id]);
+
   return (
-    <motion.div
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col gap-2"
-      exit={{ opacity: 0, scale: 0.95 }}
-      initial={{ opacity: 0, scale: 0.95 }}
-      layout={sortable.isDragging ? false : "position"}
-      transition={{ duration: 0.18, ease: "easeOut" }}
-    >
-      {showDropIndicatorBefore ? <DropIndicator /> : null}
+    <div className="relative flex flex-col gap-2">
+      {showDropIndicatorBefore ? (
+        <DropIndicator className="inset-x-0 -top-[5px]" />
+      ) : null}
       <div
+        className="touch-none select-none"
         ref={sortable.setNodeRef}
         style={style}
         {...sortable.attributes}
@@ -92,27 +96,101 @@ export function SortableTaskCard({
           task={task}
         />
       </div>
-    </motion.div>
+    </div>
+  );
+});
+
+export function DropIndicator({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute z-10 h-0.5 rounded-full bg-sky-400/80",
+        className,
+      )}
+    />
   );
 }
 
-export function DropIndicator() {
-  return (
-    <div className="h-0.5 rounded-full bg-sky-400/80 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
-  );
-}
+export function TaskCardPreview({
+  task,
+  assignee,
+  labels,
+  projectKey,
+}: {
+  task: TaskRow;
+  assignee: MemberInfo | null;
+  labels: LabelInfo[];
+  projectKey: string;
+}) {
+  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
+  const overflowCount = labels.length - visibleLabels.length;
 
-export function TaskCardPreview({ task }: { task: TaskRow }) {
   return (
-    <div className="w-72 rotate-2 rounded-lg border border-white/10 bg-[#14151c] p-3 shadow-xl">
-      <p className="text-sm leading-snug">{task.title}</p>
+    <div className="w-72 rounded-lg border border-white/20 bg-[#14151c] p-3 shadow-lg will-change-transform">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm leading-snug">{task.title}</p>
+        <div className="h-9 w-9 shrink-0" />
+      </div>
+      {labels.length > 0 ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          {visibleLabels.map((label) => (
+            <span
+              className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
+              key={label.id}
+              style={{
+                borderColor: `${label.color}55`,
+                color: label.color,
+              }}
+            >
+              {label.name}
+            </span>
+          ))}
+          {overflowCount > 0 ? (
+            <span className="inline-flex items-center rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] tracking-wide text-white/60">
+              +{overflowCount}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="font-mono text-[10px] tracking-wide text-white/40">
+            {projectKey}-{task.number}
+          </span>
+          {task.priority !== "none" ? (
+            <div
+              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
+              style={{
+                borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
+                color: PRIORITY_META[task.priority as Priority].color,
+              }}
+            >
+              <PriorityIcon
+                className="h-3 w-3"
+                priority={task.priority as Priority}
+              />
+              {PRIORITY_META[task.priority as Priority].label}
+            </div>
+          ) : null}
+          {task.estimatePomodoros != null ? (
+            <span className="inline-flex items-center gap-1 text-xs text-white/40">
+              <Timer className="h-3 w-3" />
+              {task.estimatePomodoros}
+            </span>
+          ) : null}
+        </div>
+        {assignee ? (
+          <UserAvatar image={assignee.image} name={assignee.name} size={20} />
+        ) : null}
+      </div>
     </div>
   );
 }
 
 const MAX_VISIBLE_LABELS = 2;
 
-export function TaskCard({
+export const TaskCard = memo(function TaskCard({
   boardId,
   task,
   onOpen,
@@ -250,7 +328,7 @@ export function TaskCard({
       </div>
     </div>
   );
-}
+});
 
 // today.ids is a single small array shared across every card's cache entry —
 // cheap to subscribe to per-card, only one request per board view.
