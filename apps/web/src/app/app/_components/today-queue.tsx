@@ -8,7 +8,6 @@ import {
   type Priority,
   PriorityIcon,
 } from "@/app/app/p/[slug]/_components/priority";
-import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 
@@ -39,7 +38,7 @@ export function TodayQueue() {
       await utils.today.list.cancel();
       const previous = utils.today.list.getData();
       utils.today.list.setData(undefined, (old) =>
-        old?.filter((t) => !isDoneLikeColumn(t.columnName)),
+        old?.filter((item) => !isDone(item)),
       );
       return { previous };
     },
@@ -50,9 +49,9 @@ export function TodayQueue() {
     onSettled: () => utils.today.list.invalidate(),
   });
 
-  const doneCount = data.filter((t) => isDoneLikeColumn(t.columnName)).length;
+  const doneCount = data.filter(isDone).length;
   const totalEstimate = data
-    .filter((t) => !isDoneLikeColumn(t.columnName))
+    .filter((item) => !isDone(item))
     .reduce((sum, t) => sum + (t.estimatePomodoros ?? 0), 0);
 
   if (data.length === 0) return null;
@@ -95,7 +94,7 @@ export function TodayQueue() {
 }
 
 function TodayRow({ item, onRemove }: { item: Item; onRemove: () => void }) {
-  const done = isDoneLikeColumn(item.columnName);
+  const done = isDone(item);
   return (
     <li className="group -mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-white/5">
       <Link
@@ -133,5 +132,11 @@ function TodayRow({ item, onRemove }: { item: Item; onRemove: () => void }) {
         <X className="h-3.5 w-3.5" />
       </button>
     </li>
+  );
+}
+
+function isDone(item: Item) {
+  return (
+    item.columnCategory === "completed" || item.columnCategory === "canceled"
   );
 }

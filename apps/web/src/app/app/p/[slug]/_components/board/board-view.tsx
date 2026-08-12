@@ -28,7 +28,6 @@ import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
 import { OPEN_TASK_EVENT } from "@/components/ui/rich-text-mention";
-import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { POSITION_STEP, positionBetween } from "@/lib/position";
 import { compareTasks } from "@/lib/task-sort";
 import { api } from "@/trpc/react";
@@ -785,7 +784,7 @@ export function BoardView({
 
       if (!allAlreadyInTarget) {
         const targetColumn = columns.find((c) => c.id === targetColumnId);
-        if (targetColumn && isDoneLikeColumn(targetColumn.name)) {
+        if (targetColumn?.category === "completed") {
           celebrate();
         }
       }

@@ -40,6 +40,7 @@ export const userRouter = createTRPCRouter({
         updatedAt: task.updatedAt,
         boardId: task.boardId,
         columnName: boardColumn.name,
+        columnCategory: boardColumn.category,
         projectSlug: project.slug,
         projectName: project.name,
       })

@@ -16,7 +16,6 @@ import {
 } from "@/app/app/p/[slug]/_components/priority";
 import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
 
-import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { TodayQueue } from "./today-queue";
@@ -44,7 +43,8 @@ export function MyWork() {
     const dueSoon: Assigned[] = [];
     const later: Assigned[] = [];
     for (const t of data.assigned) {
-      if (isDoneLikeColumn(t.columnName)) continue;
+      if (t.columnCategory === "completed" || t.columnCategory === "canceled")
+        continue;
       const due = t.dueAt ? new Date(t.dueAt).getTime() : null;
       if (due != null && due < todayStart) overdue.push(t);
       else if (due != null && due < weekEnd) dueSoon.push(t);

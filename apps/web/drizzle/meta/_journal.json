@@ -78,6 +78,13 @@
       "when": 1786543497141,
       "tag": "0010_nostalgic_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786544777573,
+      "tag": "0011_clean_the_anarchist",
+      "breakpoints": true
     }
   ]
 }

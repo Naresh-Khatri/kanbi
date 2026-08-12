@@ -15,7 +15,6 @@ import {
 import { z } from "zod";
 
 import type { db as Database } from "@/server/db";
-import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
 import { recordActivity } from "@/server/activity/record";
 import { draftModel } from "@/server/ai/mistral";
@@ -322,7 +321,11 @@ export const taskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
       const col = await ctx.db
-        .select({ boardId: boardColumn.boardId, name: boardColumn.name })
+        .select({
+          boardId: boardColumn.boardId,
+          name: boardColumn.name,
+          category: boardColumn.category,
+        })
         .from(boardColumn)
         .where(eq(boardColumn.id, input.toColumnId))
         .limit(1);
@@ -355,7 +358,10 @@ export const taskRouter = createTRPCRouter({
         taskId: input.taskId,
         actorId: ctx.session.user.id,
         verb: "task.moved",
-        payload: { toColumnId: input.toColumnId },
+        payload: {
+          toColumnId: input.toColumnId,
+          toColumnCategory: col[0]?.category,
+        },
       });
 
       const target = col[0];
@@ -363,7 +369,7 @@ export const taskRouter = createTRPCRouter({
         prev &&
         target &&
         prev.columnId !== input.toColumnId &&
-        isDoneLikeColumn(target.name)
+        target.category === "completed"
       ) {
         const recipients = new Set<string>();
         if (prev.reporterId) recipients.add(prev.reporterId);
@@ -398,7 +404,11 @@ export const taskRouter = createTRPCRouter({
       assertCanWrite(ctx.access);
       const taskIds = [...new Set(input.taskIds)];
       const [target] = await ctx.db
-        .select({ boardId: boardColumn.boardId, name: boardColumn.name })
+        .select({
+          boardId: boardColumn.boardId,
+          name: boardColumn.name,
+          category: boardColumn.category,
+        })
         .from(boardColumn)
         .where(eq(boardColumn.id, input.toColumnId))
         .limit(1);
@@ -452,11 +462,14 @@ export const taskRouter = createTRPCRouter({
           taskId: row.id,
           actorId: ctx.session.user.id,
           verb: "task.moved",
-          payload: { toColumnId: input.toColumnId },
+          payload: {
+            toColumnId: input.toColumnId,
+            toColumnCategory: target.category,
+          },
         });
       }
 
-      if (isDoneLikeColumn(target.name)) {
+      if (target.category === "completed") {
         const pending: Parameters<typeof createNotifications>[1] = [];
         for (const row of orderedRows) {
           if (row.columnId === input.toColumnId) continue;

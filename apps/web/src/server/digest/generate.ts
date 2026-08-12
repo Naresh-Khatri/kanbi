@@ -113,9 +113,17 @@ export async function generateBoardDigest(
           typeof payload.toColumnId === "string"
             ? columnName.get(payload.toColumnId)
             : undefined;
+        const toCategory =
+          typeof payload.toColumnCategory === "string"
+            ? payload.toColumnCategory
+            : undefined;
         if (to) {
           detail = `→ ${to}`;
-          if (isDoneLikeColumn(to)) stats.completed += 1;
+          if (
+            toCategory === "completed" ||
+            (!toCategory && isDoneLikeColumn(to))
+          )
+            stats.completed += 1;
         }
         break;
       }

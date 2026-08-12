@@ -240,6 +240,14 @@ export const columnSortMode = pgEnum("kanbi_column_sort_mode", [
 
 export const columnSortDir = pgEnum("kanbi_column_sort_dir", ["asc", "desc"]);
 
+export const columnCategory = pgEnum("kanbi_column_category", [
+  "backlog",
+  "unstarted",
+  "started",
+  "completed",
+  "canceled",
+]);
+
 export const projectStatus = pgEnum("kanbi_project_status", [
   "active",
   "on_hold",
@@ -345,6 +353,7 @@ export const boardColumn = createTable(
       .references(() => board.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     position: real("position").notNull(),
+    category: columnCategory("category").notNull().default("unstarted"),
     wipLimit: integer("wip_limit"),
     color: text("color"),
     sortMode: columnSortMode("sort_mode").notNull().default("manual"),

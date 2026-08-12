@@ -117,6 +117,38 @@ export const columnRouter = createTRPCRouter({
       });
     }),
 
+  setCategory: boardProcedure
+    .input(
+      z.object({
+        columnId: z.string().min(1),
+        category: z.enum([
+          "backlog",
+          "unstarted",
+          "started",
+          "completed",
+          "canceled",
+        ]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const [updated] = await ctx.db
+        .update(boardColumn)
+        .set({ category: input.category })
+        .where(
+          and(
+            eq(boardColumn.id, input.columnId),
+            eq(boardColumn.boardId, input.boardId),
+          ),
+        )
+        .returning({ id: boardColumn.id });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      bus.emitBoard(input.boardId, {
+        scope: "column",
+        ids: [input.columnId],
+      });
+    }),
+
   reorder: boardProcedure
     .input(
       z.object({

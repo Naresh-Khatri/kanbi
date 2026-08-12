@@ -2,7 +2,6 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
-import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionAtEnd } from "@/lib/position";
 import { resolveBoardAccess } from "@/server/api/permissions";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -28,6 +27,7 @@ export const todayRouter = createTRPCRouter({
         columnId: task.columnId,
         number: task.number,
         columnName: boardColumn.name,
+        columnCategory: boardColumn.category,
         projectSlug: project.slug,
         projectName: project.name,
         projectKey: project.key,
@@ -68,7 +68,11 @@ export const todayRouter = createTRPCRouter({
         .limit(1);
       if (!taskRow[0]) throw new TRPCError({ code: "NOT_FOUND" });
       // Throws NOT_FOUND/FORBIDDEN if the caller can't reach this board.
-      await resolveBoardAccess({ db: ctx.db, userId, boardId: taskRow[0].boardId });
+      await resolveBoardAccess({
+        db: ctx.db,
+        userId,
+        boardId: taskRow[0].boardId,
+      });
 
       const existing = await ctx.db
         .select({ position: todayItem.position })
@@ -107,7 +111,7 @@ export const todayRouter = createTRPCRouter({
       .select({
         taskId: todayItem.taskId,
         archivedAt: task.archivedAt,
-        columnName: boardColumn.name,
+        columnCategory: boardColumn.category,
       })
       .from(todayItem)
       .innerJoin(task, eq(task.id, todayItem.taskId))
@@ -115,7 +119,12 @@ export const todayRouter = createTRPCRouter({
       .where(eq(todayItem.userId, userId));
 
     const doneIds = rows
-      .filter((r) => r.archivedAt !== null || isDoneLikeColumn(r.columnName))
+      .filter(
+        (row) =>
+          row.archivedAt !== null ||
+          row.columnCategory === "completed" ||
+          row.columnCategory === "canceled",
+      )
       .map((r) => r.taskId);
     if (doneIds.length === 0) return { removed: 0 };
 

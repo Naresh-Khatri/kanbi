@@ -5,6 +5,10 @@ import {
   ArrowUp,
   ArrowUpDown,
   Check,
+  CheckCircle2,
+  Circle,
+  CircleDashed,
+  CircleDot,
   GripVertical,
   EyeOff,
   MoveLeft,
@@ -13,6 +17,7 @@ import {
   MoreHorizontal,
   Plus,
   X,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -30,6 +35,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -49,6 +57,41 @@ const SORT_LABELS: Record<Exclude<ColumnSortMode, "manual">, string> = {
 const SORT_MODES = Object.keys(SORT_LABELS) as Array<
   Exclude<ColumnSortMode, "manual">
 >;
+
+type ColumnCategory = ColumnRow["category"];
+
+const CATEGORY_META = {
+  backlog: {
+    label: "Backlog",
+    Icon: CircleDashed,
+    className: "text-white/40",
+  },
+  unstarted: {
+    label: "Unstarted",
+    Icon: Circle,
+    className: "text-white/50",
+  },
+  started: {
+    label: "Started",
+    Icon: CircleDot,
+    className: "text-sky-300",
+  },
+  completed: {
+    label: "Completed",
+    Icon: CheckCircle2,
+    className: "text-emerald-300",
+  },
+  canceled: {
+    label: "Canceled",
+    Icon: XCircle,
+    className: "text-white/40",
+  },
+} satisfies Record<
+  ColumnCategory,
+  { label: string; Icon: typeof Circle; className: string }
+>;
+
+const CATEGORIES = Object.keys(CATEGORY_META) as ColumnCategory[];
 
 export function ColumnHeader({
   boardId,
@@ -136,6 +179,32 @@ export function ColumnHeader({
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
+  const setCategory = api.column.setCategory.useMutation({
+    onMutate: async (vars) => {
+      await utils.board.get.cancel({ boardId });
+      const previous = utils.board.get.getData({ boardId });
+      utils.board.get.setData({ boardId }, (old) =>
+        old
+          ? {
+              ...old,
+              columns: old.columns.map((candidate) =>
+                candidate.id === vars.columnId
+                  ? { ...candidate, category: vars.category }
+                  : candidate,
+              ),
+            }
+          : old,
+      );
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        utils.board.get.setData({ boardId }, context.previous);
+      }
+      toast.error(error.message);
+    },
+    onSettled: () => utils.board.get.invalidate({ boardId }),
+  });
   const sorted = sortMode !== "manual";
   const [wipDialogOpen, setWipDialogOpen] = useState(false);
   const [wipLimit, setWipLimitValue] = useState(
@@ -154,6 +223,7 @@ export function ColumnHeader({
         : String(totalTaskCount);
   const overWipLimit =
     column.wipLimit != null && totalTaskCount > column.wipLimit;
+  const categoryMeta = CATEGORY_META[column.category];
 
   useEffect(() => {
     if (!renaming) setName(column.name);
@@ -235,7 +305,7 @@ export function ColumnHeader({
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
-            className="min-w-0 truncate text-left text-sm font-medium"
+            className="inline-flex min-w-0 items-center gap-1.5 truncate text-left text-sm font-medium"
             disabled={!canWrite}
             onDoubleClick={startRenaming}
             onKeyDown={(event) => {
@@ -253,7 +323,11 @@ export function ColumnHeader({
             title="Double-click or press F2 to rename"
             type="button"
           >
-            {column.name}
+            <categoryMeta.Icon
+              aria-hidden
+              className={cn("h-3.5 w-3.5 shrink-0", categoryMeta.className)}
+            />
+            <span className="truncate">{column.name}</span>
             <span
               className={cn(
                 "ml-2 text-xs text-white/40",
@@ -400,6 +474,34 @@ export function ColumnHeader({
               >
                 Set WIP limit
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>Status type</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {CATEGORIES.map((category) => {
+                    const meta = CATEGORY_META[category];
+                    return (
+                      <DropdownMenuItem
+                        key={category}
+                        onSelect={() =>
+                          setCategory.mutate({
+                            boardId,
+                            columnId: column.id,
+                            category,
+                          })
+                        }
+                      >
+                        <meta.Icon
+                          className={cn("h-3.5 w-3.5", meta.className)}
+                        />
+                        <span className="flex-1">{meta.label}</span>
+                        {column.category === category ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : null}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
             </>
           ) : null}

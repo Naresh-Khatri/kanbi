@@ -3,10 +3,6 @@ import { and, desc, eq, inArray, isNull, max, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
-  isDoneLikeColumn,
-  isInProgressLikeColumn,
-} from "@/lib/column-heuristics";
-import {
   deriveProjectKey,
   normalizeProjectKey,
   shareToken,
@@ -73,18 +69,18 @@ export const projectRouter = createTRPCRouter({
     if (rows.length === 0) return [];
     const projectIds = rows.map((r) => r.id);
 
-    // Task counts per project+column-name (via board join), non-archived only.
+    // Task counts per project and explicit workflow category, non-archived only.
     const columnCounts = await ctx.db
       .select({
         projectId: board.projectId,
-        columnName: boardColumn.name,
+        columnCategory: boardColumn.category,
         count: sql<number>`count(*)::int`,
       })
       .from(task)
       .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
       .innerJoin(board, eq(board.id, task.boardId))
       .where(and(inArray(board.projectId, projectIds), isNull(task.archivedAt)))
-      .groupBy(board.projectId, boardColumn.name);
+      .groupBy(board.projectId, boardColumn.category);
 
     // Most recent activity per project's board.
     const lastActivity = await ctx.db
@@ -108,8 +104,8 @@ export const projectRouter = createTRPCRouter({
         inProgressTasks: 0,
       };
       acc.totalTasks += row.count;
-      if (isDoneLikeColumn(row.columnName)) acc.doneTasks += row.count;
-      else if (isInProgressLikeColumn(row.columnName))
+      if (row.columnCategory === "completed") acc.doneTasks += row.count;
+      else if (row.columnCategory === "started")
         acc.inProgressTasks += row.count;
       totals.set(row.projectId, acc);
     }
@@ -285,9 +281,24 @@ export const projectRouter = createTRPCRouter({
         const [backlog, inProgress] = await tx
           .insert(boardColumn)
           .values([
-            { boardId: boardRow.id, name: "Backlog", position: 1 },
-            { boardId: boardRow.id, name: "In Progress", position: 2 },
-            { boardId: boardRow.id, name: "Done", position: 3 },
+            {
+              boardId: boardRow.id,
+              name: "Backlog",
+              category: "backlog",
+              position: 1,
+            },
+            {
+              boardId: boardRow.id,
+              name: "In Progress",
+              category: "started",
+              position: 2,
+            },
+            {
+              boardId: boardRow.id,
+              name: "Done",
+              category: "completed",
+              position: 3,
+            },
           ])
           .returning();
 
