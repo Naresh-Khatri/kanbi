@@ -16,12 +16,13 @@ export const releases: Release[] = [
     version: "0.1.0",
     date: "2026-08-12",
     entries: [
-      "Boards with drag-and-drop tasks and columns, per-column sorting, and an archive you can restore from",
+      "Build project knowledge pages with search, version history, task links, and grounded AI answers from your workspace",
+      "Shape each board around explicit backlog, in-progress, and completed workflow categories",
+      "Select multiple tasks to update or archive them together",
+      "Customize columns with sorting and visibility preferences, navigate projects faster, and enjoy smoother drag-and-drop",
       "Task detail with rich text, checklists, attachments, comments, labels, and per-project ticket numbers you can reference with #",
-      "Live sync for everyone on a board, with presence and in-app notifications",
-      "Draft tasks from a rough note with AI, and get a weekly digest of what moved",
-      "A command palette and single-key shortcuts for everything — press ? for the full list",
-      "Read-only share links, teammate invites with roles, and pairing for the Focus companion app",
+      "Collaborate with live board updates, presence, notifications, teammate roles, share links, and weekly digests",
+      "Draft tasks with AI, use keyboard-first controls, and pair the Focus companion app for distraction-free sessions",
     ],
   },
 ];
