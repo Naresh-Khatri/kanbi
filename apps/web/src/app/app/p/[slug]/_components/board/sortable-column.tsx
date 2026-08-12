@@ -51,6 +51,10 @@ export const SortableColumn = memo(function SortableColumn({
   sortMode,
   sortDir,
   onSortChange,
+  onMoveLeft,
+  onMoveRight,
+  isDefaultColumn,
+  onDefaultColumnChange,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -73,6 +77,10 @@ export const SortableColumn = memo(function SortableColumn({
   sortMode: ColumnSortMode;
   sortDir: ColumnSortDir;
   onSortChange: (mode: ColumnSortMode, dir: ColumnSortDir) => void;
+  onMoveLeft: () => void;
+  onMoveRight: () => void;
+  isDefaultColumn: boolean;
+  onDefaultColumnChange: (isDefault: boolean) => void;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -111,10 +119,12 @@ export const SortableColumn = memo(function SortableColumn({
           <ChevronRight className="h-4 w-4" />
         </Button>
         <button
-          className="mt-2 flex min-h-0 flex-1 items-center gap-2 text-sm font-medium text-white/70 [writing-mode:vertical-rl]"
+          className="mt-2 flex min-h-0 flex-1 cursor-grab touch-none items-center gap-2 text-sm font-medium text-white/70 [writing-mode:vertical-rl] active:cursor-grabbing"
           onClick={() => onCollapseChange(false)}
           ref={setDropRef}
           type="button"
+          {...sortable.attributes}
+          {...sortable.listeners}
         >
           <span className="rotate-180 truncate">{column.name}</span>
           <span
@@ -158,6 +168,10 @@ export const SortableColumn = memo(function SortableColumn({
         onAddTask={onAddTask}
         onCollapse={() => onCollapseChange(true)}
         onHide={onHide}
+        onMoveLeft={onMoveLeft}
+        onMoveRight={onMoveRight}
+        isDefaultColumn={isDefaultColumn}
+        onDefaultColumnChange={onDefaultColumnChange}
         onSortChange={onSortChange}
         sortBlocked={sortBlocked}
         sortDir={sortDir}

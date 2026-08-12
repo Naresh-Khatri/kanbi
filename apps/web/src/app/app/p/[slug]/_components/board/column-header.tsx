@@ -4,14 +4,17 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Check,
   GripVertical,
   EyeOff,
+  MoveLeft,
+  MoveRight,
   PanelLeftClose,
   MoreHorizontal,
   Plus,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +66,10 @@ export function ColumnHeader({
   onSortChange,
   onHide,
   onCollapse,
+  onMoveLeft,
+  onMoveRight,
+  isDefaultColumn,
+  onDefaultColumnChange,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -79,10 +86,16 @@ export function ColumnHeader({
   onSortChange: (mode: ColumnSortMode, dir: ColumnSortDir) => void;
   onHide: () => void;
   onCollapse: () => void;
+  onMoveLeft: () => void;
+  onMoveRight: () => void;
+  isDefaultColumn: boolean;
+  onDefaultColumnChange: (isDefault: boolean) => void;
 }) {
   const utils = api.useUtils();
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(column.name);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const cancelRenameRef = useRef(false);
 
   const rename = api.column.rename.useMutation({
     onSuccess: async () => {
@@ -95,6 +108,9 @@ export function ColumnHeader({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const otherColumns = columns.filter(
     (candidate) => candidate.id !== column.id,
+  );
+  const columnIndex = columns.findIndex(
+    (candidate) => candidate.id === column.id,
   );
   const [destinationColumnId, setDestinationColumnId] = useState(
     otherColumns[0]?.id ?? "",
@@ -139,11 +155,53 @@ export function ColumnHeader({
   const overWipLimit =
     column.wipLimit != null && totalTaskCount > column.wipLimit;
 
+  useEffect(() => {
+    if (!renaming) setName(column.name);
+  }, [column.name, renaming]);
+
+  function startRenaming() {
+    cancelRenameRef.current = false;
+    setName(column.name);
+    setRenaming(true);
+  }
+
+  function cancelRenaming() {
+    cancelRenameRef.current = true;
+    setName(column.name);
+    setRenaming(false);
+  }
+
+  function commitRename() {
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false;
+      return;
+    }
+    if (rename.isPending) return;
+    const nextName = name.trim();
+    if (!nextName) {
+      toast.error("Column names can't be empty");
+      return;
+    }
+    if (nextName === column.name) {
+      cancelRenaming();
+      return;
+    }
+    cancelRenameRef.current = true;
+    setRenaming(false);
+    rename.mutate({ boardId, columnId: column.id, name: nextName });
+  }
+
   return (
-    <div className="flex items-center gap-1 px-1">
+    <div
+      className="flex items-center gap-1 px-1"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setMenuOpen(true);
+      }}
+    >
       {canWrite ? (
         <button
-          aria-label="Drag column"
+          aria-label={`Drag ${column.name} column`}
           className="cursor-grab p-2 text-white/40 hover:text-white/80 active:cursor-grabbing"
           type="button"
           {...dragHandleProps}
@@ -156,13 +214,21 @@ export function ColumnHeader({
           className="flex-1"
           onSubmit={(e) => {
             e.preventDefault();
-            rename.mutate({ boardId, columnId: column.id, name });
+            commitRename();
           }}
         >
           <Input
             autoFocus
-            onBlur={() => setRenaming(false)}
+            disabled={rename.isPending}
+            onBlur={commitRename}
             onChange={(e) => setName(e.target.value)}
+            onFocus={(event) => event.currentTarget.select()}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                cancelRenaming();
+              }
+            }}
             value={name}
           />
         </form>
@@ -171,7 +237,20 @@ export function ColumnHeader({
           <button
             className="min-w-0 truncate text-left text-sm font-medium"
             disabled={!canWrite}
-            onClick={() => setRenaming(true)}
+            onDoubleClick={startRenaming}
+            onKeyDown={(event) => {
+              if (event.key === "F2") {
+                event.preventDefault();
+                startRenaming();
+              } else if (event.altKey && event.key === "ArrowLeft") {
+                event.preventDefault();
+                onMoveLeft();
+              } else if (event.altKey && event.key === "ArrowRight") {
+                event.preventDefault();
+                onMoveRight();
+              }
+            }}
+            title="Double-click or press F2 to rename"
             type="button"
           >
             {column.name}
@@ -280,7 +359,7 @@ export function ColumnHeader({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             aria-label={`More actions for ${column.name}`}
@@ -294,10 +373,31 @@ export function ColumnHeader({
         <DropdownMenuContent align="end">
           {canWrite ? (
             <>
-              <DropdownMenuItem onSelect={() => setRenaming(true)}>
+              <DropdownMenuItem onSelect={startRenaming}>
                 Rename
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setWipDialogOpen(true)}>
+              <DropdownMenuItem
+                disabled={columnIndex <= 0}
+                onSelect={onMoveLeft}
+              >
+                <MoveLeft className="h-3.5 w-3.5" />
+                Move left
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={
+                  columnIndex === -1 || columnIndex >= columns.length - 1
+                }
+                onSelect={onMoveRight}
+              >
+                <MoveRight className="h-3.5 w-3.5" />
+                Move right
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setWipLimitValue(column.wipLimit?.toString() ?? "");
+                  setWipDialogOpen(true);
+                }}
+              >
                 Set WIP limit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -310,6 +410,12 @@ export function ColumnHeader({
           <DropdownMenuItem onSelect={onHide}>
             <EyeOff className="h-3.5 w-3.5" />
             Hide column
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => onDefaultColumnChange(!isDefaultColumn)}
+          >
+            <span className="flex-1">Default for new tasks</span>
+            {isDefaultColumn ? <Check className="h-3.5 w-3.5" /> : null}
           </DropdownMenuItem>
           {canWrite ? (
             <>

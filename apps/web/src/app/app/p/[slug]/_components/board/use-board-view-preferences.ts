@@ -82,10 +82,18 @@ export function useBoardViewPreferences(
     [update],
   );
 
+  const setDefaultColumnId = useCallback(
+    (columnId: string | null) => {
+      update((current) => ({ ...current, defaultColumnId: columnId }));
+    },
+    [update],
+  );
+
   return {
     preferences,
     setColumnSort,
     setColumnHidden,
     setColumnCollapsed,
+    setDefaultColumnId,
   };
 }

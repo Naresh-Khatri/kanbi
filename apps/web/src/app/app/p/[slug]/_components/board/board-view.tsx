@@ -90,6 +90,13 @@ export function BoardView({
   }, [members]);
   const utils = api.useUtils();
   const { columns, tasks, labels, taskLabels, access } = data;
+  const {
+    preferences,
+    setColumnCollapsed,
+    setColumnHidden,
+    setColumnSort,
+    setDefaultColumnId,
+  } = useBoardViewPreferences(boardId, data.viewPreferences);
   const canWrite = access.canWrite;
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   useEffect(() => {
@@ -120,10 +127,14 @@ export function BoardView({
     if (createTaskToken === lastCreateTaskToken.current) return;
     lastCreateTaskToken.current = createTaskToken;
     if (columns.length > 0) {
-      setQuickAddColumnId(null);
+      setQuickAddColumnId(
+        columns.some((column) => column.id === preferences.defaultColumnId)
+          ? preferences.defaultColumnId
+          : null,
+      );
       setQuickAddOpen(true);
     }
-  }, [createTaskToken, columns.length]);
+  }, [createTaskToken, columns, preferences.defaultColumnId]);
 
   const openTask = openTaskId
     ? (tasks.find((t) => t.id === openTaskId) ?? null)
@@ -312,8 +323,6 @@ export function BoardView({
   );
 
   const filtersActive = hasActiveFilters(filters);
-  const { preferences, setColumnCollapsed, setColumnHidden, setColumnSort } =
-    useBoardViewPreferences(boardId, data.viewPreferences);
 
   const taskCountsByColumn = useMemo(() => {
     const counts = new Map(
@@ -432,7 +441,7 @@ export function BoardView({
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 2 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
@@ -669,6 +678,28 @@ export function BoardView({
     setColumnHidden(columnId, true);
   }
 
+  function moveColumnByOffset(columnId: string, offset: -1 | 1) {
+    const fromIndex = sortedColumns.findIndex(
+      (column) => column.id === columnId,
+    );
+    const targetIndex = fromIndex + offset;
+    if (
+      fromIndex === -1 ||
+      targetIndex < 0 ||
+      targetIndex >= sortedColumns.length
+    ) {
+      return;
+    }
+    const without = sortedColumns.filter((column) => column.id !== columnId);
+    const before = without[targetIndex - 1]?.position ?? null;
+    const after = without[targetIndex]?.position ?? null;
+    const vars = { boardId, columnId, before, after };
+    const previous = utils.board.get.getData({ boardId });
+    if (previous) preappliedColumnMoves.current.set(columnId, previous);
+    applyOptimisticColumnMove(vars);
+    reorderColumn.mutate(vars);
+  }
+
   const handleOpenTask = useCallback((taskId: string) => {
     setFocusedTaskId(taskId);
     setOpenTaskId(taskId);
@@ -878,9 +909,15 @@ export function BoardView({
                       setColumnCollapsed(col.id, collapsed)
                     }
                     onHide={() => hideColumn(col.id)}
+                    onMoveLeft={() => moveColumnByOffset(col.id, -1)}
+                    onMoveRight={() => moveColumnByOffset(col.id, 1)}
                     onOpenTask={handleOpenTask}
                     onSortChange={(mode, dir) =>
                       setColumnSort(col.id, mode, dir)
+                    }
+                    isDefaultColumn={preferences.defaultColumnId === col.id}
+                    onDefaultColumnChange={(isDefault) =>
+                      setDefaultColumnId(isDefault ? col.id : null)
                     }
                     projectKey={projectKey}
                     sortBlocked={sortBlockedColumnId === col.id}
