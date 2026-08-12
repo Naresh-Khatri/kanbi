@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Sparkles, UserRound } from "lucide-react";
+import { Archive, LogOut, Sparkles, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -43,6 +43,11 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/app/profile">
             <UserRound className="h-4 w-4" /> Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/app/archive">
+            <Archive className="h-4 w-4" /> Archived projects
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

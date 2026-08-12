@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -47,7 +47,13 @@ export const userRouter = createTRPCRouter({
       .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
       .innerJoin(board, eq(board.id, task.boardId))
       .innerJoin(project, eq(project.id, board.projectId))
-      .where(and(eq(task.assigneeId, userId), isNull(task.archivedAt)))
+      .where(
+        and(
+          eq(task.assigneeId, userId),
+          isNull(task.archivedAt),
+          ne(project.status, "archived"),
+        ),
+      )
       .orderBy(asc(task.dueAt));
 
     const mentions = await ctx.db
@@ -68,6 +74,7 @@ export const userRouter = createTRPCRouter({
         and(
           eq(notification.userId, userId),
           eq(notification.type, "task.mention"),
+          ne(project.status, "archived"),
         ),
       )
       .orderBy(desc(notification.createdAt))

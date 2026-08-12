@@ -55,6 +55,8 @@ export function TodayQueue() {
     .filter((t) => !isDoneLikeColumn(t.columnName))
     .reduce((sum, t) => sum + (t.estimatePomodoros ?? 0), 0);
 
+  if (data.length === 0) return null;
+
   return (
     <section className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4">
       <div className="flex items-center gap-2">
@@ -79,32 +81,20 @@ export function TodayQueue() {
           </button>
         ) : null}
       </div>
-      {data.length === 0 ? (
-        <p className="py-1 text-sm text-white/40">
-          Nothing queued for today — add tasks from any board.
-        </p>
-      ) : (
-        <ul className="flex flex-col">
-          {data.map((item) => (
-            <TodayRow
-              item={item}
-              key={item.taskId}
-              onRemove={() => remove.mutate({ taskId: item.taskId })}
-            />
-          ))}
-        </ul>
-      )}
+      <ul className="flex flex-col">
+        {data.map((item) => (
+          <TodayRow
+            item={item}
+            key={item.taskId}
+            onRemove={() => remove.mutate({ taskId: item.taskId })}
+          />
+        ))}
+      </ul>
     </section>
   );
 }
 
-function TodayRow({
-  item,
-  onRemove,
-}: {
-  item: Item;
-  onRemove: () => void;
-}) {
+function TodayRow({ item, onRemove }: { item: Item; onRemove: () => void }) {
   const done = isDoneLikeColumn(item.columnName);
   return (
     <li className="group -mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-white/5">
@@ -136,7 +126,7 @@ function TodayRow({
       </Link>
       <button
         aria-label="Remove from today"
-        className="shrink-0 rounded p-1 text-white/40 opacity-0 transition hover:bg-white/10 hover:text-white group-hover:opacity-100"
+        className="shrink-0 rounded p-1 text-white/40 opacity-0 transition group-hover:opacity-100 hover:bg-white/10 hover:text-white"
         onClick={onRemove}
         type="button"
       >

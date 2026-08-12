@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
@@ -38,7 +38,11 @@ export const todayRouter = createTRPCRouter({
       .innerJoin(board, eq(board.id, task.boardId))
       .innerJoin(project, eq(project.id, board.projectId))
       .where(
-        and(eq(todayItem.userId, ctx.session.user.id), isNull(task.archivedAt)),
+        and(
+          eq(todayItem.userId, ctx.session.user.id),
+          isNull(task.archivedAt),
+          ne(project.status, "archived"),
+        ),
       )
       .orderBy(asc(todayItem.position));
   }),

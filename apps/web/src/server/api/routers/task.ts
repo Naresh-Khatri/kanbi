@@ -8,6 +8,7 @@ import {
   ilike,
   inArray,
   isNull,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -431,6 +432,7 @@ export const taskRouter = createTRPCRouter({
         .where(
           and(
             isNull(task.archivedAt),
+            ne(project.status, "archived"),
             ilike(task.title, term),
             or(eq(project.ownerId, userId), eq(projectMember.userId, userId)),
           ),

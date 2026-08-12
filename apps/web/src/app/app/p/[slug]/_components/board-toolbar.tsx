@@ -147,12 +147,13 @@ export const BoardToolbar = forwardRef<
     onChange: (next: BoardFilters) => void;
     labels: BoardLabel[];
     members: BoardMember[];
-    onlineIds: string[];
     visibleCount: number;
     totalCount: number;
     archivedCount: number;
     onOpenArchive: () => void;
     onOpenDigest: () => void;
+    expanded: boolean;
+    onExpandedChange: (expanded: boolean) => void;
   }
 >(function BoardToolbar(
   {
@@ -160,17 +161,24 @@ export const BoardToolbar = forwardRef<
     onChange,
     labels,
     members,
-    onlineIds,
     visibleCount,
     totalCount,
     archivedCount,
     onOpenArchive,
     onOpenDigest,
+    expanded,
+    onExpandedChange,
   },
   searchRef,
 ) {
   const active = hasActiveFilters(filters);
   const hidden = totalCount - visibleCount;
+  const filterCount =
+    filters.priorities.length +
+    filters.labelIds.length +
+    filters.assigneeIds.length +
+    (filters.due === "any" ? 0 : 1);
+  const showControls = expanded || active;
 
   function toggle<T>(list: T[], value: T): T[] {
     return list.includes(value)
@@ -178,227 +186,264 @@ export const BoardToolbar = forwardRef<
       : [...list, value];
   }
 
+  function openSearch() {
+    onExpandedChange(true);
+    requestAnimationFrame(() => {
+      if (searchRef && typeof searchRef !== "function") {
+        searchRef.current?.focus();
+      }
+    });
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-6 py-2">
-      <div className="relative max-w-sm min-w-0 flex-1">
-        <Search
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/40"
-        />
-        <Input
-          aria-label="Search tasks"
-          className="h-8 pr-8 pl-8"
-          onChange={(e) => onChange({ ...filters, query: e.target.value })}
-          placeholder="Search tasks…  /"
-          ref={searchRef}
-          value={filters.query}
-        />
-        {filters.query ? (
-          <button
-            aria-label="Clear search"
-            className="absolute top-1/2 right-2 -translate-y-1/2 text-white/40 hover:text-white"
-            onClick={() => onChange({ ...filters, query: "" })}
-            type="button"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        ) : null}
-      </div>
-
-      <FilterChip
-        count={filters.priorities.length}
-        icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
-        label="Priority"
-      >
-        {PRIORITIES.map((p) => {
-          const checked = filters.priorities.includes(p);
-          return (
-            <FilterItem
-              checked={checked}
-              key={p}
-              onSelect={() =>
-                onChange({
-                  ...filters,
-                  priorities: toggle(filters.priorities, p),
-                })
-              }
-            >
-              <PriorityIcon className="h-3.5 w-3.5" priority={p} />
-              <span>{PRIORITY_META[p].label}</span>
-            </FilterItem>
-          );
-        })}
-      </FilterChip>
-
-      <FilterChip
-        count={filters.labelIds.length}
-        disabled={labels.length === 0}
-        icon={<Tag className="h-3.5 w-3.5" />}
-        label="Labels"
-      >
-        {labels.length === 0 ? (
-          <div className="px-2 py-1.5 text-xs text-white/50">No labels yet</div>
-        ) : (
-          labels.map((l) => {
-            const checked = filters.labelIds.includes(l.id);
-            return (
-              <FilterItem
-                checked={checked}
-                key={l.id}
-                onSelect={() =>
-                  onChange({
-                    ...filters,
-                    labelIds: toggle(filters.labelIds, l.id),
-                  })
-                }
-              >
-                <span
-                  aria-hidden
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: l.color }}
-                />
-                <span className="truncate">{l.name}</span>
-              </FilterItem>
-            );
-          })
-        )}
-      </FilterChip>
-
-      <FilterChip
-        count={filters.assigneeIds.length}
-        icon={<User className="h-3.5 w-3.5" />}
-        label="Assignee"
-      >
-        <FilterItem
-          checked={filters.assigneeIds.includes(UNASSIGNED)}
-          onSelect={() =>
-            onChange({
-              ...filters,
-              assigneeIds: toggle(filters.assigneeIds, UNASSIGNED),
-            })
-          }
-        >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-[10px] text-white/60">
-            ?
-          </span>
-          <span>Unassigned</span>
-        </FilterItem>
-        {members.length > 0 ? <div className="my-1 h-px bg-white/10" /> : null}
-        {members.map((m) => {
-          const checked = filters.assigneeIds.includes(m.userId);
-          return (
-            <FilterItem
-              checked={checked}
-              key={m.userId}
-              onSelect={() =>
-                onChange({
-                  ...filters,
-                  assigneeIds: toggle(filters.assigneeIds, m.userId),
-                })
-              }
-            >
-              <UserAvatar image={m.image} name={m.name} size={20} />
-              <span className="truncate">{m.name}</span>
-            </FilterItem>
-          );
-        })}
-      </FilterChip>
-
-      <FilterChip
-        count={filters.due === "any" ? 0 : 1}
-        icon={<CalendarClock className="h-3.5 w-3.5" />}
-        label={filters.due === "any" ? "Due" : DUE_LABEL[filters.due]}
-      >
-        {(Object.keys(DUE_LABEL) as DueFilter[]).map((d) => (
-          <FilterItem
-            checked={filters.due === d}
-            key={d}
-            onSelect={() => onChange({ ...filters, due: d })}
-          >
-            <span>{DUE_LABEL[d]}</span>
-          </FilterItem>
-        ))}
-      </FilterChip>
-
-      {active ? (
+    <div className="border-b border-white/5">
+      <div className="flex items-center gap-1 px-6 py-2">
         <Button
-          className="h-8 text-white/70 hover:text-white"
-          onClick={() => onChange(EMPTY_FILTERS)}
+          aria-controls="board-search-filters"
+          aria-expanded={showControls}
+          className={cn(
+            "h-8 gap-1.5 text-white/60 hover:text-white",
+            filters.query && "text-sky-200",
+          )}
+          onClick={openSearch}
           size="sm"
           variant="ghost"
         >
-          Clear
+          <Search className="h-3.5 w-3.5" />
+          <span>Search</span>
+          <kbd className="rounded border border-white/10 px-1 font-sans text-[10px] text-white/40">
+            /
+          </kbd>
         </Button>
-      ) : null}
-
-      <div className="ml-auto flex items-center gap-2">
-        <PresenceStack members={members} onlineIds={onlineIds} />
+        <Button
+          aria-controls="board-search-filters"
+          aria-expanded={showControls}
+          className={cn(
+            "h-8 gap-1.5 text-white/60 hover:text-white",
+            filterCount > 0 && "text-sky-200",
+          )}
+          onClick={() => onExpandedChange(!expanded)}
+          size="sm"
+          variant="ghost"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <span>Filters</span>
+          {filterCount > 0 ? (
+            <span className="rounded bg-sky-400/15 px-1 text-[10px]">
+              {filterCount}
+            </span>
+          ) : null}
+        </Button>
         {active ? (
-          <span className="text-xs text-white/60">
+          <span className="ml-1 text-xs text-white/40">
             {hidden > 0 ? `${hidden} hidden` : "Showing all"}
           </span>
         ) : null}
-        <Button
-          className="h-8 gap-1.5 text-white/70 hover:text-white"
-          onClick={onOpenDigest}
-          size="sm"
-          variant="ghost"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Digest</span>
-        </Button>
-        {archivedCount > 0 ? (
+
+        <div className="ml-auto flex items-center gap-1">
           <Button
             className="h-8 gap-1.5 text-white/70 hover:text-white"
-            onClick={onOpenArchive}
+            onClick={onOpenDigest}
             size="sm"
             variant="ghost"
           >
-            <Archive className="h-3.5 w-3.5" />
-            <span>Archive</span>
-            <span className="rounded bg-white/10 px-1 text-[10px]">
-              {archivedCount}
-            </span>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Digest</span>
           </Button>
-        ) : null}
+          {archivedCount > 0 ? (
+            <Button
+              className="h-8 gap-1.5 text-white/60 hover:text-white"
+              onClick={onOpenArchive}
+              size="sm"
+              variant="ghost"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              <span>Archive</span>
+              <span className="rounded bg-white/10 px-1 text-[10px]">
+                {archivedCount}
+              </span>
+            </Button>
+          ) : null}
+        </div>
       </div>
-    </div>
-  );
-});
 
-/** Overlapping avatars of members who currently have the board open. */
-function PresenceStack({
-  members,
-  onlineIds,
-}: {
-  members: BoardMember[];
-  onlineIds: string[];
-}) {
-  const online = members.filter((m) => onlineIds.includes(m.userId));
-  if (online.length === 0) return null;
-  const shown = online.slice(0, 4);
-  const extra = online.length - shown.length;
-  return (
-    <div
-      className="flex items-center"
-      title={`${online.length} online — ${online.map((m) => m.name).join(", ")}`}
-    >
-      <div className="flex -space-x-1.5">
-        {shown.map((m) => (
-          <span
-            className="rounded-full ring-1 ring-emerald-400/70 ring-offset-2 ring-offset-zinc-950"
-            key={m.userId}
+      {showControls ? (
+        <div
+          className="flex flex-wrap items-center gap-2 border-t border-white/5 px-6 py-2"
+          id="board-search-filters"
+        >
+          <div className="relative max-w-sm min-w-[12rem] flex-1">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/40"
+            />
+            <Input
+              aria-label="Search tasks"
+              className="h-8 pr-8 pl-8"
+              onChange={(e) => onChange({ ...filters, query: e.target.value })}
+              placeholder="Search tasks…"
+              ref={searchRef}
+              value={filters.query}
+            />
+            {filters.query ? (
+              <button
+                aria-label="Clear search"
+                className="absolute top-1/2 right-2 -translate-y-1/2 text-white/40 hover:text-white"
+                onClick={() => onChange({ ...filters, query: "" })}
+                type="button"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
+
+          <FilterChip
+            count={filters.priorities.length}
+            icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
+            label="Priority"
           >
-            <UserAvatar image={m.image} name={m.name} size={22} />
-          </span>
-        ))}
-      </div>
-      {extra > 0 ? (
-        <span className="ml-2 text-[10px] text-white/50">+{extra}</span>
+            {PRIORITIES.map((p) => {
+              const checked = filters.priorities.includes(p);
+              return (
+                <FilterItem
+                  checked={checked}
+                  key={p}
+                  onSelect={() =>
+                    onChange({
+                      ...filters,
+                      priorities: toggle(filters.priorities, p),
+                    })
+                  }
+                >
+                  <PriorityIcon className="h-3.5 w-3.5" priority={p} />
+                  <span>{PRIORITY_META[p].label}</span>
+                </FilterItem>
+              );
+            })}
+          </FilterChip>
+
+          <FilterChip
+            count={filters.labelIds.length}
+            disabled={labels.length === 0}
+            icon={<Tag className="h-3.5 w-3.5" />}
+            label="Labels"
+          >
+            {labels.length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-white/50">
+                No labels yet
+              </div>
+            ) : (
+              labels.map((l) => {
+                const checked = filters.labelIds.includes(l.id);
+                return (
+                  <FilterItem
+                    checked={checked}
+                    key={l.id}
+                    onSelect={() =>
+                      onChange({
+                        ...filters,
+                        labelIds: toggle(filters.labelIds, l.id),
+                      })
+                    }
+                  >
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ background: l.color }}
+                    />
+                    <span className="truncate">{l.name}</span>
+                  </FilterItem>
+                );
+              })
+            )}
+          </FilterChip>
+
+          <FilterChip
+            count={filters.assigneeIds.length}
+            icon={<User className="h-3.5 w-3.5" />}
+            label="Assignee"
+          >
+            <FilterItem
+              checked={filters.assigneeIds.includes(UNASSIGNED)}
+              onSelect={() =>
+                onChange({
+                  ...filters,
+                  assigneeIds: toggle(filters.assigneeIds, UNASSIGNED),
+                })
+              }
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-[10px] text-white/60">
+                ?
+              </span>
+              <span>Unassigned</span>
+            </FilterItem>
+            {members.length > 0 ? (
+              <div className="my-1 h-px bg-white/10" />
+            ) : null}
+            {members.map((m) => {
+              const checked = filters.assigneeIds.includes(m.userId);
+              return (
+                <FilterItem
+                  checked={checked}
+                  key={m.userId}
+                  onSelect={() =>
+                    onChange({
+                      ...filters,
+                      assigneeIds: toggle(filters.assigneeIds, m.userId),
+                    })
+                  }
+                >
+                  <UserAvatar image={m.image} name={m.name} size={20} />
+                  <span className="truncate">{m.name}</span>
+                </FilterItem>
+              );
+            })}
+          </FilterChip>
+
+          <FilterChip
+            count={filters.due === "any" ? 0 : 1}
+            icon={<CalendarClock className="h-3.5 w-3.5" />}
+            label={filters.due === "any" ? "Due" : DUE_LABEL[filters.due]}
+          >
+            {(Object.keys(DUE_LABEL) as DueFilter[]).map((d) => (
+              <FilterItem
+                checked={filters.due === d}
+                key={d}
+                onSelect={() => onChange({ ...filters, due: d })}
+              >
+                <span>{DUE_LABEL[d]}</span>
+              </FilterItem>
+            ))}
+          </FilterChip>
+
+          {active ? (
+            <Button
+              className="h-8 text-white/70 hover:text-white"
+              onClick={() => {
+                onChange(EMPTY_FILTERS);
+                onExpandedChange(false);
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              Clear
+            </Button>
+          ) : (
+            <Button
+              aria-label="Hide search and filters"
+              className="h-8 w-8 p-0 text-white/40 hover:text-white"
+              onClick={() => onExpandedChange(false)}
+              size="sm"
+              variant="ghost"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       ) : null}
     </div>
   );
-}
+});
 
 function FilterChip({
   icon,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
@@ -78,22 +78,8 @@ export function ProjectInfo() {
           >
             <Plus className="h-4 w-4" /> New project
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href={`/app/p/${slug}/settings`}>
-              <Settings className="h-4 w-4" /> Project settings
-            </Link>
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {project.description ? (
-        <span
-          className="hidden max-w-[28ch] truncate text-xs text-white/50 md:inline"
-          title={project.description}
-        >
-          — {project.description}
-        </span>
-      ) : null}
     </div>
   );
 }

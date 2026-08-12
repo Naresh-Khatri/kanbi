@@ -1,8 +1,8 @@
 "use client";
 
-import { ChevronDown, Settings, UserPlus } from "lucide-react";
+import { ChevronDown, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 
 import {
   DropdownMenu,
@@ -32,6 +32,7 @@ const ROLE_BADGE: Record<Role, string> = {
  */
 export function ProjectTeamButton() {
   const { slug } = useParams<{ slug: string }>();
+  const pathname = usePathname();
   const project = api.project.bySlug.useQuery({ slug }).data;
   const board = api.board.get.useQuery(
     { boardId: project?.boardId ?? "" },
@@ -61,6 +62,10 @@ export function ProjectTeamButton() {
       { enabled: !!project?.boardId },
     ).data ?? [],
   );
+  // The connection that marks this tab present can emit before its own SSE
+  // listener is ready. Being on the board route is itself authoritative for
+  // the current user; settings pages do not count as viewing the board.
+  if (me && pathname === `/app/p/${slug}`) online.add(me.id);
 
   if (!project || members.length === 0) return null;
 
@@ -178,14 +183,6 @@ export function ProjectTeamButton() {
             </DropdownMenuItem>
           </>
         ) : null}
-
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href={`/app/p/${slug}/settings`}>
-            <Settings className="h-4 w-4" />
-            Project settings
-          </Link>
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

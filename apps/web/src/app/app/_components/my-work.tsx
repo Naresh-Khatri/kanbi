@@ -19,6 +19,7 @@ import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { TodayQueue } from "./today-queue";
 
 type Assigned = RouterOutputs["user"]["myWork"]["assigned"][number];
 type Mention = RouterOutputs["user"]["myWork"]["mentions"][number];
@@ -34,6 +35,7 @@ function startOfTodayMs() {
 
 export function MyWork() {
   const [data] = api.user.myWork.useSuspenseQuery();
+  const [today] = api.today.list.useSuspenseQuery();
 
   const { overdue, dueSoon, later } = useMemo(() => {
     const todayStart = startOfTodayMs();
@@ -52,6 +54,7 @@ export function MyWork() {
   }, [data.assigned]);
 
   const empty =
+    today.length === 0 &&
     overdue.length === 0 &&
     dueSoon.length === 0 &&
     later.length === 0 &&
@@ -61,14 +64,10 @@ export function MyWork() {
     <section className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold">My work</h1>
-        <p className="text-sm text-white/60">
-          Everything on your plate, across every project.
-        </p>
       </div>
+      <TodayQueue />
       {empty ? (
-        <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-white/50">
-          Nothing assigned to you right now. Enjoy the calm.
-        </div>
+        <p className="text-sm text-white/40">Nothing needs your attention.</p>
       ) : (
         <div className="flex flex-col gap-4">
           <Section
@@ -221,7 +220,9 @@ function MentionRow({ mention: m }: { mention: Mention }) {
           {body}
         </Link>
       ) : (
-        <span className="-mx-2 flex items-center gap-2 px-2 py-1.5">{body}</span>
+        <span className="-mx-2 flex items-center gap-2 px-2 py-1.5">
+          {body}
+        </span>
       )}
     </li>
   );

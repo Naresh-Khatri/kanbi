@@ -1,7 +1,7 @@
-import { and, between, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, between, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
 import type { db as Database } from "@/server/db";
-import { notification, task } from "@/server/db/schema";
+import { board, notification, project, task } from "@/server/db/schema";
 import { createNotifications } from "@/server/notifications/create";
 
 const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
@@ -19,10 +19,13 @@ export async function runDueReminders(db: typeof Database) {
       dueAt: task.dueAt,
     })
     .from(task)
+    .innerJoin(board, eq(board.id, task.boardId))
+    .innerJoin(project, eq(project.id, board.projectId))
     .where(
       and(
         isNotNull(task.assigneeId),
         isNull(task.archivedAt),
+        ne(project.status, "archived"),
         between(task.dueAt, now, until),
       ),
     );

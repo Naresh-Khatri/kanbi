@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
+import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
 import { OPEN_TASK_EVENT } from "@/components/ui/rich-text-mention";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionBetween } from "@/lib/position";
@@ -53,7 +54,6 @@ import { celebrate } from "./celebrate";
 import { QuickAddTaskDialog } from "../quick-add-task-dialog";
 import { useArchiveTask } from "../use-archive-task";
 import { SortableColumn } from "./sortable-column";
-import { StatsBar } from "./stats-bar";
 import { TaskCardPreview } from "./task-card";
 import { TaskDetailSheet } from "../task-detail-sheet";
 
@@ -69,8 +69,7 @@ export function BoardView({
 }) {
   const [data] = api.board.get.useSuspenseQuery({ boardId });
   const membersQuery = api.project.members.useQuery({ projectId });
-  const members = membersQuery.data ?? [];
-  const onlineIds = api.realtime.presence.useQuery({ boardId }).data ?? [];
+  const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
   const membersById = useMemo(() => {
     const map = new Map<string, MemberInfo>();
     for (const m of members) {
@@ -126,6 +125,10 @@ export function BoardView({
         if (evt.scope === "presence") {
           // Keeps the header team/presence popover live while the board is open.
           utils.realtime.presence.invalidate({ boardId });
+          return;
+        }
+        if (evt.scope === "board") {
+          void invalidateProjectLifecycle(utils);
           return;
         }
         if (evt.scope === "comment") {
@@ -196,13 +199,17 @@ export function BoardView({
   });
 
   const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
+  const [toolbarExpanded, setToolbarExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   useHotkeys(
     "/",
     (e) => {
       e.preventDefault();
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
+      setToolbarExpanded(true);
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      });
     },
     { preventDefault: true },
   );
@@ -480,30 +487,6 @@ export function BoardView({
     [columns],
   );
 
-  const stats = useMemo(() => {
-    const now = Date.now();
-    const doneColumnIds = new Set(
-      columns.filter((c) => isDoneLikeColumn(c.name)).map((c) => c.id),
-    );
-    let total = 0;
-    let done = 0;
-    let overdue = 0;
-    let unassigned = 0;
-    let highPriority = 0;
-    for (const t of tasks) {
-      if (t.archivedAt) continue;
-      total++;
-      const isDone = doneColumnIds.has(t.columnId);
-      if (isDone) done++;
-      if (!isDone && t.dueAt && t.dueAt.getTime() < now) overdue++;
-      if (!t.assigneeId) unassigned++;
-      if (!isDone && (t.priority === "high" || t.priority === "urgent")) {
-        highPriority++;
-      }
-    }
-    return { total, done, overdue, unassigned, highPriority };
-  }, [columns, tasks]);
-
   function handleOpenTask(taskId: string) {
     setFocusedTaskId(taskId);
     setOpenTaskId(taskId);
@@ -522,8 +505,7 @@ export function BoardView({
   );
   // aiDraftOpen lives in the shell store (read imperatively in nav handlers so
   // opening the AI dialog never re-renders the board); the rest are local.
-  const navActive =
-    !openTask && !quickAddOpen && !archiveOpen && !digestOpen;
+  const navActive = !openTask && !quickAddOpen && !archiveOpen && !digestOpen;
   const kbRef = useRef({
     navColumns,
     focusedTaskId,
@@ -629,7 +611,12 @@ export function BoardView({
   useHotkeys(
     "enter, e",
     (e) => {
-      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active || !kbRef.current.focusedTaskId) return;
+      if (
+        useAppShell.getState().aiDraftOpen ||
+        !kbRef.current.active ||
+        !kbRef.current.focusedTaskId
+      )
+        return;
       e.preventDefault();
       handleOpenTask(kbRef.current.focusedTaskId);
     },
@@ -638,7 +625,12 @@ export function BoardView({
   useHotkeys(
     "x",
     (e) => {
-      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active || !kbRef.current.focusedTaskId) return;
+      if (
+        useAppShell.getState().aiDraftOpen ||
+        !kbRef.current.active ||
+        !kbRef.current.focusedTaskId
+      )
+        return;
       e.preventDefault();
       archiveFocused();
     },
@@ -647,14 +639,14 @@ export function BoardView({
 
   return (
     <main className="flex h-[calc(100vh-57px)] flex-col">
-      <StatsBar stats={stats} />
       <BoardToolbar
         archivedCount={archivedTasks.length}
+        expanded={toolbarExpanded}
         filters={filters}
         labels={labels}
         members={members}
         onChange={setFilters}
-        onlineIds={onlineIds}
+        onExpandedChange={setToolbarExpanded}
         onOpenArchive={() => setArchiveOpen(true)}
         onOpenDigest={() => setDigestOpen(true)}
         ref={searchInputRef}

@@ -243,6 +243,7 @@ export const columnSortDir = pgEnum("kanbi_column_sort_dir", ["asc", "desc"]);
 export const projectStatus = pgEnum("kanbi_project_status", [
   "active",
   "on_hold",
+  "archived",
 ]);
 
 // ── Projects ────────────────────────────────────────────────────────────────

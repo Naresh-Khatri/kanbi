@@ -33,10 +33,15 @@ import {
 } from "@/server/db/schema";
 import { sendProjectInviteEmail } from "@/server/mail";
 import { createNotifications } from "@/server/notifications/create";
+import { bus } from "@/server/realtime/bus";
 
 export const projectRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
+    const access = or(
+      eq(project.ownerId, userId),
+      eq(projectMember.userId, userId),
+    );
     const rows = await ctx.db
       .selectDistinct({
         id: project.id,
@@ -62,7 +67,7 @@ export const projectRouter = createTRPCRouter({
           eq(projectMember.userId, userId),
         ),
       )
-      .where(or(eq(project.ownerId, userId), eq(projectMember.userId, userId)))
+      .where(and(access, ne(project.status, "archived")))
       .orderBy(desc(project.updatedAt));
 
     if (rows.length === 0) return [];
@@ -140,6 +145,37 @@ export const projectRouter = createTRPCRouter({
     return [...active, ...onHold];
   }),
 
+  listArchived: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    return ctx.db
+      .selectDistinct({
+        id: project.id,
+        slug: project.slug,
+        name: project.name,
+        description: project.description,
+        color: project.color,
+        status: project.status,
+        role: sql<ProjectRole>`case when ${project.ownerId} = ${userId} then 'owner'::kanbi_project_role else ${projectMember.role} end`.as(
+          "role",
+        ),
+      })
+      .from(project)
+      .leftJoin(
+        projectMember,
+        and(
+          eq(projectMember.projectId, project.id),
+          eq(projectMember.userId, userId),
+        ),
+      )
+      .where(
+        and(
+          eq(project.status, "archived"),
+          or(eq(project.ownerId, userId), eq(projectMember.userId, userId)),
+        ),
+      )
+      .orderBy(desc(project.updatedAt));
+  }),
+
   bySlug: protectedProcedure
     .input(z.object({ slug: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
@@ -154,6 +190,7 @@ export const projectRouter = createTRPCRouter({
           systemPrompt: project.systemPrompt,
           color: project.color,
           icon: project.icon,
+          status: project.status,
           ownerId: project.ownerId,
           boardId: board.id,
           role: projectMember.role,
@@ -378,13 +415,28 @@ export const projectRouter = createTRPCRouter({
   }),
 
   setStatus: projectProcedure
-    .input(z.object({ status: z.enum(["active", "on_hold"]) }))
+    .input(z.object({ status: z.enum(["active", "on_hold", "archived"]) }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.access.canWrite) throw new TRPCError({ code: "FORBIDDEN" });
+      const [current] = await ctx.db
+        .select({ status: project.status, boardId: board.id })
+        .from(project)
+        .innerJoin(board, eq(board.projectId, project.id))
+        .where(eq(project.id, input.projectId))
+        .limit(1);
+      if (!current) throw new TRPCError({ code: "NOT_FOUND" });
+      if (input.status === "archived" || current.status === "archived") {
+        assertCanAdmin(ctx.access);
+      } else if (!ctx.access.canWrite) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
       await ctx.db
         .update(project)
         .set({ status: input.status })
         .where(eq(project.id, input.projectId));
+      bus.emitBoard(current.boardId, {
+        scope: "board",
+        ids: [current.boardId],
+      });
     }),
 
   leave: projectProcedure.mutation(async ({ ctx, input }) => {

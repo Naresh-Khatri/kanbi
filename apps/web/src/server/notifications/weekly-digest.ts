@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, ne } from "drizzle-orm";
 
 import type { db as Database } from "@/server/db";
 import {
@@ -8,7 +8,10 @@ import {
   projectMember,
   user as userTable,
 } from "@/server/db/schema";
-import { DIGEST_WINDOW_MS, generateBoardDigest } from "@/server/digest/generate";
+import {
+  DIGEST_WINDOW_MS,
+  generateBoardDigest,
+} from "@/server/digest/generate";
 import { sendDigestEmail } from "@/server/mail";
 
 /**
@@ -22,7 +25,9 @@ export async function runWeeklyDigests(db: typeof Database) {
   const activeBoards = await db
     .selectDistinct({ boardId: activity.boardId })
     .from(activity)
-    .where(gte(activity.createdAt, since));
+    .innerJoin(board, eq(board.id, activity.boardId))
+    .innerJoin(project, eq(project.id, board.projectId))
+    .where(and(gte(activity.createdAt, since), ne(project.status, "archived")));
 
   let generated = 0;
   let emailed = 0;
@@ -43,7 +48,11 @@ export async function runWeeklyDigests(db: typeof Database) {
       .innerJoin(board, eq(board.projectId, project.id))
       .innerJoin(userTable, eq(userTable.id, projectMember.userId))
       .where(
-        and(eq(board.id, boardId), eq(projectMember.digestEmail, true)),
+        and(
+          eq(board.id, boardId),
+          eq(projectMember.digestEmail, true),
+          ne(project.status, "archived"),
+        ),
       );
 
     for (const r of recipients) {

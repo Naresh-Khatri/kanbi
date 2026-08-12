@@ -42,6 +42,7 @@ export async function resolveBoardAccess(args: {
     .select({
       projectId: board.projectId,
       ownerId: project.ownerId,
+      projectStatus: project.status,
       role: projectMember.role,
     })
     .from(board)
@@ -70,7 +71,7 @@ export async function resolveBoardAccess(args: {
     boardId: args.boardId,
     role,
     canRead: true,
-    canWrite: roleCan(role, "editor"),
+    canWrite: hit.projectStatus !== "archived" && roleCan(role, "editor"),
     canAdmin: roleCan(role, "owner"),
   };
 }

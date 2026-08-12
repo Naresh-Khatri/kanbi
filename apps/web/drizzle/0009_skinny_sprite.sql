@@ -1,0 +1,1 @@
+ALTER TYPE "public"."kanbi_project_status" ADD VALUE 'archived';

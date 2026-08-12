@@ -1,7 +1,8 @@
 "use client";
 
-import { formatRelative } from "@kanbi/shared";
 import {
+  Archive,
+  ChevronRight,
   MoreHorizontal,
   PauseCircle,
   PlayCircle,
@@ -15,6 +16,12 @@ import { toast } from "sonner";
 
 import { DeleteProjectDialog } from "@/app/app/p/[slug]/settings/_components/delete-project-dialog";
 import { useAppShell } from "@/components/keybinds/shell-store";
+import { invalidateProjectLifecycle } from "./invalidate-project-lifecycle";
+import {
+  ProjectLifecycleDialog,
+  shouldSkipProjectLifecycleDialog,
+  type ProjectLifecycleAction,
+} from "./project-lifecycle-dialog";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +50,7 @@ type ProjectCard = {
   description: string | null;
   color: string | null;
   role: "owner" | "editor" | "viewer";
-  status: "active" | "on_hold";
+  status: "active" | "on_hold" | "archived";
   totalTasks: number;
   doneTasks: number;
   inProgressTasks: number;
@@ -52,6 +59,7 @@ type ProjectCard = {
 
 export function ProjectsDashboard() {
   const [projects] = api.project.list.useSuspenseQuery();
+  const [showOnHold, setShowOnHold] = useState(false);
   const active = projects.filter((p) => p.status === "active");
   const onHold = projects.filter((p) => p.status === "on_hold");
 
@@ -75,12 +83,8 @@ export function ProjectsDashboard() {
         <>
           {active.length > 0 ? (
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {active.map((p, i) => (
-                <ProjectCardItem
-                  jumpNumber={i < 9 ? i + 1 : undefined}
-                  key={p.id}
-                  project={p}
-                />
+              {active.map((p) => (
+                <ProjectCardItem key={p.id} project={p} />
               ))}
             </ul>
           ) : (
@@ -89,14 +93,28 @@ export function ProjectsDashboard() {
 
           {onHold.length > 0 ? (
             <div className="flex flex-col gap-2">
-              <h2 className="text-xs font-medium tracking-wide text-white/40 uppercase">
-                On hold
-              </h2>
-              <ul className="flex flex-col divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10">
-                {onHold.map((p) => (
-                  <OnHoldRow key={p.id} project={p} />
-                ))}
-              </ul>
+              <button
+                aria-controls="on-hold-projects"
+                aria-expanded={showOnHold}
+                className="flex w-fit items-center gap-1.5 rounded-md px-1 py-1 text-xs text-white/50 transition hover:bg-white/5 hover:text-white/80"
+                onClick={() => setShowOnHold((open) => !open)}
+                type="button"
+              >
+                <ChevronRight
+                  className={`h-3.5 w-3.5 transition-transform ${showOnHold ? "rotate-90" : ""}`}
+                />
+                On hold · {onHold.length}
+              </button>
+              {showOnHold ? (
+                <ul
+                  className="flex flex-col divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10"
+                  id="on-hold-projects"
+                >
+                  {onHold.map((p) => (
+                    <OnHoldRow key={p.id} project={p} />
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
         </>
@@ -105,20 +123,9 @@ export function ProjectsDashboard() {
   );
 }
 
-function ProjectCardItem({
-  project,
-  jumpNumber,
-}: {
-  project: ProjectCard;
-  jumpNumber?: number;
-}) {
+function ProjectCardItem({ project }: { project: ProjectCard }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const isOwner = project.role === "owner";
-  const pct =
-    project.totalTasks > 0
-      ? Math.round((project.doneTasks / project.totalTasks) * 100)
-      : 0;
-
   return (
     <li className="relative">
       <Link
@@ -132,36 +139,11 @@ function ProjectCardItem({
           />
           <span className="truncate font-medium">{project.name}</span>
         </div>
-        {project.description ? (
-          <p className="mt-1.5 line-clamp-1 text-sm text-white/60">
-            {project.description}
+        {project.inProgressTasks > 0 ? (
+          <p className="mt-2 text-xs text-white/40">
+            {project.inProgressTasks} in progress
           </p>
         ) : null}
-
-        <div className="mt-3 flex items-center gap-2">
-          <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-white/50"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <span className="shrink-0 text-xs tabular-nums text-white/40">
-            {project.doneTasks}/{project.totalTasks}
-          </span>
-        </div>
-
-        <div className="mt-2 flex items-center justify-between text-xs text-white/40">
-          <span>
-            {project.inProgressTasks > 0
-              ? `${project.inProgressTasks} in flight`
-              : null}
-          </span>
-          <span>
-            {project.lastActivityAt
-              ? formatRelative(project.lastActivityAt)
-              : "no activity yet"}
-          </span>
-        </div>
       </Link>
       <div className="absolute top-3 right-3">
         <ProjectMenu
@@ -169,11 +151,6 @@ function ProjectCardItem({
           project={project}
         />
       </div>
-      {jumpNumber ? (
-        <span className="pointer-events-none absolute right-3 bottom-3 font-mono text-[10px] text-white/25">
-          {jumpNumber}
-        </span>
-      ) : null}
       {isOwner ? (
         <DeleteProjectDialog
           onOpenChange={setDeleteOpen}
@@ -201,7 +178,7 @@ function OnHoldRow({ project }: { project: ProjectCard }) {
           style={{ background: project.color ?? "#6366f1" }}
         />
         <span className="truncate text-sm">{project.name}</span>
-        <span className="ml-auto shrink-0 text-xs tabular-nums text-white/40">
+        <span className="ml-auto shrink-0 text-xs text-white/40 tabular-nums">
           {project.doneTasks}/{project.totalTasks}
         </span>
       </Link>
@@ -229,66 +206,108 @@ function ProjectMenu({
   onDeleteRequest: () => void;
 }) {
   const utils = api.useUtils();
+  const [lifecycleAction, setLifecycleAction] =
+    useState<ProjectLifecycleAction | null>(null);
   const isOwner = project.role === "owner";
   const canWrite = project.role !== "viewer";
 
   const setStatus = api.project.setStatus.useMutation({
-    onSuccess: () => utils.project.list.invalidate(),
+    onSuccess: async (_data, variables) => {
+      setLifecycleAction(null);
+      await invalidateProjectLifecycle(utils);
+      if (variables.status === "archived") toast.success("Project archived");
+    },
     onError: (err) => toast.error(err.message),
   });
 
+  function applyStatus(status: "active" | ProjectLifecycleAction) {
+    setStatus.mutate({
+      projectId: project.id,
+      status,
+    });
+  }
+
+  function requestLifecycleAction(action: ProjectLifecycleAction) {
+    if (shouldSkipProjectLifecycleDialog(action)) {
+      applyStatus(action);
+      return;
+    }
+
+    setLifecycleAction(action);
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          aria-label="Project actions"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-white/50 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
-          onClick={(e) => e.preventDefault()}
-          type="button"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
-        <DropdownMenuItem asChild>
-          <Link href={`/app/p/${project.slug}/settings`}>
-            <Settings className="h-4 w-4" /> Settings
-          </Link>
-        </DropdownMenuItem>
-        {canWrite ? (
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              setStatus.mutate({
-                projectId: project.id,
-                status: project.status === "active" ? "on_hold" : "active",
-              });
-            }}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            aria-label="Project actions"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-white/50 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+            onClick={(e) => e.preventDefault()}
+            type="button"
           >
-            {project.status === "active" ? (
-              <>
-                <PauseCircle className="h-4 w-4" /> Put on hold
-              </>
-            ) : (
-              <>
-                <PlayCircle className="h-4 w-4" /> Reactivate
-              </>
-            )}
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem asChild>
+            <Link href={`/app/p/${project.slug}/settings`}>
+              <Settings className="h-4 w-4" /> Settings
+            </Link>
           </DropdownMenuItem>
-        ) : null}
-        {isOwner ? (
-          <DropdownMenuItem
-            destructive
-            onSelect={(e) => {
-              e.preventDefault();
-              onDeleteRequest();
-            }}
-          >
-            <Trash2 className="h-4 w-4" /> Delete
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {canWrite ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                if (project.status === "active") {
+                  requestLifecycleAction("on_hold");
+                } else {
+                  applyStatus("active");
+                }
+              }}
+            >
+              {project.status === "active" ? (
+                <>
+                  <PauseCircle className="h-4 w-4" /> Put on hold
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="h-4 w-4" /> Reactivate
+                </>
+              )}
+            </DropdownMenuItem>
+          ) : null}
+          {isOwner ? (
+            <DropdownMenuItem
+              onSelect={() => requestLifecycleAction("archived")}
+            >
+              <Archive className="h-4 w-4" /> Archive
+            </DropdownMenuItem>
+          ) : null}
+          {isOwner ? (
+            <DropdownMenuItem
+              destructive
+              onSelect={(e) => {
+                e.preventDefault();
+                onDeleteRequest();
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <ProjectLifecycleDialog
+        action={lifecycleAction}
+        isPending={setStatus.isPending}
+        key={lifecycleAction ?? "closed"}
+        onConfirm={applyStatus}
+        onOpenChange={(open) => {
+          if (!open) setLifecycleAction(null);
+        }}
+        projectName={project.name}
+      />
+    </>
   );
 }
 

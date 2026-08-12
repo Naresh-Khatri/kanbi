@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { resolveBoardAccess } from "@/server/api/permissions";
@@ -45,7 +45,9 @@ export const focusRouter = createTRPCRouter({
         .select(projectFields)
         .from(board)
         .innerJoin(project, eq(project.id, board.projectId))
-        .where(eq(project.ownerId, userId)),
+        .where(
+          and(eq(project.ownerId, userId), ne(project.status, "archived")),
+        ),
       ctx.db
         .select(projectFields)
         .from(board)
@@ -56,7 +58,8 @@ export const focusRouter = createTRPCRouter({
             eq(projectMember.projectId, project.id),
             eq(projectMember.userId, userId),
           ),
-        ),
+        )
+        .where(ne(project.status, "archived")),
     ]);
 
     const seen = new Set<string>();

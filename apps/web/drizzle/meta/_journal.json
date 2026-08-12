@@ -64,6 +64,13 @@
       "when": 1786518738260,
       "tag": "0008_cheerful_grandmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786523124254,
+      "tag": "0009_skinny_sprite",
+      "breakpoints": true
     }
   ]
 }
