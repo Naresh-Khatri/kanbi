@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
+import { WhatsNewDialog } from "@/app/app/_components/whats-new-dialog";
 import { CommandPalette } from "@/components/command/command-palette";
 import { KeybindCheatsheet } from "@/components/keybinds/keybind-cheatsheet";
 import { useAppShell } from "@/components/keybinds/shell-store";
@@ -69,6 +70,7 @@ export function KeybindProvider() {
     <>
       <CommandPalette />
       <KeybindCheatsheet />
+      <WhatsNewDialog />
     </>
   );
 }

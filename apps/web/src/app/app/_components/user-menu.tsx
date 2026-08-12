@@ -1,9 +1,10 @@
 "use client";
 
-import { LogOut, UserRound } from "lucide-react";
+import { LogOut, Sparkles, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { APP_VERSION } from "@/changelog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,14 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/app/profile">
             <UserRound className="h-4 w-4" /> Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/app/changelog">
+            <Sparkles className="h-4 w-4" /> What&apos;s new
+            <span className="ml-auto pl-3 font-mono text-xs text-white/40">
+              v{APP_VERSION}
+            </span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onSignOut}>
