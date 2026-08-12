@@ -2,9 +2,16 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Archive, GitBranch, Link2, MoreHorizontal } from "lucide-react";
+import {
+  Archive,
+  GitBranch,
+  Link2,
+  MoreHorizontal,
+  Sun,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
+import { api } from "@/trpc/react";
 import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
 import { copyBranchCommand, defaultBranchType } from "../copy-branch-command";
 import { copyTaskLink } from "../copy-task-link";
@@ -122,6 +130,7 @@ export function TaskCard({
 }) {
   const remove = useUndoableBoardDelete(boardId);
   const archiveTask = useArchiveTask(boardId);
+  const toggleToday = useToggleToday(task.id);
   const ref = useRef<HTMLDivElement>(null);
   const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
   const overflowCount = labels.length - visibleLabels.length;
@@ -167,6 +176,10 @@ export function TaskCard({
               }
             >
               <GitBranch className="h-3.5 w-3.5" /> Copy git branch
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={toggleToday.onSelect}>
+              <Sun className="h-3.5 w-3.5" />
+              {toggleToday.onToday ? "Remove from Today" : "Add to Today"}
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => archiveTask({ id: task.id, title: task.title })}
@@ -230,4 +243,52 @@ export function TaskCard({
       </div>
     </div>
   );
+}
+
+// today.ids is a single small array shared across every card's cache entry —
+// cheap to subscribe to per-card, only one request per board view.
+function useToggleToday(taskId: string) {
+  const utils = api.useUtils();
+  const ids = api.today.ids.useQuery();
+  const onToday = ids.data?.includes(taskId) ?? false;
+
+  const invalidate = () => {
+    void utils.today.ids.invalidate();
+    void utils.today.list.invalidate();
+  };
+
+  const add = api.today.add.useMutation({
+    onMutate: async () => {
+      await utils.today.ids.cancel();
+      const previous = utils.today.ids.getData();
+      utils.today.ids.setData(undefined, (old) => [...(old ?? []), taskId]);
+      return { previous };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) utils.today.ids.setData(undefined, ctx.previous);
+      toast.error(e.message);
+    },
+    onSettled: invalidate,
+  });
+  const remove = api.today.remove.useMutation({
+    onMutate: async () => {
+      await utils.today.ids.cancel();
+      const previous = utils.today.ids.getData();
+      utils.today.ids.setData(undefined, (old) =>
+        old?.filter((id) => id !== taskId),
+      );
+      return { previous };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) utils.today.ids.setData(undefined, ctx.previous);
+      toast.error(e.message);
+    },
+    onSettled: invalidate,
+  });
+
+  return {
+    onToday,
+    onSelect: () =>
+      onToday ? remove.mutate({ taskId }) : add.mutate({ taskId }),
+  };
 }

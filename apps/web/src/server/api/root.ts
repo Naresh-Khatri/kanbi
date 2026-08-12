@@ -13,6 +13,7 @@ import { projectRouter } from "@/server/api/routers/project";
 import { realtimeRouter } from "@/server/api/routers/realtime";
 import { shareRouter } from "@/server/api/routers/share";
 import { taskRouter } from "@/server/api/routers/task";
+import { todayRouter } from "@/server/api/routers/today";
 import { userRouter } from "@/server/api/routers/user";
 import {
   createCallerFactory,
@@ -35,6 +36,7 @@ export const appRouter = createTRPCRouter({
   activity: activityRouter,
   realtime: realtimeRouter,
   user: userRouter,
+  today: todayRouter,
   notification: notificationRouter,
   device: deviceRouter,
   focus: focusRouter,

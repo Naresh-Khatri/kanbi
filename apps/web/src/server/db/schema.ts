@@ -598,6 +598,28 @@ export const deviceToken = createTable(
   (t) => [index("device_token_user_idx").on(t.userId)],
 );
 
+// ── Today queue (per-user cross-project working list) ──────────────────────
+
+export const todayItem = createTable(
+  "today_item",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    position: real("position").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.taskId] }),
+    index("today_item_user_idx").on(t.userId),
+  ],
+);
+
 // ── Public read-only share link ─────────────────────────────────────────────
 
 export const boardShare = createTable(
@@ -630,6 +652,7 @@ export const userRelations = relations(user, ({ many }) => ({
   assignedTasks: many(task, { relationName: "task_assignee" }),
   reportedTasks: many(task, { relationName: "task_reporter" }),
   deviceTokens: many(deviceToken),
+  todayItems: many(todayItem),
 }));
 
 export const deviceTokenRelations = relations(deviceToken, ({ one }) => ({
@@ -747,6 +770,11 @@ export const boardShareRelations = relations(boardShare, ({ one }) => ({
     fields: [boardShare.createdById],
     references: [user.id],
   }),
+}));
+
+export const todayItemRelations = relations(todayItem, ({ one }) => ({
+  user: one(user, { fields: [todayItem.userId], references: [user.id] }),
+  task: one(task, { fields: [todayItem.taskId], references: [task.id] }),
 }));
 
 export const notificationRelations = relations(notification, ({ one }) => ({

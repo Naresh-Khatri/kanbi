@@ -12,6 +12,7 @@ import {
   Plus,
   Settings2,
   SquareKanban,
+  Sun,
   Tag,
   Trash2,
   User as UserIcon,
@@ -276,6 +277,7 @@ function TaskDetail({
             .map((l) => l.name)}
           task={task}
         />
+        <TodayToggle taskId={task.id} />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -824,6 +826,65 @@ function BranchMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+// Personal, per-user — not a board write, so no canWrite gate.
+function TodayToggle({ taskId }: { taskId: string }) {
+  const utils = api.useUtils();
+  const ids = api.today.ids.useQuery();
+  const onToday = ids.data?.includes(taskId) ?? false;
+
+  const invalidate = () => {
+    void utils.today.ids.invalidate();
+    void utils.today.list.invalidate();
+  };
+
+  const add = api.today.add.useMutation({
+    onMutate: async () => {
+      await utils.today.ids.cancel();
+      const previous = utils.today.ids.getData();
+      utils.today.ids.setData(undefined, (old) => [...(old ?? []), taskId]);
+      return { previous };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) utils.today.ids.setData(undefined, ctx.previous);
+      toast.error(e.message);
+    },
+    onSettled: invalidate,
+  });
+  const remove = api.today.remove.useMutation({
+    onMutate: async () => {
+      await utils.today.ids.cancel();
+      const previous = utils.today.ids.getData();
+      utils.today.ids.setData(undefined, (old) =>
+        old?.filter((id) => id !== taskId),
+      );
+      return { previous };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) utils.today.ids.setData(undefined, ctx.previous);
+      toast.error(e.message);
+    },
+    onSettled: invalidate,
+  });
+
+  return (
+    <button
+      className={PROP_BTN}
+      onClick={() =>
+        onToday ? remove.mutate({ taskId }) : add.mutate({ taskId })
+      }
+      type="button"
+    >
+      <Sun
+        className={cn(PROP_ICON, onToday && "text-amber-400/80")}
+        fill={onToday ? "currentColor" : "none"}
+      />
+      <span className={cn(!onToday && PROP_PLACEHOLDER)}>
+        {onToday ? "On today" : "Add to today"}
+      </span>
+    </button>
   );
 }
 
