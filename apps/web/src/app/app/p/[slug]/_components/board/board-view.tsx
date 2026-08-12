@@ -353,6 +353,9 @@ export function BoardView({
 
   const [active, setActive] = useState<ActiveDrag>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
+  const [sortBlockedColumnId, setSortBlockedColumnId] = useState<string | null>(
+    null,
+  );
   const dropTargetRef = useRef<DropTarget>(null);
 
   const updateDropTarget = useCallback((next: DropTarget) => {
@@ -480,22 +483,45 @@ export function BoardView({
   }
 
   function onDragMove(e: DragMoveEvent) {
-    updateDropTarget(getTaskDropTarget(e));
+    const target = getTaskDropTarget(e);
+    updateDropTarget(target);
+    updateSortedDragHint(e, target);
   }
 
   function onDragOver(e: DragOverEvent) {
-    updateDropTarget(getTaskDropTarget(e));
+    const target = getTaskDropTarget(e);
+    updateDropTarget(target);
+    updateSortedDragHint(e, target);
+  }
+
+  function updateSortedDragHint(
+    e: DragMoveEvent | DragOverEvent,
+    target: DropTarget,
+  ) {
+    const activeTask = tasks.find((task) => task.id === e.active.id);
+    const sourceColumn = activeTask
+      ? columns.find((column) => column.id === activeTask.columnId)
+      : null;
+    setSortBlockedColumnId(
+      activeTask &&
+        sourceColumn?.sortMode !== "manual" &&
+        target?.columnId === activeTask.columnId
+        ? activeTask.columnId
+        : null,
+    );
   }
 
   function onDragCancel() {
     setActive(null);
     updateDropTarget(null);
+    setSortBlockedColumnId(null);
   }
 
   function onDragEnd(e: DragEndEvent) {
     const finalDropTarget = dropTargetRef.current ?? getTaskDropTarget(e);
     setActive(null);
     updateDropTarget(null);
+    setSortBlockedColumnId(null);
     const { active: a, over } = e;
     if (!over) return;
     const activeKind = a.data.current?.kind as "task" | "column" | undefined;
@@ -800,6 +826,7 @@ export function BoardView({
                   onAddTask={handleAddTask}
                   onOpenTask={handleOpenTask}
                   projectKey={projectKey}
+                  sortBlocked={sortBlockedColumnId === col.id}
                   tasks={tasksByColumn.get(col.id) ?? []}
                 />
               ))}

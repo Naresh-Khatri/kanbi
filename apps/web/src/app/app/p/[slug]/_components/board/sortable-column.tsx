@@ -39,6 +39,7 @@ export const SortableColumn = memo(function SortableColumn({
   labelsByTask,
   focusedTaskId,
   projectKey,
+  sortBlocked,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -51,6 +52,7 @@ export const SortableColumn = memo(function SortableColumn({
   labelsByTask: Map<string, LabelInfo[]>;
   focusedTaskId: string | null;
   projectKey: string;
+  sortBlocked: boolean;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -84,6 +86,8 @@ export const SortableColumn = memo(function SortableColumn({
           ...sortable.attributes,
           ...sortable.listeners,
         }}
+        onAddTask={onAddTask}
+        sortBlocked={sortBlocked}
         taskCount={tasks.length}
       />
       <ScrollArea className="-mx-1 min-h-0 flex-1">
@@ -108,12 +112,15 @@ export const SortableColumn = memo(function SortableColumn({
                 labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
                 onOpenTask={onOpenTask}
                 projectKey={projectKey}
-                showDropIndicatorBefore={dropTarget?.beforeTaskId === t.id}
+                showDropIndicatorBefore={
+                  !sortBlocked && dropTarget?.beforeTaskId === t.id
+                }
                 task={t}
               />
             ))}
           </SortableContext>
-          {dropTarget &&
+          {!sortBlocked &&
+          dropTarget &&
           dropTarget.beforeTaskId === null &&
           tasks.length > 0 ? (
             <DropIndicator className="inset-x-1 -bottom-px" />

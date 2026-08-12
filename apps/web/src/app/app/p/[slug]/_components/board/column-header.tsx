@@ -3,9 +3,10 @@
 import {
   ArrowDown,
   ArrowUp,
-  ChevronRight,
+  ArrowUpDown,
   GripVertical,
   MoreHorizontal,
+  Plus,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -24,13 +25,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import type { ColumnSortDir, ColumnSortMode } from "@/lib/task-sort";
+import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
 import type { ColumnRow } from "./board-types";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
@@ -52,12 +51,16 @@ export function ColumnHeader({
   canWrite,
   taskCount,
   dragHandleProps,
+  onAddTask,
+  sortBlocked,
 }: {
   boardId: string;
   column: ColumnRow;
   canWrite: boolean;
   taskCount: number;
   dragHandleProps: React.HTMLAttributes<HTMLButtonElement>;
+  onAddTask: (columnId: string) => void;
+  sortBlocked: boolean;
 }) {
   const utils = api.useUtils();
   const [renaming, setRenaming] = useState(false);
@@ -161,29 +164,96 @@ export function ColumnHeader({
             {column.name}
             <span className="ml-2 text-xs text-white/40">{taskCount}</span>
           </button>
-          {sorted ? (
-            <button
-              className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-sky-300/80 hover:text-sky-200"
-              onClick={() => canWrite && applySort("manual")}
-              title={
-                canWrite
-                  ? `Sorted by ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">].toLowerCase()} — click to clear`
-                  : `Sorted by ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">].toLowerCase()}`
-              }
-              type="button"
-            >
-              {sortDir === "asc" ? (
-                <ArrowUp className="h-3 w-3" />
-              ) : (
-                <ArrowDown className="h-3 w-3" />
-              )}
-              <span className="lowercase">
-                {SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">]}
-              </span>
-            </button>
-          ) : null}
         </div>
       )}
+      {canWrite ? (
+        <Button
+          aria-label={`Add task to ${column.name}`}
+          onClick={() => onAddTask(column.id)}
+          size="icon"
+          title={`Add task to ${column.name}`}
+          variant="ghost"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      ) : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label={
+              sorted
+                ? `Sort ${column.name}: ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">]} ${sortDir === "asc" ? "ascending" : "descending"}`
+                : `Sort ${column.name}`
+            }
+            className={cn(
+              "transition",
+              sorted && "bg-sky-400/10 text-sky-200 hover:bg-sky-400/15",
+              sortBlocked &&
+                "bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/50 hover:bg-amber-400/20",
+            )}
+            disabled={!canWrite}
+            size="icon"
+            title={
+              sortBlocked
+                ? "This column is sorted. Clear sorting to reorder tasks manually."
+                : sorted
+                  ? `Sorted by ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">].toLowerCase()}`
+                  : "Sort tasks"
+            }
+            variant="ghost"
+          >
+            {sorted ? (
+              sortDir === "asc" ? (
+                <ArrowUp className="h-4 w-4" />
+              ) : (
+                <ArrowDown className="h-4 w-4" />
+              )
+            ) : (
+              <ArrowUpDown className="h-4 w-4" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {SORT_MODES.map((mode) => {
+            const isActive = sortMode === mode;
+            return (
+              <DropdownMenuItem
+                className={
+                  isActive
+                    ? "bg-sky-400/15 text-sky-200 focus:bg-sky-400/25"
+                    : undefined
+                }
+                key={mode}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  applySort(
+                    mode,
+                    isActive && sortDir === "asc" ? "desc" : "asc",
+                  );
+                }}
+              >
+                <span className="flex-1">{SORT_LABELS[mode]}</span>
+                {isActive ? (
+                  sortDir === "asc" ? (
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  )
+                ) : null}
+              </DropdownMenuItem>
+            );
+          })}
+          {sorted ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => applySort("manual")}>
+                <X className="h-3.5 w-3.5" />
+                <span>Clear sort</span>
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
       {canWrite ? (
         <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
           <DropdownMenuTrigger asChild>
@@ -199,61 +269,6 @@ export function ColumnHeader({
             <DropdownMenuItem onSelect={() => setRenaming(true)}>
               Rename
             </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <span>Sort by</span>
-                <ChevronRight className="ml-2 h-3.5 w-3.5 opacity-60" />
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent
-                onMouseEnter={cancelClose}
-                onMouseLeave={scheduleClose}
-              >
-                {SORT_MODES.map((m) => {
-                  const isActive = sortMode === m;
-                  return (
-                    <DropdownMenuItem
-                      className={
-                        isActive
-                          ? "bg-sky-400/15 text-sky-200 focus:bg-sky-400/25"
-                          : undefined
-                      }
-                      key={m}
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        if (isActive) {
-                          applySort(m, sortDir === "asc" ? "desc" : "asc");
-                        } else {
-                          applySort(m, "asc");
-                        }
-                      }}
-                    >
-                      <span className="flex-1">{SORT_LABELS[m]}</span>
-                      {isActive ? (
-                        sortDir === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        )
-                      ) : null}
-                    </DropdownMenuItem>
-                  );
-                })}
-                {sorted ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        applySort("manual");
-                      }}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      <span>Clear sort</span>
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               destructive
