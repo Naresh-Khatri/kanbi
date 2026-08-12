@@ -4,6 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Archive,
+  Check,
   GitBranch,
   Link2,
   MoreHorizontal,
@@ -46,6 +47,8 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   showDropIndicatorBefore,
   focused,
   projectKey,
+  selected,
+  onToggleSelection,
 }: {
   boardId: string;
   task: TaskRow;
@@ -57,6 +60,8 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   showDropIndicatorBefore: boolean;
   focused: boolean;
   projectKey: string;
+  selected: boolean;
+  onToggleSelection?: (taskId: string, extend: boolean) => void;
 }) {
   const sortable = useSortable({
     id: task.id,
@@ -89,10 +94,17 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         <TaskCard
           assignee={assignee}
           boardId={boardId}
+          canWrite={canWrite}
           focused={focused}
           labels={labels}
           onOpen={onOpen}
+          onToggleSelection={
+            onToggleSelection
+              ? (extend) => onToggleSelection(task.id, extend)
+              : undefined
+          }
           projectKey={projectKey}
+          selected={selected}
           task={task}
         />
       </div>
@@ -198,6 +210,9 @@ export const TaskCard = memo(function TaskCard({
   labels,
   focused = false,
   projectKey,
+  selected = false,
+  onToggleSelection,
+  canWrite,
 }: {
   boardId: string;
   task: TaskRow;
@@ -206,6 +221,9 @@ export const TaskCard = memo(function TaskCard({
   labels: LabelInfo[];
   focused?: boolean;
   projectKey: string;
+  selected?: boolean;
+  onToggleSelection?: (extend: boolean) => void;
+  canWrite: boolean;
 }) {
   const remove = useUndoableBoardDelete(boardId);
   const archiveTask = useArchiveTask(boardId);
@@ -223,19 +241,47 @@ export const TaskCard = memo(function TaskCard({
       className={cn(
         "group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20",
         focused && "border-sky-400/60 ring-2 ring-sky-400/50",
+        selected && "border-sky-300/60 bg-sky-400/[0.08]",
       )}
-      onClick={onOpen}
+      onClick={(event) => {
+        if (event.shiftKey && onToggleSelection) {
+          event.preventDefault();
+          onToggleSelection(true);
+          return;
+        }
+        onOpen();
+      }}
       ref={ref}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm leading-snug">{task.title}</p>
+        {onToggleSelection ? (
+          <button
+            aria-label={selected ? "Deselect task" : "Select task"}
+            aria-pressed={selected}
+            className={cn(
+              "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-white/20 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100",
+              selected && "border-sky-300/60 bg-sky-400/20 opacity-100",
+            )}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSelection(event.shiftKey);
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            type="button"
+          >
+            {selected ? <Check className="h-3 w-3" /> : null}
+          </button>
+        ) : null}
+        <p className="min-w-0 flex-1 text-sm leading-snug">{task.title}</p>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              aria-label={`More actions for ${task.title}`}
               className="opacity-0 group-hover:opacity-100"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               size="icon"
+              title={`More actions for ${task.title}`}
               variant="ghost"
             >
               <MoreHorizontal className="h-4 w-4" />
@@ -256,24 +302,34 @@ export const TaskCard = memo(function TaskCard({
             >
               <GitBranch className="h-3.5 w-3.5" /> Copy git branch
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={toggleToday.onSelect}>
-              <Sun className="h-3.5 w-3.5" />
-              {toggleToday.onToday ? "Remove from Today" : "Add to Today"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => archiveTask({ id: task.id, title: task.title })}
-            >
-              <Archive className="h-3.5 w-3.5" /> Archive
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              destructive
-              onSelect={() =>
-                void remove({ kind: "task", id: task.id, name: task.title })
-              }
-            >
-              Delete
-            </DropdownMenuItem>
+            {canWrite ? (
+              <>
+                <DropdownMenuItem onSelect={toggleToday.onSelect}>
+                  <Sun className="h-3.5 w-3.5" />
+                  {toggleToday.onToday ? "Remove from Today" : "Add to Today"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    archiveTask({ id: task.id, title: task.title })
+                  }
+                >
+                  <Archive className="h-3.5 w-3.5" /> Archive
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  destructive
+                  onSelect={() =>
+                    void remove({
+                      kind: "task",
+                      id: task.id,
+                      name: task.title,
+                    })
+                  }
+                >
+                  Delete
+                </DropdownMenuItem>
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

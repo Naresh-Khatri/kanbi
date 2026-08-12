@@ -29,7 +29,7 @@ import { useAppShell } from "@/components/keybinds/shell-store";
 import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
 import { OPEN_TASK_EVENT } from "@/components/ui/rich-text-mention";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
-import { positionBetween } from "@/lib/position";
+import { POSITION_STEP, positionBetween } from "@/lib/position";
 import { compareTasks } from "@/lib/task-sort";
 import { api } from "@/trpc/react";
 import { AddColumn } from "./add-column";
@@ -51,7 +51,8 @@ import type {
 } from "./board-types";
 import { celebrate } from "./celebrate";
 import { QuickAddTaskDialog } from "../quick-add-task-dialog";
-import { useArchiveTask } from "../use-archive-task";
+import type { Priority } from "../priority";
+import { BulkTaskActions } from "./bulk-task-actions";
 import { SortableColumn } from "./sortable-column";
 import { TaskCardPreview } from "./task-card";
 import { HiddenColumns } from "./hidden-columns";
@@ -67,6 +68,22 @@ const DROP_ANIMATION: DropAnimation = {
     },
   }),
 };
+
+function positionsForBlock(
+  count: number,
+  before: number | null,
+  after: number | null,
+) {
+  return Array.from({ length: count }, (_, index) => {
+    if (before != null && after != null) {
+      const step = (after - before) / (count + 1);
+      return before + step * (index + 1);
+    }
+    if (before != null) return before + POSITION_STEP * (index + 1);
+    if (after != null) return after - POSITION_STEP * (count - index);
+    return POSITION_STEP * (index + 1);
+  });
+}
 
 export function BoardView({
   boardId,
@@ -120,7 +137,19 @@ export function BoardView({
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [digestOpen, setDigestOpen] = useState(false);
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
-  const archiveTask = useArchiveTask(boardId);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const selectionAnchorRef = useRef<string | null>(null);
+  useEffect(() => {
+    const available = new Set(
+      tasks.filter((task) => !task.archivedAt).map((task) => task.id),
+    );
+    setSelectedTaskIds((current) => {
+      const next = new Set([...current].filter((id) => available.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [tasks]);
   const createTaskToken = useAppShell((s) => s.createTaskToken);
   const lastCreateTaskToken = useRef(createTaskToken);
   useEffect(() => {
@@ -177,6 +206,7 @@ export function BoardView({
 
   const preappliedTaskMoves = useRef(new Map<string, typeof data>());
   const preappliedColumnMoves = useRef(new Map<string, typeof data>());
+  const preappliedBulkMove = useRef<typeof data | null>(null);
 
   function applyOptimisticTaskMove(vars: {
     taskId: string;
@@ -198,6 +228,34 @@ export function BoardView({
               }
             : t,
         ),
+      };
+    });
+  }
+
+  function applyOptimisticTaskMoves(vars: {
+    taskIds: string[];
+    toColumnId: string;
+    before: number | null;
+    after: number | null;
+  }) {
+    const positions = positionsForBlock(
+      vars.taskIds.length,
+      vars.before,
+      vars.after,
+    );
+    const positionById = new Map(
+      vars.taskIds.map((taskId, index) => [taskId, positions[index]!] as const),
+    );
+    utils.board.get.setData({ boardId }, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        tasks: old.tasks.map((task) => {
+          const position = positionById.get(task.id);
+          return position === undefined
+            ? task
+            : { ...task, columnId: vars.toColumnId, position };
+        }),
       };
     });
   }
@@ -248,6 +306,60 @@ export function BoardView({
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
+    },
+    onSettled: () => utils.board.get.invalidate({ boardId }),
+  });
+  const moveTasks = api.task.moveMany.useMutation({
+    onMutate: async (vars) => {
+      await utils.board.get.cancel({ boardId });
+      const previous =
+        preappliedBulkMove.current ?? utils.board.get.getData({ boardId });
+      if (preappliedBulkMove.current) preappliedBulkMove.current = null;
+      else applyOptimisticTaskMoves(vars);
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        utils.board.get.setData({ boardId }, context.previous);
+      }
+      toast.error(error.message);
+    },
+    onSettled: () => utils.board.get.invalidate({ boardId }),
+  });
+  const bulkUpdateTasks = api.task.bulkUpdate.useMutation({
+    onMutate: async (vars) => {
+      await utils.board.get.cancel({ boardId });
+      const previous = utils.board.get.getData({ boardId });
+      const selected = new Set(vars.taskIds);
+      utils.board.get.setData({ boardId }, (old) =>
+        old
+          ? {
+              ...old,
+              tasks: old.tasks.map((task) =>
+                selected.has(task.id)
+                  ? {
+                      ...task,
+                      ...(vars.priority !== undefined
+                        ? { priority: vars.priority }
+                        : {}),
+                      ...(vars.archived !== undefined
+                        ? {
+                            archivedAt: vars.archived ? new Date() : null,
+                          }
+                        : {}),
+                    }
+                  : task,
+              ),
+            }
+          : old,
+      );
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        utils.board.get.setData({ boardId }, context.previous);
+      }
+      toast.error(error.message);
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
@@ -414,10 +526,15 @@ export function BoardView({
       // Pointer containment is both cheaper and less jittery than measuring the
       // distance to every card's four corners. Prefer the card under the pointer,
       // then its column drop zone. Keyboard dragging falls back to corners.
+      const movingTaskIds = selectedTaskIds.has(String(args.active.id))
+        ? selectedTaskIds
+        : new Set([String(args.active.id)]);
       const pointerCollisions = pointerWithin(args);
       if (pointerCollisions.length > 0) {
         const task = pointerCollisions.find(
-          ({ data }) => data?.droppableContainer.data.current?.kind === "task",
+          ({ data, id }) =>
+            data?.droppableContainer.data.current?.kind === "task" &&
+            !movingTaskIds.has(String(id)),
         );
         if (task) return [task];
 
@@ -432,12 +549,13 @@ export function BoardView({
         ...args,
         droppableContainers: args.droppableContainers.filter(
           (d) =>
-            d.data.current?.kind === "task" ||
+            (d.data.current?.kind === "task" &&
+              !movingTaskIds.has(String(d.id))) ||
             d.data.current?.columnId !== undefined,
         ),
       });
     },
-    [columnIds],
+    [columnIds, selectedTaskIds],
   );
 
   const sensors = useSensors(
@@ -497,9 +615,12 @@ export function BoardView({
     if (!columnId) return null;
     let beforeTaskId: string | null = null;
     if (overKind === "task" && String(over.id) !== String(a.id)) {
+      const movingIds = selectedTaskIds.has(String(a.id))
+        ? selectedTaskIds
+        : new Set([String(a.id)]);
       if (isDropAfter(a, over)) {
         const list = (tasksByColumn.get(columnId) ?? []).filter(
-          (t) => t.id !== a.id,
+          (task) => !movingIds.has(task.id),
         );
         const idx = list.findIndex((t) => t.id === over.id);
         beforeTaskId = list[idx + 1]?.id ?? null;
@@ -591,18 +712,25 @@ export function BoardView({
 
       const activeTask = tasks.find((t) => t.id === a.id);
       if (!activeTask) return;
-
-      const sourceColumn = columns.find((c) => c.id === activeTask.columnId);
-      const sourceSort = sourceColumn
-        ? (preferences.sorts[sourceColumn.id]?.mode ?? "manual")
-        : "manual";
-      if (sourceSort !== "manual" && activeTask.columnId === targetColumnId) {
+      const movingTaskIds =
+        selectedTaskIds.has(activeTask.id) && selectedTaskIds.size > 1
+          ? selectedTaskIdsInVisualOrder()
+          : [activeTask.id];
+      const movingIdSet = new Set(movingTaskIds);
+      const movingTasksInOrder = movingTaskIds
+        .map((taskId) => tasks.find((task) => task.id === taskId))
+        .filter((task): task is TaskRow => Boolean(task));
+      const allAlreadyInTarget = movingTasksInOrder.every(
+        (task) => task.columnId === targetColumnId,
+      );
+      const targetSort = preferences.sorts[targetColumnId]?.mode ?? "manual";
+      if (targetSort !== "manual" && allAlreadyInTarget) {
         toast("Clear sort to reorder tasks within this column");
         return;
       }
 
       const columnTasks = [...(tasksByColumn.get(targetColumnId) ?? [])].filter(
-        (t) => t.id !== a.id,
+        (task) => !movingIdSet.has(task.id),
       );
 
       let before: number | null = null;
@@ -618,31 +746,44 @@ export function BoardView({
       before = columnTasks[insertAt - 1]?.position ?? null;
       after = columnTasks[insertAt]?.position ?? null;
 
-      if (activeTask.columnId === targetColumnId) {
+      if (allAlreadyInTarget) {
         const currentOrder = tasksByColumn.get(targetColumnId) ?? [];
         const nextOrder = [...columnTasks];
-        nextOrder.splice(insertAt, 0, activeTask);
+        nextOrder.splice(insertAt, 0, ...movingTasksInOrder);
         const unchanged = nextOrder.every(
           (task, index) => task.id === currentOrder[index]?.id,
         );
         if (unchanged) return;
       }
 
-      const vars = {
-        boardId,
-        taskId: activeTask.id,
-        toColumnId: targetColumnId,
-        before,
-        after,
-      };
       // Apply in the drop event's React batch so DragOverlay measures the new
       // card position. onMutate reuses this snapshot for rollback.
       const previous = utils.board.get.getData({ boardId });
-      if (previous) preappliedTaskMoves.current.set(vars.taskId, previous);
-      applyOptimisticTaskMove(vars);
-      moveTask.mutate(vars);
+      if (movingTaskIds.length > 1) {
+        const vars = {
+          boardId,
+          taskIds: movingTaskIds,
+          toColumnId: targetColumnId,
+          before,
+          after,
+        };
+        if (previous) preappliedBulkMove.current = previous;
+        applyOptimisticTaskMoves(vars);
+        moveTasks.mutate(vars);
+      } else {
+        const vars = {
+          boardId,
+          taskId: activeTask.id,
+          toColumnId: targetColumnId,
+          before,
+          after,
+        };
+        if (previous) preappliedTaskMoves.current.set(vars.taskId, previous);
+        applyOptimisticTaskMove(vars);
+        moveTask.mutate(vars);
+      }
 
-      if (activeTask.columnId !== targetColumnId) {
+      if (!allAlreadyInTarget) {
         const targetColumn = columns.find((c) => c.id === targetColumnId);
         if (targetColumn && isDoneLikeColumn(targetColumn.name)) {
           celebrate();
@@ -669,6 +810,106 @@ export function BoardView({
       ),
     [preferences.hiddenColumnIds, sortedColumns],
   );
+  function visibleTaskIdsInOrder() {
+    return visibleColumns.flatMap((column) =>
+      (tasksByColumn.get(column.id) ?? []).map((task) => task.id),
+    );
+  }
+
+  function selectedTaskIdsInVisualOrder() {
+    const visibleOrder = sortedColumns.flatMap((column) =>
+      (tasksByColumn.get(column.id) ?? []).map((task) => task.id),
+    );
+    const ordered = visibleOrder.filter((taskId) =>
+      selectedTaskIds.has(taskId),
+    );
+    const included = new Set(ordered);
+    for (const task of tasks) {
+      if (
+        !task.archivedAt &&
+        selectedTaskIds.has(task.id) &&
+        !included.has(task.id)
+      ) {
+        ordered.push(task.id);
+      }
+    }
+    return ordered;
+  }
+
+  function toggleTaskSelection(taskId: string, extend: boolean) {
+    setFocusedTaskId(taskId);
+    setSelectedTaskIds((current) => {
+      const next = new Set(current);
+      const anchor = selectionAnchorRef.current;
+      if (extend && anchor) {
+        const order = visibleTaskIdsInOrder();
+        const from = order.indexOf(anchor);
+        const to = order.indexOf(taskId);
+        if (from !== -1 && to !== -1) {
+          for (const id of order.slice(
+            Math.min(from, to),
+            Math.max(from, to) + 1,
+          )) {
+            next.add(id);
+          }
+          return next;
+        }
+      }
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      selectionAnchorRef.current = taskId;
+      return next;
+    });
+  }
+
+  function clearTaskSelection() {
+    selectionAnchorRef.current = null;
+    setSelectedTaskIds(new Set());
+  }
+
+  function moveSelectedTasks(toColumnId: string) {
+    const taskIds = selectedTaskIdsInVisualOrder();
+    if (taskIds.length === 0) return;
+    const selected = new Set(taskIds);
+    const destinationTasks = tasks
+      .filter(
+        (task) =>
+          !task.archivedAt &&
+          task.columnId === toColumnId &&
+          !selected.has(task.id),
+      )
+      .sort((a, b) => a.position - b.position);
+    moveTasks.mutate({
+      boardId,
+      taskIds,
+      toColumnId,
+      before: destinationTasks.at(-1)?.position ?? null,
+      after: null,
+    });
+  }
+
+  function setSelectedPriority(priority: Priority) {
+    const taskIds = selectedTaskIdsInVisualOrder();
+    if (taskIds.length === 0) return;
+    bulkUpdateTasks.mutate({ boardId, taskIds, priority });
+  }
+
+  function archiveSelectedTasks() {
+    const taskIds = selectedTaskIdsInVisualOrder();
+    if (taskIds.length === 0) return;
+    bulkUpdateTasks.mutate({ boardId, taskIds, archived: true });
+    clearTaskSelection();
+    toast(
+      `Archived ${taskIds.length} ${taskIds.length === 1 ? "task" : "tasks"}`,
+      {
+        action: {
+          label: "Undo",
+          onClick: () =>
+            bulkUpdateTasks.mutate({ boardId, taskIds, archived: false }),
+        },
+      },
+    );
+  }
 
   function hideColumn(columnId: string) {
     if (visibleColumns.length <= 1) {
@@ -729,26 +970,23 @@ export function BoardView({
     focusedTaskId,
     active: navActive,
     canWrite,
-    tasks,
-    archive: archiveTask,
   });
   kbRef.current = {
     navColumns,
     focusedTaskId,
     active: navActive,
     canWrite,
-    tasks,
-    archive: archiveTask,
   };
 
   function moveFocus(dir: "up" | "down" | "left" | "right") {
     const { navColumns: cols, focusedTaskId: fid } = kbRef.current;
     const firstNonEmpty = cols.find((c) => c.taskIds.length > 0);
-    if (!firstNonEmpty) return;
+    if (!firstNonEmpty) return null;
     let ci = fid ? cols.findIndex((c) => c.taskIds.includes(fid)) : -1;
     if (ci === -1) {
-      setFocusedTaskId(firstNonEmpty.taskIds[0] ?? null);
-      return;
+      const first = firstNonEmpty.taskIds[0] ?? null;
+      setFocusedTaskId(first);
+      return first;
     }
     let ti = cols[ci]!.taskIds.indexOf(fid!);
     if (dir === "down") {
@@ -761,32 +999,29 @@ export function BoardView({
       while (nci >= 0 && nci < cols.length && cols[nci]!.taskIds.length === 0) {
         nci += step;
       }
-      if (nci < 0 || nci >= cols.length) return;
+      if (nci < 0 || nci >= cols.length) return null;
       ci = nci;
       ti = Math.min(ti, cols[ci]!.taskIds.length - 1);
     }
     const next = cols[ci]?.taskIds[ti];
     if (next) setFocusedTaskId(next);
+    return next ?? null;
   }
 
-  function archiveFocused() {
-    const {
-      focusedTaskId: fid,
-      canWrite: cw,
-      tasks: ts,
-      navColumns: cols,
-    } = kbRef.current;
-    if (!fid || !cw) return;
-    const target = ts.find((t) => t.id === fid);
-    if (!target) return;
-    const col = cols.find((c) => c.taskIds.includes(fid));
-    let nextFocus: string | null = null;
-    if (col) {
-      const idx = col.taskIds.indexOf(fid);
-      nextFocus = col.taskIds[idx + 1] ?? col.taskIds[idx - 1] ?? null;
+  function moveFocusWithSelection(
+    direction: "up" | "down" | "left" | "right",
+    extend: boolean,
+  ) {
+    if (extend && !selectionAnchorRef.current && kbRef.current.focusedTaskId) {
+      selectionAnchorRef.current = kbRef.current.focusedTaskId;
+      setSelectedTaskIds((current) =>
+        new Set(current).add(kbRef.current.focusedTaskId!),
+      );
     }
-    kbRef.current.archive({ id: target.id, title: target.title });
-    setFocusedTaskId(nextFocus);
+    const next = moveFocus(direction);
+    if (extend && next && kbRef.current.canWrite) {
+      toggleTaskSelection(next, true);
+    }
   }
 
   const cardKeyOpts = { enableOnFormTags: false } as const;
@@ -795,7 +1030,7 @@ export function BoardView({
     (e) => {
       if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
-      moveFocus("down");
+      moveFocusWithSelection("down", e.shiftKey);
     },
     cardKeyOpts,
   );
@@ -804,7 +1039,7 @@ export function BoardView({
     (e) => {
       if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
-      moveFocus("up");
+      moveFocusWithSelection("up", e.shiftKey);
     },
     cardKeyOpts,
   );
@@ -813,7 +1048,7 @@ export function BoardView({
     (e) => {
       if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
-      moveFocus("right");
+      moveFocusWithSelection("right", e.shiftKey);
     },
     cardKeyOpts,
   );
@@ -822,7 +1057,7 @@ export function BoardView({
     (e) => {
       if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
       e.preventDefault();
-      moveFocus("left");
+      moveFocusWithSelection("left", e.shiftKey);
     },
     cardKeyOpts,
   );
@@ -846,17 +1081,26 @@ export function BoardView({
       if (
         useAppShell.getState().aiDraftOpen ||
         !kbRef.current.active ||
-        !kbRef.current.focusedTaskId
+        !kbRef.current.focusedTaskId ||
+        !kbRef.current.canWrite
       )
         return;
       e.preventDefault();
-      archiveFocused();
+      toggleTaskSelection(kbRef.current.focusedTaskId, e.shiftKey);
+    },
+    cardKeyOpts,
+  );
+  useHotkeys(
+    "esc",
+    () => {
+      if (!kbRef.current.active || selectedTaskIds.size === 0) return;
+      clearTaskSelection();
     },
     cardKeyOpts,
   );
 
   return (
-    <main className="flex h-[calc(100vh-57px)] flex-col">
+    <main className="relative flex h-[calc(100vh-57px)] flex-col">
       <BoardToolbar
         archivedCount={archivedTasks.length}
         expanded={toolbarExpanded}
@@ -880,8 +1124,8 @@ export function BoardView({
         onDragStart={canWrite ? onDragStart : undefined}
         sensors={sensors}
       >
-        <div className="min-h-0 flex-1 overflow-x-auto">
-          <div className="flex h-full min-w-max gap-4 p-6">
+        <div className="min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto md:snap-none">
+          <div className="flex h-full min-w-max gap-3 p-4 md:gap-4 md:p-6">
             <SortableContext
               items={visibleColumns.map((c) => c.id)}
               strategy={horizontalListSortingStrategy}
@@ -912,6 +1156,7 @@ export function BoardView({
                     onMoveLeft={() => moveColumnByOffset(col.id, -1)}
                     onMoveRight={() => moveColumnByOffset(col.id, 1)}
                     onOpenTask={handleOpenTask}
+                    onToggleTaskSelection={toggleTaskSelection}
                     onSortChange={(mode, dir) =>
                       setColumnSort(col.id, mode, dir)
                     }
@@ -920,6 +1165,7 @@ export function BoardView({
                       setDefaultColumnId(isDefault ? col.id : null)
                     }
                     projectKey={projectKey}
+                    selectedTaskIds={selectedTaskIds}
                     sortBlocked={sortBlockedColumnId === col.id}
                     sortDir={sort.dir}
                     sortMode={sort.mode}
@@ -943,12 +1189,20 @@ export function BoardView({
           style={{ willChange: "transform" }}
         >
           {active?.kind === "task" ? (
-            <TaskCardPreview
-              assignee={active.assignee}
-              labels={active.labels}
-              projectKey={projectKey}
-              task={active.task}
-            />
+            <div className="relative">
+              <TaskCardPreview
+                assignee={active.assignee}
+                labels={active.labels}
+                projectKey={projectKey}
+                task={active.task}
+              />
+              {selectedTaskIds.has(active.task.id) &&
+              selectedTaskIds.size > 1 ? (
+                <span className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  +{selectedTaskIds.size - 1}
+                </span>
+              ) : null}
+            </div>
           ) : active?.kind === "column" ? (
             <div className="w-72 rounded-xl bg-white/[0.06] p-3 shadow-xl">
               <div className="text-sm font-medium">{active.column.name}</div>
@@ -956,6 +1210,16 @@ export function BoardView({
           ) : null}
         </DragOverlay>
       </DndContext>
+      {canWrite && selectedTaskIds.size > 0 ? (
+        <BulkTaskActions
+          columns={sortedColumns}
+          count={selectedTaskIds.size}
+          onArchive={archiveSelectedTasks}
+          onClear={clearTaskSelection}
+          onMove={moveSelectedTasks}
+          onPriorityChange={setSelectedPriority}
+        />
+      ) : null}
       <TaskDetailSheet
         boardId={boardId}
         canWrite={canWrite}

@@ -29,8 +29,10 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
     entries: [
       { keys: "/", description: "Focus task search" },
       { keys: "↑ ↓ ← →", description: "Move between cards" },
+      { keys: "Shift + arrows", description: "Extend card selection" },
       { keys: "Enter / e", description: "Open focused card" },
-      { keys: "x", description: "Archive focused card" },
+      { keys: "x", description: "Select focused card" },
+      { keys: "Esc", description: "Clear card selection" },
     ],
   },
 ];

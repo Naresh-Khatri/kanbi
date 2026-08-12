@@ -55,6 +55,8 @@ export const SortableColumn = memo(function SortableColumn({
   onMoveRight,
   isDefaultColumn,
   onDefaultColumnChange,
+  selectedTaskIds,
+  onToggleTaskSelection,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -81,6 +83,8 @@ export const SortableColumn = memo(function SortableColumn({
   onMoveRight: () => void;
   isDefaultColumn: boolean;
   onDefaultColumnChange: (isDefault: boolean) => void;
+  selectedTaskIds: Set<string>;
+  onToggleTaskSelection: (taskId: string, extend: boolean) => void;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -104,7 +108,7 @@ export const SortableColumn = memo(function SortableColumn({
     return (
       <div
         className={cn(
-          "flex h-full w-12 shrink-0 flex-col items-center rounded-lg bg-white/[0.03] py-2",
+          "flex h-full w-12 shrink-0 snap-center flex-col items-center rounded-lg bg-white/[0.03] py-2 md:[scroll-snap-align:none]",
           dropTarget && "bg-white/[0.08] ring-1 ring-white/20",
         )}
         ref={sortable.setNodeRef}
@@ -147,7 +151,7 @@ export const SortableColumn = memo(function SortableColumn({
   return (
     <div
       className={cn(
-        "flex h-full w-72 shrink-0 flex-col gap-3 rounded-lg bg-white/[0.03] p-3",
+        "flex h-full w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-3 rounded-lg bg-white/[0.03] p-3 md:w-72 md:[scroll-snap-align:none]",
         column.wipLimit != null &&
           totalTaskCount > column.wipLimit &&
           "ring-1 ring-amber-300/40",
@@ -201,13 +205,32 @@ export const SortableColumn = memo(function SortableColumn({
                 labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
                 onOpenTask={onOpenTask}
                 projectKey={projectKey}
+                selected={selectedTaskIds.has(t.id)}
                 showDropIndicatorBefore={
                   !sortBlocked && dropTarget?.beforeTaskId === t.id
                 }
                 task={t}
+                onToggleSelection={canWrite ? onToggleTaskSelection : undefined}
               />
             ))}
           </SortableContext>
+          {tasks.length === 0 && !dropTarget ? (
+            <div className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-white/10 px-3 text-center">
+              <p className="text-xs text-white/40">
+                {totalTaskCount > 0 ? "No matching tasks" : "No tasks yet"}
+              </p>
+              {canWrite && totalTaskCount === 0 ? (
+                <Button
+                  className="text-white/70"
+                  onClick={() => onAddTask(column.id)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add task
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {!sortBlocked &&
           dropTarget &&
           dropTarget.beforeTaskId === null &&
@@ -219,7 +242,7 @@ export const SortableColumn = memo(function SortableColumn({
           ) : null}
         </div>
       </ScrollArea>
-      {canWrite ? (
+      {canWrite && tasks.length > 0 ? (
         <Button
           className="justify-start text-white/70"
           onClick={() => onAddTask(column.id)}

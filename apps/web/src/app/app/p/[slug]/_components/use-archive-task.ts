@@ -5,7 +5,7 @@ import { api } from "@/trpc/react";
 
 /**
  * Archive a task optimistically (it drops off the board immediately) with an
- * Undo toast. Shared by the card menu and the keyboard `x` shortcut.
+ * Undo toast. Shared by task actions that archive one card.
  */
 export function useArchiveTask(boardId: string) {
   const utils = api.useUtils();

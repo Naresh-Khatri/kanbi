@@ -385,6 +385,146 @@ export const taskRouter = createTRPCRouter({
       }
     }),
 
+  moveMany: boardProcedure
+    .input(
+      z.object({
+        taskIds: z.array(z.string().min(1)).min(1).max(100),
+        toColumnId: z.string().min(1),
+        before: z.number().nullable(),
+        after: z.number().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const taskIds = [...new Set(input.taskIds)];
+      const [target] = await ctx.db
+        .select({ boardId: boardColumn.boardId, name: boardColumn.name })
+        .from(boardColumn)
+        .where(eq(boardColumn.id, input.toColumnId))
+        .limit(1);
+      if (!target || target.boardId !== input.boardId) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const rows = await ctx.db
+        .select({
+          id: task.id,
+          columnId: task.columnId,
+          title: task.title,
+          reporterId: task.reporterId,
+          assigneeId: task.assigneeId,
+        })
+        .from(task)
+        .where(and(eq(task.boardId, input.boardId), inArray(task.id, taskIds)));
+      if (rows.length !== taskIds.length) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const orderedRows = taskIds.map((id) => byId.get(id)!);
+      const count = orderedRows.length;
+      const positions = orderedRows.map((_, index) => {
+        if (input.before != null && input.after != null) {
+          const step = (input.after - input.before) / (count + 1);
+          return input.before + step * (index + 1);
+        }
+        if (input.before != null) {
+          return input.before + POSITION_STEP * (index + 1);
+        }
+        if (input.after != null) {
+          return input.after - POSITION_STEP * (count - index);
+        }
+        return POSITION_STEP * (index + 1);
+      });
+
+      await ctx.db.transaction(async (tx) => {
+        for (const [index, row] of orderedRows.entries()) {
+          await tx
+            .update(task)
+            .set({ columnId: input.toColumnId, position: positions[index]! })
+            .where(and(eq(task.id, row.id), eq(task.boardId, input.boardId)));
+        }
+      });
+      bus.emitBoard(input.boardId, { scope: "task", ids: taskIds });
+
+      for (const row of orderedRows) {
+        await recordActivity(ctx.db, {
+          boardId: input.boardId,
+          taskId: row.id,
+          actorId: ctx.session.user.id,
+          verb: "task.moved",
+          payload: { toColumnId: input.toColumnId },
+        });
+      }
+
+      if (isDoneLikeColumn(target.name)) {
+        const pending: Parameters<typeof createNotifications>[1] = [];
+        for (const row of orderedRows) {
+          if (row.columnId === input.toColumnId) continue;
+          const recipients = new Set<string>();
+          if (row.reporterId) recipients.add(row.reporterId);
+          if (row.assigneeId) recipients.add(row.assigneeId);
+          recipients.delete(ctx.session.user.id);
+          for (const userId of recipients) {
+            pending.push({
+              userId,
+              actorId: ctx.session.user.id,
+              type: "task.moved_to_done",
+              boardId: input.boardId,
+              taskId: row.id,
+              data: { title: row.title, columnName: target.name },
+            });
+          }
+        }
+        if (pending.length > 0) await createNotifications(ctx.db, pending);
+      }
+    }),
+
+  bulkUpdate: boardProcedure
+    .input(
+      z
+        .object({
+          taskIds: z.array(z.string().min(1)).min(1).max(100),
+          priority: priorityEnum.optional(),
+          archived: z.boolean().optional(),
+        })
+        .refine(
+          (input) =>
+            input.priority !== undefined || input.archived !== undefined,
+          { message: "Choose at least one update." },
+        ),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const taskIds = [...new Set(input.taskIds)];
+      const updates: {
+        priority?: z.infer<typeof priorityEnum>;
+        archivedAt?: Date | null;
+      } = {};
+      if (input.priority !== undefined) updates.priority = input.priority;
+      if (input.archived !== undefined) {
+        updates.archivedAt = input.archived ? new Date() : null;
+      }
+      await ctx.db.transaction(async (tx) => {
+        const existing = await tx
+          .select({ id: task.id })
+          .from(task)
+          .where(
+            and(eq(task.boardId, input.boardId), inArray(task.id, taskIds)),
+          )
+          .for("update");
+        if (existing.length !== taskIds.length) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+        await tx
+          .update(task)
+          .set(updates)
+          .where(
+            and(eq(task.boardId, input.boardId), inArray(task.id, taskIds)),
+          );
+      });
+      bus.emitBoard(input.boardId, { scope: "task", ids: taskIds });
+    }),
+
   archive: boardProcedure
     .input(z.object({ taskId: z.string().min(1), archived: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
