@@ -14,12 +14,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/trpc/react";
 
+const PROJECT_SWITCHER_LIMIT = 5;
+
 export function ProjectInfo() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
   const requestCreateProject = useAppShell((s) => s.requestCreateProject);
   const project = api.project.bySlug.useQuery({ slug }).data;
   const projects = api.project.list.useQuery().data ?? [];
+  const switchableProjects = projects
+    .filter((project) => project.status === "active")
+    .slice(0, PROJECT_SWITCHER_LIMIT);
 
   if (!project) return null;
 
@@ -45,7 +50,7 @@ export function ProjectInfo() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
           <div className="px-2 py-1 text-xs text-white/50">Switch project</div>
-          {projects.map((p) => {
+          {switchableProjects.map((p) => {
             const active = p.slug === slug;
             return (
               <DropdownMenuItem asChild key={p.id}>
