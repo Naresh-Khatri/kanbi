@@ -1,6 +1,14 @@
 "use client";
 
-import { MoreHorizontal, Plus, Settings, Trash2 } from "lucide-react";
+import { formatRelative } from "@kanbi/shared";
+import {
+  MoreHorizontal,
+  PauseCircle,
+  PlayCircle,
+  Plus,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -35,10 +43,17 @@ type ProjectCard = {
   description: string | null;
   color: string | null;
   role: "owner" | "editor" | "viewer";
+  status: "active" | "on_hold";
+  totalTasks: number;
+  doneTasks: number;
+  inProgressTasks: number;
+  lastActivityAt: Date | null;
 };
 
 export function ProjectsDashboard() {
   const [projects] = api.project.list.useSuspenseQuery();
+  const active = projects.filter((p) => p.status === "active");
+  const onHold = projects.filter((p) => p.status === "on_hold");
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,11 +72,30 @@ export function ProjectsDashboard() {
           No projects yet. Create your first one.
         </div>
       ) : (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <ProjectCardItem key={p.id} project={p} />
-          ))}
-        </ul>
+        <>
+          {active.length > 0 ? (
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {active.map((p) => (
+                <ProjectCardItem key={p.id} project={p} />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-white/40">No active projects.</p>
+          )}
+
+          {onHold.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <h2 className="text-xs font-medium tracking-wide text-white/40 uppercase">
+                On hold
+              </h2>
+              <ul className="flex flex-col divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10">
+                {onHold.map((p) => (
+                  <OnHoldRow key={p.id} project={p} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -70,6 +104,10 @@ export function ProjectsDashboard() {
 function ProjectCardItem({ project }: { project: ProjectCard }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const isOwner = project.role === "owner";
+  const pct =
+    project.totalTasks > 0
+      ? Math.round((project.doneTasks / project.totalTasks) * 100)
+      : 0;
 
   return (
     <li className="relative">
@@ -85,42 +123,41 @@ function ProjectCardItem({ project }: { project: ProjectCard }) {
           <span className="truncate font-medium">{project.name}</span>
         </div>
         {project.description ? (
-          <p className="mt-2 line-clamp-2 text-sm text-white/60">
+          <p className="mt-1.5 line-clamp-1 text-sm text-white/60">
             {project.description}
           </p>
         ) : null}
+
+        <div className="mt-3 flex items-center gap-2">
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-white/50"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="shrink-0 text-xs tabular-nums text-white/40">
+            {project.doneTasks}/{project.totalTasks}
+          </span>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between text-xs text-white/40">
+          <span>
+            {project.inProgressTasks > 0
+              ? `${project.inProgressTasks} in flight`
+              : null}
+          </span>
+          <span>
+            {project.lastActivityAt
+              ? formatRelative(project.lastActivityAt)
+              : "no activity yet"}
+          </span>
+        </div>
       </Link>
       <div className="absolute top-3 right-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              aria-label="Project actions"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-white/50 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
-              onClick={(e) => e.preventDefault()}
-              type="button"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem asChild>
-              <Link href={`/app/p/${project.slug}/settings`}>
-                <Settings className="h-4 w-4" /> Settings
-              </Link>
-            </DropdownMenuItem>
-            {isOwner ? (
-              <DropdownMenuItem
-                destructive
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setDeleteOpen(true);
-                }}
-              >
-                <Trash2 className="h-4 w-4" /> Delete
-              </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ProjectMenu
+          onDeleteRequest={() => setDeleteOpen(true)}
+          project={project}
+        />
       </div>
       {isOwner ? (
         <DeleteProjectDialog
@@ -131,6 +168,112 @@ function ProjectCardItem({ project }: { project: ProjectCard }) {
         />
       ) : null}
     </li>
+  );
+}
+
+function OnHoldRow({ project }: { project: ProjectCard }) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const isOwner = project.role === "owner";
+
+  return (
+    <li className="flex items-center gap-2 bg-white/[0.01] px-3 py-2 opacity-60 transition hover:opacity-100">
+      <Link
+        className="flex min-w-0 flex-1 items-center gap-2"
+        href={`/app/p/${project.slug}`}
+      >
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ background: project.color ?? "#6366f1" }}
+        />
+        <span className="truncate text-sm">{project.name}</span>
+        <span className="ml-auto shrink-0 text-xs tabular-nums text-white/40">
+          {project.doneTasks}/{project.totalTasks}
+        </span>
+      </Link>
+      <ProjectMenu
+        onDeleteRequest={() => setDeleteOpen(true)}
+        project={project}
+      />
+      {isOwner ? (
+        <DeleteProjectDialog
+          onOpenChange={setDeleteOpen}
+          open={deleteOpen}
+          projectId={project.id}
+          projectName={project.name}
+        />
+      ) : null}
+    </li>
+  );
+}
+
+function ProjectMenu({
+  project,
+  onDeleteRequest,
+}: {
+  project: ProjectCard;
+  onDeleteRequest: () => void;
+}) {
+  const utils = api.useUtils();
+  const isOwner = project.role === "owner";
+  const canWrite = project.role !== "viewer";
+
+  const setStatus = api.project.setStatus.useMutation({
+    onSuccess: () => utils.project.list.invalidate(),
+    onError: (err) => toast.error(err.message),
+  });
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          aria-label="Project actions"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-white/50 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+          onClick={(e) => e.preventDefault()}
+          type="button"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem asChild>
+          <Link href={`/app/p/${project.slug}/settings`}>
+            <Settings className="h-4 w-4" /> Settings
+          </Link>
+        </DropdownMenuItem>
+        {canWrite ? (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setStatus.mutate({
+                projectId: project.id,
+                status: project.status === "active" ? "on_hold" : "active",
+              });
+            }}
+          >
+            {project.status === "active" ? (
+              <>
+                <PauseCircle className="h-4 w-4" /> Put on hold
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4" /> Reactivate
+              </>
+            )}
+          </DropdownMenuItem>
+        ) : null}
+        {isOwner ? (
+          <DropdownMenuItem
+            destructive
+            onSelect={(e) => {
+              e.preventDefault();
+              onDeleteRequest();
+            }}
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -240,6 +240,11 @@ export const columnSortMode = pgEnum("kanbi_column_sort_mode", [
 
 export const columnSortDir = pgEnum("kanbi_column_sort_dir", ["asc", "desc"]);
 
+export const projectStatus = pgEnum("kanbi_project_status", [
+  "active",
+  "on_hold",
+]);
+
 // ── Projects ────────────────────────────────────────────────────────────────
 
 export const project = createTable(
@@ -261,6 +266,7 @@ export const project = createTable(
     systemPrompt: text("system_prompt"),
     icon: text("icon"),
     color: text("color"),
+    status: projectStatus("status").notNull().default("active"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

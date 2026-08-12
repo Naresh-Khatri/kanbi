@@ -1,7 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import {
+  isDoneLikeColumn,
+  isInProgressLikeColumn,
+} from "@/lib/column-heuristics";
 import {
   deriveProjectKey,
   normalizeProjectKey,
@@ -17,6 +21,7 @@ import {
 } from "@/server/api/trpc";
 import type { ProjectRole } from "@/server/api/permissions";
 import {
+  activity,
   board,
   boardColumn,
   label,
@@ -32,7 +37,7 @@ import { createNotifications } from "@/server/notifications/create";
 export const projectRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
-    return ctx.db
+    const rows = await ctx.db
       .selectDistinct({
         id: project.id,
         slug: project.slug,
@@ -41,6 +46,7 @@ export const projectRouter = createTRPCRouter({
         description: project.description,
         color: project.color,
         icon: project.icon,
+        status: project.status,
         ownerId: project.ownerId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
@@ -58,6 +64,80 @@ export const projectRouter = createTRPCRouter({
       )
       .where(or(eq(project.ownerId, userId), eq(projectMember.userId, userId)))
       .orderBy(desc(project.updatedAt));
+
+    if (rows.length === 0) return [];
+    const projectIds = rows.map((r) => r.id);
+
+    // Task counts per project+column-name (via board join), non-archived only.
+    const columnCounts = await ctx.db
+      .select({
+        projectId: board.projectId,
+        columnName: boardColumn.name,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(task)
+      .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
+      .innerJoin(board, eq(board.id, task.boardId))
+      .where(and(inArray(board.projectId, projectIds), isNull(task.archivedAt)))
+      .groupBy(board.projectId, boardColumn.name);
+
+    // Most recent activity per project's board.
+    const lastActivity = await ctx.db
+      .select({
+        projectId: board.projectId,
+        lastActivityAt: sql<Date>`max(${activity.createdAt})`,
+      })
+      .from(activity)
+      .innerJoin(board, eq(board.id, activity.boardId))
+      .where(inArray(board.projectId, projectIds))
+      .groupBy(board.projectId);
+
+    const totals = new Map<
+      string,
+      { totalTasks: number; doneTasks: number; inProgressTasks: number }
+    >();
+    for (const row of columnCounts) {
+      const acc = totals.get(row.projectId) ?? {
+        totalTasks: 0,
+        doneTasks: 0,
+        inProgressTasks: 0,
+      };
+      acc.totalTasks += row.count;
+      if (isDoneLikeColumn(row.columnName)) acc.doneTasks += row.count;
+      else if (isInProgressLikeColumn(row.columnName))
+        acc.inProgressTasks += row.count;
+      totals.set(row.projectId, acc);
+    }
+
+    const activityByProject = new Map(
+      lastActivity.map((r) => [r.projectId, r.lastActivityAt]),
+    );
+
+    const enriched = rows.map((r) => ({
+      ...r,
+      totalTasks: totals.get(r.id)?.totalTasks ?? 0,
+      doneTasks: totals.get(r.id)?.doneTasks ?? 0,
+      inProgressTasks: totals.get(r.id)?.inProgressTasks ?? 0,
+      lastActivityAt: activityByProject.get(r.id) ?? null,
+    }));
+
+    // Active first (most recently active first, nulls last), then on-hold.
+    const byRecency = (
+      a: (typeof enriched)[number],
+      b: (typeof enriched)[number],
+    ) => {
+      if (!a.lastActivityAt && !b.lastActivityAt) return 0;
+      if (!a.lastActivityAt) return 1;
+      if (!b.lastActivityAt) return -1;
+      return b.lastActivityAt.getTime() - a.lastActivityAt.getTime();
+    };
+    const active = enriched
+      .filter((p) => p.status === "active")
+      .sort(byRecency);
+    const onHold = enriched
+      .filter((p) => p.status === "on_hold")
+      .sort(byRecency);
+    return [...active, ...onHold];
   }),
 
   bySlug: protectedProcedure
@@ -296,6 +376,16 @@ export const projectRouter = createTRPCRouter({
     assertCanAdmin(ctx.access);
     await ctx.db.delete(project).where(eq(project.id, input.projectId));
   }),
+
+  setStatus: projectProcedure
+    .input(z.object({ status: z.enum(["active", "on_hold"]) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.access.canWrite) throw new TRPCError({ code: "FORBIDDEN" });
+      await ctx.db
+        .update(project)
+        .set({ status: input.status })
+        .where(eq(project.id, input.projectId));
+    }),
 
   leave: projectProcedure.mutation(async ({ ctx, input }) => {
     if (ctx.access.role === "owner") {
