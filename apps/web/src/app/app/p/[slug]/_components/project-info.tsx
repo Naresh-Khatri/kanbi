@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/trpc/react";
 
-const PROJECT_SWITCHER_LIMIT = 5;
+const PROJECT_SWITCHER_LIMIT = 9;
 
 export function ProjectInfo() {
   const { slug } = useParams<{ slug: string }>();
