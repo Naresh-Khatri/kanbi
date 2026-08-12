@@ -82,6 +82,24 @@ export function SettingsView({ slug }: { slug: string }) {
           projectId={project.id}
           projectName={project.name}
         />
+
+        <p className="border-t border-white/5 pt-6 text-xs text-white/40">
+          Beyond the browser:{" "}
+          <Link
+            className="underline underline-offset-2 transition hover:text-white/70"
+            href="/docs/mcp"
+          >
+            connect an AI agent
+          </Link>{" "}
+          over MCP, or{" "}
+          <Link
+            className="underline underline-offset-2 transition hover:text-white/70"
+            href="/docs/focus"
+          >
+            pair the Focus app
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );
