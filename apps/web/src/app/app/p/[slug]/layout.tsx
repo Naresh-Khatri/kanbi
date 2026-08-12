@@ -6,6 +6,7 @@ import { AppHeader } from "@/app/app/_components/app-header";
 import { ProjectAiButton } from "@/app/app/p/[slug]/_components/project-ai-button";
 import { ProjectArchiveStatus } from "@/app/app/p/[slug]/_components/project-archive-status";
 import { ProjectInfo } from "@/app/app/p/[slug]/_components/project-info";
+import { ProjectSectionNav } from "@/app/app/p/[slug]/_components/project-section-nav";
 import { ProjectTeamButton } from "@/app/app/p/[slug]/_components/project-team-button";
 import { resolveProject } from "@/app/app/p/[slug]/_lib/resolve-project";
 import { api, HydrateClient } from "@/trpc/server";
@@ -24,7 +25,6 @@ export default async function ProjectLayout({
   void api.user.me.prefetch();
   void api.project.list.prefetch();
   void api.project.bySlug.prefetch({ slug });
-  void api.board.get.prefetch({ boardId: project.boardId });
   void api.project.members.prefetch({ projectId: project.id });
   if (project.role === "owner") {
     void api.project.listInvites.prefetch({ projectId: project.id });
@@ -54,7 +54,12 @@ export default async function ProjectLayout({
             </Link>
           </>
         }
-        start={<ProjectInfo />}
+        start={
+          <>
+            <ProjectInfo />
+            <ProjectSectionNav slug={slug} />
+          </>
+        }
       />
       {children}
     </HydrateClient>

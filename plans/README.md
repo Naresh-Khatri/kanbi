@@ -5,19 +5,21 @@ Execute in the order below unless dependencies say otherwise. Each executor:
 read the plan fully before starting, honor its STOP conditions, and update your
 row when done.
 
-These four plans were selected (from a larger audit) as the highest-value,
+The first four plans were selected (from a larger audit) as the highest-value,
 highest-confidence set: two security fixes, the test verification baseline, and
-a latent correctness bug. The rest of the audit findings are listed at the
-bottom so they are not re-discovered from scratch.
+a latent correctness bug. Plan 005 is a later, user-requested product direction
+plan for project-native documentation. The rest of the original audit findings
+are listed at the bottom so they are not re-discovered from scratch.
 
 ## Execution order & status
 
-| Plan | Title | Priority | Effort | Depends on | Status |
-|------|-------|----------|--------|------------|--------|
-| 001  | Vitest verification baseline + first unit tests | P1 | S | — | TODO |
-| 002  | Close IDOR gaps (board-ownership checks) | P1 | S | — | TODO |
-| 003  | Bind invite acceptance to email; gate `listInvites` | P1 | S | — | TODO |
-| 004  | Wire position rebalance (fix collapsing drag order) | P2 | M | 001 (recommend after 002) | TODO |
+| Plan | Title                                                         | Priority | Effort | Depends on                | Status                                     |
+| ---- | ------------------------------------------------------------- | -------- | ------ | ------------------------- | ------------------------------------------ |
+| 001  | Vitest verification baseline + first unit tests               | P1       | S      | —                         | DONE                                       |
+| 002  | Close IDOR gaps (board-ownership checks)                      | P1       | S      | —                         | TODO                                       |
+| 003  | Bind invite acceptance to email; gate `listInvites`           | P1       | S      | —                         | TODO                                       |
+| 004  | Wire position rebalance (fix collapsing drag order)           | P2       | M      | 001 (recommend after 002) | TODO                                       |
+| 005  | Project-native Docs with versioned editing and task backlinks | P1       | L      | 001                       | IN PROGRESS (migration/runtime QA pending) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)
 
@@ -32,6 +34,9 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
    callers change) and should follow 002 because both edit `column.reorder`
    (002 adds the ownership check; 004 adds the rebalance). 004 carries MED risk
    (multi-row UPDATE in a transaction on the reorder path).
+4. **005** after 001 and after the current hidden-column/schema work is committed
+   or reconciled. It is an independent product slice but adds new fractional
+   hierarchy and conflict logic that should not land without the test baseline.
 
 ## Dependency notes
 
@@ -42,6 +47,9 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
   preserve its ownership-check block and insert the rebalance after the position
   write. 004's drift check is written to expect this.
 - 002 and 003 have no dependencies and don't touch the same files as each other.
+- **005 requires 001** because its hierarchy, rich-text link extraction, and
+  version-conflict behavior need focused unit tests. It does not depend on plans
+  002–004.
 
 ## Findings considered and not turned into plans (this round)
 
@@ -50,6 +58,7 @@ re-audited from zero next time. (Not rejected as invalid; just out of the
 selected high-value batch.)
 
 **Security / hardening**
+
 - Bump vulnerable deps: `drizzle-orm` (`^0.41.0` → ≥0.45.2, HIGH SQLi-via-identifier
   advisory; current static queries likely don't reach it) and `next` (below the
   ≥15.5.16 middleware-bypass patch). S effort; re-run `pnpm audit` to confirm.
@@ -62,6 +71,7 @@ selected high-value batch.)
   report-only, `X-Frame-Options`, HSTS, `X-Content-Type-Options`).
 
 **Performance**
+
 - `board.get` over-fetches: returns archived tasks (no `isNull(archivedAt)`) and
   full `description` (≤10 KB/task) to every client on every board invalidation.
   M effort, MED risk (the archive panel and task-detail sheet read from this
@@ -74,6 +84,7 @@ selected high-value batch.)
   deliberate "events carry no data" architecture.
 
 **DX / tech-debt / docs**
+
 - `turbo.json` build-cache `env` list is stale (lists `GOOGLE_CLIENT_ID`, `AWS_*`,
   `S3_BUCKET`, `R2_ENDPOINT`, `SMTP_PASS` — none exist in `env.js`; real names
   differ). Build cache won't invalidate on the real vars → stale prod builds. S.
@@ -82,7 +93,7 @@ selected high-value batch.)
 - Server-side duplication: `assertTaskOnBoard` copy-pasted in `comment.ts` +
   `checklist.ts`; the 4-query board-assembly duplicated in `board.ts` + `share.ts`;
   AI prompt/context blocks duplicated across `task.ts` `draftFromMessage`/`enhance`.
-  (Note: do the IDOR fix in Plan 002 *before* extracting the shared
+  (Note: do the IDOR fix in Plan 002 _before_ extracting the shared
   `assertTaskOnBoard`, or coordinate the two.)
 - Stale docs: `TODO.md` lists 4 already-shipped features as missing (comment
   edit/delete, label rename/delete, @-mentions, archive view); `.env.example`
@@ -93,6 +104,7 @@ selected high-value batch.)
   have a hard cap and no cursor (older items become invisible).
 
 **Direction (product options for the maintainer — not defects)**
+
 - `board.settings` jsonb is allocated but unused — cheapest extension point for
   saved filter views.
 - `column.wipLimit` in schema, no UI/enforcement — a lightweight count-badge is S.
@@ -112,5 +124,5 @@ selected high-value batch.)
 - `error.tsx` rendering `error.message` — Next.js strips server errors in prod;
   the tRPC formatter already strips Zod errors.
 - "My Work page" direction suggestion — **already shipped** (`feat(app): My Work
-  landing page across projects`).
-</content>
+landing page across projects`).
+  </content>

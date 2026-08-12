@@ -68,6 +68,15 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 - Deletes are undoable (`use-undoable-board-delete.ts`): remove from cache immediately, defer the server mutation 6s, Sonner toast with Undo restores the snapshot.
 - Cross-component signals (create-task, AI import, command palette) go through the Zustand store `src/components/keybinds/shell-store.ts` (`useAppShell`).
 
+### Docs feature (`src/app/app/p/[slug]/docs/`)
+
+- Docs are project-scoped pages exposed beside the board at `/app/p/[slug]/docs/[documentId]`; they reuse project owner/editor/viewer permissions through `projectProcedure`.
+- `src/server/api/routers/document.ts` owns the page tree, explicit versioned saves, history/restore, search, and task backlinks. Page ordering uses the same fractional position helpers as board entities.
+- Current content lives in `projectDocument`; immutable checkpoints live in `documentRevision`. Saves use an `expectedVersion` compare-and-swap so stale editors cannot overwrite newer work.
+- Ticket mentions inside page HTML are sanitized and normalized into `documentTaskLink`. The task sheet reads that join table to show linked Docs; clients must not write backlink rows directly.
+- Shared server rich-text sanitization lives in `src/server/rich-text/`. Keep task/comment and document editor schemas compatible when adding nodes or marks.
+- Docs intentionally do not share the board activity/digest stream or implement realtime coediting yet. Do not add either accidentally without defining document-specific invalidation and digest behavior.
+
 ### AI
 
 `src/server/ai/mistral.ts` (server-only) uses the Mistral SDK to draft structured tasks; only active when `MISTRAL_API_KEY` is set — treat the feature as optional.

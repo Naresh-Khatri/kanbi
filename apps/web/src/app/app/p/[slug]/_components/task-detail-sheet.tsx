@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Check,
   Copy,
+  FileText,
   GitBranch,
   Link2,
   Loader2,
@@ -21,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -313,6 +315,8 @@ function TaskDetail({
         </div>
       </div>
 
+      <LinkedDocsPanel boardId={boardId} taskId={task.id} />
+
       <ChecklistPanel boardId={boardId} canWrite={canWrite} taskId={task.id} />
       <AttachmentsPanel
         boardId={boardId}
@@ -344,6 +348,38 @@ function TaskDetail({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function LinkedDocsPanel({
+  boardId,
+  taskId,
+}: {
+  boardId: string;
+  taskId: string;
+}) {
+  const linked = api.document.linkedToTask.useQuery({ boardId, taskId });
+  if (!linked.data || linked.data.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <Label>Docs</Label>
+      <div className="divide-y divide-white/[0.06] rounded-md border border-white/10 bg-white/[0.025] px-2">
+        {linked.data.map((document) => (
+          <Link
+            className="group flex items-center gap-2 rounded-sm px-1 py-2 text-sm text-white/65 transition hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+            href={`/app/p/${document.projectSlug}/docs/${document.id}`}
+            key={document.id}
+          >
+            <FileText className="h-3.5 w-3.5 shrink-0 text-white/35 group-hover:text-white/55" />
+            <span className="truncate">{document.title}</span>
+            <span className="ml-auto shrink-0 text-[11px] text-white/30">
+              {formatRelative(document.updatedAt ?? document.createdAt)}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

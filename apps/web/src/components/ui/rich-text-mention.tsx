@@ -17,12 +17,8 @@ import type {
 } from "@tiptap/suggestion";
 import { ArrowUpRight, Hash } from "lucide-react";
 import { HoverCard } from "radix-ui";
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useState,
-} from "react";
+import { useRouter } from "next/navigation";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
@@ -43,6 +39,8 @@ export type TicketMentionItem = {
   status?: string;
   priority?: string;
   assignee?: string | null;
+  /** Route fallback for readers outside the mounted board view. */
+  href?: string;
 };
 
 /** Tailwind class applied to a rendered user-mention chip (editor + read-only). */
@@ -85,7 +83,11 @@ function MentionChip({
   const item = id ? getItems().find((i) => i.id === id) : undefined;
 
   const chip = (
-    <span className={MENTION_CLASS} data-id={id ?? undefined} data-type="mention">
+    <span
+      className={MENTION_CLASS}
+      data-id={id ?? undefined}
+      data-type="mention"
+    >
       @{name}
     </span>
   );
@@ -135,12 +137,17 @@ function TicketChip({
   editor: Editor;
   getItems: () => TicketMentionItem[];
 }) {
+  const router = useRouter();
   const id = (node.attrs.id as string | null) ?? null;
   const label = (node.attrs.label as string | null) ?? id ?? "";
   const item = id ? getItems().find((i) => i.id === id) : undefined;
 
   const openTask = () => {
     if (!id) return;
+    if (item?.href) {
+      router.push(item.href);
+      return;
+    }
     window.dispatchEvent(
       new CustomEvent(OPEN_TASK_EVENT, { detail: { taskId: id } }),
     );
@@ -191,7 +198,7 @@ function TicketChip({
               <span className="font-mono text-xs text-violet-300">
                 {item.label}
               </span>
-              <span className="text-sm font-medium leading-snug">
+              <span className="text-sm leading-snug font-medium">
                 {item.title}
               </span>
               {meta.length > 0 ? (

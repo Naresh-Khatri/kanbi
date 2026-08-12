@@ -1,7 +1,14 @@
 "use client";
 
 import { Command } from "cmdk";
-import { ArrowRight, Layers, ListTodo, Plus, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  FileText,
+  Layers,
+  ListTodo,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -47,6 +54,10 @@ export function CommandPalette() {
     { query: trimmed },
     { enabled: paletteOpen && trimmed.length >= 2 },
   );
+  const documentSearch = api.document.search.useQuery(
+    { query: trimmed, limit: 8 },
+    { enabled: paletteOpen && trimmed.length >= 2 },
+  );
 
   useEffect(() => {
     if (!paletteOpen) setQuery("");
@@ -74,7 +85,7 @@ export function CommandPalette() {
           autoFocus
           className="h-12 w-full bg-transparent px-4 text-sm outline-none placeholder:text-white/40"
           onValueChange={setQuery}
-          placeholder="Type a command or search projects…"
+          placeholder="Type a command or search projects, tasks, and docs…"
           value={query}
         />
         <Command.List className="max-h-[50vh] overflow-y-auto border-t border-white/5 py-1">
@@ -169,6 +180,35 @@ export function CommandPalette() {
               ))}
             </Command.Group>
           ) : null}
+
+          {documentSearch.data && documentSearch.data.length > 0 ? (
+            <Command.Group
+              className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
+              heading="Docs"
+            >
+              {documentSearch.data.map((document) => (
+                <PaletteItem
+                  icon={<FileText className="h-4 w-4" />}
+                  key={document.id}
+                  onSelect={() =>
+                    go(() =>
+                      router.push(
+                        `/app/p/${document.projectSlug}/docs/${document.id}`,
+                      ),
+                    )
+                  }
+                  value={`document doc page ${document.title} ${document.projectName}`}
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="truncate">{document.title}</span>
+                    <span className="ml-auto shrink-0 text-xs text-white/40">
+                      {document.projectName}
+                    </span>
+                  </span>
+                </PaletteItem>
+              ))}
+            </Command.Group>
+          ) : null}
         </Command.List>
       </Command>
     </div>
@@ -197,9 +237,7 @@ function PaletteItem({
       <span className="text-white/60">{icon}</span>
       {children}
       {hint ? (
-        <span className="ml-auto shrink-0 text-xs text-white/40">
-          {hint}
-        </span>
+        <span className="ml-auto shrink-0 text-xs text-white/40">{hint}</span>
       ) : null}
     </Command.Item>
   );

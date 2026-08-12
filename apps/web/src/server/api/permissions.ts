@@ -128,7 +128,11 @@ export async function resolveProjectAccess(args: {
   projectId: string;
 }): Promise<{ role: ProjectRole; canWrite: boolean; canAdmin: boolean }> {
   const row = await args.db
-    .select({ ownerId: project.ownerId, role: projectMember.role })
+    .select({
+      ownerId: project.ownerId,
+      projectStatus: project.status,
+      role: projectMember.role,
+    })
     .from(project)
     .leftJoin(
       projectMember,
@@ -149,7 +153,7 @@ export async function resolveProjectAccess(args: {
 
   return {
     role,
-    canWrite: roleCan(role, "editor"),
+    canWrite: hit.projectStatus !== "archived" && roleCan(role, "editor"),
     canAdmin: roleCan(role, "owner"),
   };
 }

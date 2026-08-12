@@ -6,6 +6,7 @@ import { columnRouter } from "@/server/api/routers/column";
 import { commentRouter } from "@/server/api/routers/comment";
 import { deviceRouter } from "@/server/api/routers/device";
 import { digestRouter } from "@/server/api/routers/digest";
+import { documentRouter } from "@/server/api/routers/document";
 import { focusRouter } from "@/server/api/routers/focus";
 import { labelRouter } from "@/server/api/routers/label";
 import { notificationRouter } from "@/server/api/routers/notification";
@@ -32,6 +33,7 @@ export const appRouter = createTRPCRouter({
   attachment: attachmentRouter,
   comment: commentRouter,
   digest: digestRouter,
+  document: documentRouter,
   share: shareRouter,
   activity: activityRouter,
   realtime: realtimeRouter,

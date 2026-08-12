@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -519,6 +520,86 @@ export const comment = createTable(
   (t) => [index("comment_task_idx").on(t.taskId, t.createdAt)],
 );
 
+// ── Project documents ───────────────────────────────────────────────────────
+
+export const projectDocument = createTable(
+  "document",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    parentId: text("parent_id").references(
+      (): AnyPgColumn => projectDocument.id,
+      { onDelete: "set null" },
+    ),
+    title: text("title").notNull(),
+    body: text("body").notNull().default("<p></p>"),
+    searchText: text("search_text").notNull().default(""),
+    position: real("position").notNull(),
+    version: integer("version").notNull().default(1),
+    createdById: text("created_by_id")
+      .notNull()
+      .references(() => user.id),
+    updatedById: text("updated_by_id")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("document_project_parent_position_idx").on(
+      t.projectId,
+      t.parentId,
+      t.position,
+    ),
+    index("document_project_updated_idx").on(t.projectId, t.updatedAt),
+  ],
+);
+
+export const documentRevision = createTable(
+  "document_revision",
+  {
+    id: id(),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => projectDocument.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    editorId: text("editor_id")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("document_revision_document_version_uq").on(
+      t.documentId,
+      t.version,
+    ),
+    index("document_revision_document_created_idx").on(
+      t.documentId,
+      t.createdAt,
+    ),
+  ],
+);
+
+export const documentTaskLink = createTable(
+  "document_task_link",
+  {
+    documentId: text("document_id")
+      .notNull()
+      .references(() => projectDocument.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.documentId, t.taskId] }),
+    index("document_task_link_task_idx").on(t.taskId),
+  ],
+);
+
 export const activity = createTable(
   "activity",
   {
@@ -700,6 +781,13 @@ export const userRelations = relations(user, ({ many }) => ({
   reportedTasks: many(task, { relationName: "task_reporter" }),
   deviceTokens: many(deviceToken),
   todayItems: many(todayItem),
+  createdDocuments: many(projectDocument, {
+    relationName: "document_created_by",
+  }),
+  updatedDocuments: many(projectDocument, {
+    relationName: "document_updated_by",
+  }),
+  documentRevisions: many(documentRevision),
 }));
 
 export const deviceTokenRelations = relations(deviceToken, ({ one }) => ({
@@ -719,6 +807,7 @@ export const projectRelations = relations(project, ({ one, many }) => ({
   board: one(board, { fields: [project.id], references: [board.projectId] }),
   members: many(projectMember),
   invites: many(projectInvite),
+  documents: many(projectDocument),
 }));
 
 export const projectMemberRelations = relations(projectMember, ({ one }) => ({
@@ -776,7 +865,64 @@ export const taskRelations = relations(task, ({ one, many }) => ({
   checklist: many(checklistItem),
   attachments: many(taskAttachment),
   comments: many(comment),
+  documentLinks: many(documentTaskLink),
 }));
+
+export const projectDocumentRelations = relations(
+  projectDocument,
+  ({ one, many }) => ({
+    project: one(project, {
+      fields: [projectDocument.projectId],
+      references: [project.id],
+    }),
+    parent: one(projectDocument, {
+      fields: [projectDocument.parentId],
+      references: [projectDocument.id],
+      relationName: "document_tree",
+    }),
+    children: many(projectDocument, { relationName: "document_tree" }),
+    createdBy: one(user, {
+      fields: [projectDocument.createdById],
+      references: [user.id],
+      relationName: "document_created_by",
+    }),
+    updatedBy: one(user, {
+      fields: [projectDocument.updatedById],
+      references: [user.id],
+      relationName: "document_updated_by",
+    }),
+    revisions: many(documentRevision),
+    taskLinks: many(documentTaskLink),
+  }),
+);
+
+export const documentRevisionRelations = relations(
+  documentRevision,
+  ({ one }) => ({
+    document: one(projectDocument, {
+      fields: [documentRevision.documentId],
+      references: [projectDocument.id],
+    }),
+    editor: one(user, {
+      fields: [documentRevision.editorId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const documentTaskLinkRelations = relations(
+  documentTaskLink,
+  ({ one }) => ({
+    document: one(projectDocument, {
+      fields: [documentTaskLink.documentId],
+      references: [projectDocument.id],
+    }),
+    task: one(task, {
+      fields: [documentTaskLink.taskId],
+      references: [task.id],
+    }),
+  }),
+);
 
 export const labelRelations = relations(label, ({ one, many }) => ({
   board: one(board, { fields: [label.boardId], references: [board.id] }),

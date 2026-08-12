@@ -8,6 +8,7 @@
     "dev:focus": "turbo run dev --filter=focus",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "format": "turbo run format",
     "format:write": "turbo run format:write",

@@ -7,6 +7,8 @@ import StarterKit from "@tiptap/starter-kit";
 import {
   Bold,
   Code,
+  Heading1,
+  Heading2,
   Italic,
   Link as LinkIcon,
   List,
@@ -61,6 +63,8 @@ interface RichTextEditorProps {
   mentions?: MentionItem[];
   /** When provided, enables #-mention autocomplete against these tickets. */
   tickets?: TicketMentionItem[];
+  /** Long-form documents get a persistent toolbar; compact fields use a bubble menu. */
+  toolbar?: "bubble" | "document";
 }
 
 export function RichTextEditor({
@@ -73,6 +77,7 @@ export function RichTextEditor({
   minHeight = "72px",
   mentions,
   tickets,
+  toolbar = "bubble",
 }: RichTextEditorProps) {
   // Keep mention/ticket items fresh (they load async) without re-creating the
   // editor: each extension reads through its ref on every query.
@@ -81,9 +86,7 @@ export function RichTextEditor({
   mentionsRef.current = mentions ?? [];
   const mentionExtension = React.useMemo(
     () =>
-      enableMentions
-        ? createMentionExtension(() => mentionsRef.current)
-        : null,
+      enableMentions ? createMentionExtension(() => mentionsRef.current) : null,
     [enableMentions],
   );
 
@@ -134,95 +137,132 @@ export function RichTextEditor({
 
   return (
     <>
-      <BubbleMenu
-        className="z-[100] flex items-center gap-0.5 rounded-lg border border-white/10 bg-neutral-900 p-1 shadow-xl"
-        editor={editor}
-        options={{ placement: "top", strategy: "fixed", offset: 8 }}
-        updateDelay={150}
-      >
-        <ToolbarButton
-          active={editor.isActive("bold")}
-          label="Bold"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-        >
-          <Bold className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("italic")}
-          label="Italic"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-        >
-          <Italic className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("underline")}
-          label="Underline"
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-        >
-          <UnderlineIcon className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("strike")}
-          label="Strikethrough"
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-        >
-          <Strikethrough className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <Divider />
-        <ToolbarButton
-          active={editor.isActive("code")}
-          label="Code"
-          onClick={() => editor.chain().focus().toggleCode().run()}
-        >
-          <Code className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("link")}
-          label="Link"
-          onClick={() => {
-            const prev = editor.getAttributes("link").href as
-              | string
-              | undefined;
-            const url = window.prompt("URL", prev ?? "https://");
-            if (url === null) return;
-            if (url === "") {
-              editor.chain().focus().extendMarkRange("link").unsetLink().run();
-              return;
+      {toolbar === "document" ? (
+        <div className="sticky top-0 z-10 mb-5 flex flex-wrap items-center gap-0.5 border-b border-white/10 bg-[#0b0b0f]/95 py-2 backdrop-blur">
+          <ToolbarButton
+            active={editor.isActive("heading", { level: 1 })}
+            label="Heading 1"
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 1 }).run()
             }
-            editor
-              .chain()
-              .focus()
-              .extendMarkRange("link")
-              .setLink({ href: url })
-              .run();
-          }}
+          >
+            <Heading1 className="h-3.5 w-3.5" />
+          </ToolbarButton>
+          <ToolbarButton
+            active={editor.isActive("heading", { level: 2 })}
+            label="Heading 2"
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 2 }).run()
+            }
+          >
+            <Heading2 className="h-3.5 w-3.5" />
+          </ToolbarButton>
+          <Divider />
+          <InlineFormatting editor={editor} />
+        </div>
+      ) : null}
+      {toolbar === "bubble" ? (
+        <BubbleMenu
+          className="z-[100] flex items-center gap-0.5 rounded-lg border border-white/10 bg-neutral-900 p-1 shadow-xl"
+          editor={editor}
+          options={{ placement: "top", strategy: "fixed", offset: 8 }}
+          updateDelay={150}
         >
-          <LinkIcon className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <Divider />
-        <ToolbarButton
-          active={editor.isActive("bulletList")}
-          label="Bullet list"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-        >
-          <List className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("orderedList")}
-          label="Ordered list"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        >
-          <ListOrdered className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("blockquote")}
-          label="Quote"
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        >
-          <Quote className="h-3.5 w-3.5" />
-        </ToolbarButton>
-      </BubbleMenu>
+          <InlineFormatting editor={editor} />
+        </BubbleMenu>
+      ) : null}
       <EditorContent editor={editor} />
+    </>
+  );
+}
+
+function InlineFormatting({
+  editor,
+}: {
+  editor: ReturnType<typeof useEditor>;
+}) {
+  if (!editor) return null;
+  return (
+    <>
+      <ToolbarButton
+        active={editor.isActive("bold")}
+        label="Bold"
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
+        <Bold className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive("italic")}
+        label="Italic"
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
+        <Italic className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive("underline")}
+        label="Underline"
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+      >
+        <UnderlineIcon className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive("strike")}
+        label="Strikethrough"
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      >
+        <Strikethrough className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <Divider />
+      <ToolbarButton
+        active={editor.isActive("code")}
+        label="Code"
+        onClick={() => editor.chain().focus().toggleCode().run()}
+      >
+        <Code className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive("link")}
+        label="Link"
+        onClick={() => {
+          const prev = editor.getAttributes("link").href as string | undefined;
+          const url = window.prompt("URL", prev ?? "https://");
+          if (url === null) return;
+          if (url === "") {
+            editor.chain().focus().extendMarkRange("link").unsetLink().run();
+            return;
+          }
+          editor
+            .chain()
+            .focus()
+            .extendMarkRange("link")
+            .setLink({ href: url })
+            .run();
+        }}
+      >
+        <LinkIcon className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <Divider />
+      <ToolbarButton
+        active={editor.isActive("bulletList")}
+        label="Bullet list"
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        <List className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive("orderedList")}
+        label="Ordered list"
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        <ListOrdered className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive("blockquote")}
+        label="Quote"
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        <Quote className="h-3.5 w-3.5" />
+      </ToolbarButton>
     </>
   );
 }

@@ -4,6 +4,7 @@ import { AiDraftController } from "@/app/app/p/[slug]/_components/ai-draft-contr
 import { BoardView } from "@/app/app/p/[slug]/_components/board/board-view";
 import { RecentProjectTracker } from "@/app/app/p/[slug]/_components/recent-project-tracker";
 import { resolveProject } from "@/app/app/p/[slug]/_lib/resolve-project";
+import { api } from "@/trpc/server";
 
 export default async function ProjectPage({
   params,
@@ -13,6 +14,7 @@ export default async function ProjectPage({
   const { slug } = await params;
   const project = await resolveProject(slug);
   if (!project) notFound();
+  void api.board.get.prefetch({ boardId: project.boardId });
 
   return (
     <>
