@@ -91,6 +91,32 @@ export const columnRouter = createTRPCRouter({
       });
     }),
 
+  setWipLimit: boardProcedure
+    .input(
+      z.object({
+        columnId: z.string().min(1),
+        wipLimit: z.number().int().min(1).max(999).nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const [updated] = await ctx.db
+        .update(boardColumn)
+        .set({ wipLimit: input.wipLimit })
+        .where(
+          and(
+            eq(boardColumn.id, input.columnId),
+            eq(boardColumn.boardId, input.boardId),
+          ),
+        )
+        .returning({ id: boardColumn.id });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      bus.emitBoard(input.boardId, {
+        scope: "column",
+        ids: [input.columnId],
+      });
+    }),
+
   reorder: boardProcedure
     .input(
       z.object({

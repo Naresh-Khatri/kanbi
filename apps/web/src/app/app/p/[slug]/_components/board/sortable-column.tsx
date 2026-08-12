@@ -7,7 +7,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,6 +20,8 @@ import type {
 } from "./board-types";
 import { ColumnHeader } from "./column-header";
 import { DropIndicator, SortableTaskCard } from "./task-card";
+import type { ColumnSortDir, ColumnSortMode } from "@/lib/task-sort";
+import { cn } from "@/lib/utils";
 
 const EMPTY_LABELS: LabelInfo[] = [];
 const SORTABLE_TRANSITION = {
@@ -43,6 +45,12 @@ export const SortableColumn = memo(function SortableColumn({
   totalTaskCount,
   columns,
   deletionTaskCount,
+  collapsed,
+  onCollapseChange,
+  onHide,
+  sortMode,
+  sortDir,
+  onSortChange,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -59,6 +67,12 @@ export const SortableColumn = memo(function SortableColumn({
   totalTaskCount: number;
   columns: ColumnRow[];
   deletionTaskCount: number;
+  collapsed: boolean;
+  onCollapseChange: (collapsed: boolean) => void;
+  onHide: () => void;
+  sortMode: ColumnSortMode;
+  sortDir: ColumnSortDir;
+  onSortChange: (mode: ColumnSortMode, dir: ColumnSortDir) => void;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -78,9 +92,56 @@ export const SortableColumn = memo(function SortableColumn({
     willChange: sortable.transform ? "transform" : undefined,
   };
 
+  if (collapsed) {
+    return (
+      <div
+        className={cn(
+          "flex h-full w-12 shrink-0 flex-col items-center rounded-lg bg-white/[0.03] py-2",
+          dropTarget && "bg-white/[0.08] ring-1 ring-white/20",
+        )}
+        ref={sortable.setNodeRef}
+        style={style}
+      >
+        <Button
+          aria-label={`Expand ${column.name}`}
+          onClick={() => onCollapseChange(false)}
+          size="icon"
+          variant="ghost"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <button
+          className="mt-2 flex min-h-0 flex-1 items-center gap-2 text-sm font-medium text-white/70 [writing-mode:vertical-rl]"
+          onClick={() => onCollapseChange(false)}
+          ref={setDropRef}
+          type="button"
+        >
+          <span className="rotate-180 truncate">{column.name}</span>
+          <span
+            className={cn(
+              "rotate-180 text-xs text-white/40",
+              column.wipLimit != null &&
+                totalTaskCount > column.wipLimit &&
+                "text-amber-300",
+            )}
+          >
+            {column.wipLimit != null
+              ? `${totalTaskCount}/${column.wipLimit}`
+              : totalTaskCount}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="flex h-full w-72 shrink-0 flex-col gap-3 rounded-xl bg-white/[0.03] p-3"
+      className={cn(
+        "flex h-full w-72 shrink-0 flex-col gap-3 rounded-lg bg-white/[0.03] p-3",
+        column.wipLimit != null &&
+          totalTaskCount > column.wipLimit &&
+          "ring-1 ring-amber-300/40",
+      )}
       ref={sortable.setNodeRef}
       style={style}
     >
@@ -95,8 +156,14 @@ export const SortableColumn = memo(function SortableColumn({
           ...sortable.listeners,
         }}
         onAddTask={onAddTask}
+        onCollapse={() => onCollapseChange(true)}
+        onHide={onHide}
+        onSortChange={onSortChange}
         sortBlocked={sortBlocked}
-        taskCount={totalTaskCount}
+        sortDir={sortDir}
+        sortMode={sortMode}
+        taskCount={tasks.length}
+        totalTaskCount={totalTaskCount}
       />
       <ScrollArea className="-mx-1 min-h-0 flex-1">
         <div

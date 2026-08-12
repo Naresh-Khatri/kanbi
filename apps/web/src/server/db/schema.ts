@@ -355,6 +355,41 @@ export const boardColumn = createTable(
   (t) => [index("column_board_position_idx").on(t.boardId, t.position)],
 );
 
+export const boardViewPreference = createTable(
+  "board_view_preference",
+  {
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sorts: jsonb("sorts")
+      .$type<
+        Record<
+          string,
+          {
+            mode: "manual" | "priority" | "assignee" | "dueAt" | "createdAt";
+            dir: "asc" | "desc";
+          }
+        >
+      >()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    hiddenColumnIds: jsonb("hidden_column_ids")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    collapsedColumnIds: jsonb("collapsed_column_ids")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    defaultColumnId: text("default_column_id"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.boardId, t.userId] })],
+);
+
 export const task = createTable(
   "task",
   {

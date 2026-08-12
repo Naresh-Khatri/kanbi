@@ -30,11 +30,7 @@ import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-pro
 import { OPEN_TASK_EVENT } from "@/components/ui/rich-text-mention";
 import { isDoneLikeColumn } from "@/lib/column-heuristics";
 import { positionBetween } from "@/lib/position";
-import {
-  type ColumnSortDir,
-  type ColumnSortMode,
-  compareTasks,
-} from "@/lib/task-sort";
+import { compareTasks } from "@/lib/task-sort";
 import { api } from "@/trpc/react";
 import { AddColumn } from "./add-column";
 import { ArchivePanel } from "./archive-panel";
@@ -58,6 +54,8 @@ import { QuickAddTaskDialog } from "../quick-add-task-dialog";
 import { useArchiveTask } from "../use-archive-task";
 import { SortableColumn } from "./sortable-column";
 import { TaskCardPreview } from "./task-card";
+import { HiddenColumns } from "./hidden-columns";
+import { useBoardViewPreferences } from "./use-board-view-preferences";
 import { TaskDetailSheet } from "../task-detail-sheet";
 
 const DROP_ANIMATION: DropAnimation = {
@@ -314,6 +312,8 @@ export function BoardView({
   );
 
   const filtersActive = hasActiveFilters(filters);
+  const { preferences, setColumnCollapsed, setColumnHidden, setColumnSort } =
+    useBoardViewPreferences(boardId, data.viewPreferences);
 
   const taskCountsByColumn = useMemo(() => {
     const counts = new Map(
@@ -353,16 +353,22 @@ export function BoardView({
     for (const c of columns) {
       const list = map.get(c.id);
       if (!list) continue;
-      list.sort(
-        compareTasks(
-          c.sortMode as ColumnSortMode,
-          c.sortDir as ColumnSortDir,
-          nameOf,
-        ),
-      );
+      const sort = preferences.sorts[c.id] ?? {
+        mode: "manual" as const,
+        dir: "asc" as const,
+      };
+      list.sort(compareTasks(sort.mode, sort.dir, nameOf));
     }
     return { tasksByColumn: map, visibleCount: visible, totalCount: total };
-  }, [columns, tasks, filters, filtersActive, labelsByTask, membersById]);
+  }, [
+    columns,
+    tasks,
+    filters,
+    filtersActive,
+    labelsByTask,
+    membersById,
+    preferences.sorts,
+  ]);
 
   const [active, setActive] = useState<ActiveDrag>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
@@ -515,9 +521,12 @@ export function BoardView({
     const sourceColumn = activeTask
       ? columns.find((column) => column.id === activeTask.columnId)
       : null;
+    const sourceSort = sourceColumn
+      ? (preferences.sorts[sourceColumn.id]?.mode ?? "manual")
+      : "manual";
     setSortBlockedColumnId(
       activeTask &&
-        sourceColumn?.sortMode !== "manual" &&
+        sourceSort !== "manual" &&
         target?.columnId === activeTask.columnId
         ? activeTask.columnId
         : null,
@@ -575,10 +584,10 @@ export function BoardView({
       if (!activeTask) return;
 
       const sourceColumn = columns.find((c) => c.id === activeTask.columnId);
-      if (
-        sourceColumn?.sortMode !== "manual" &&
-        activeTask.columnId === targetColumnId
-      ) {
+      const sourceSort = sourceColumn
+        ? (preferences.sorts[sourceColumn.id]?.mode ?? "manual")
+        : "manual";
+      if (sourceSort !== "manual" && activeTask.columnId === targetColumnId) {
         toast("Clear sort to reorder tasks within this column");
         return;
       }
@@ -637,6 +646,28 @@ export function BoardView({
     () => [...columns].sort((a, b) => a.position - b.position),
     [columns],
   );
+  const visibleColumns = useMemo(
+    () =>
+      sortedColumns.filter(
+        (column) => !preferences.hiddenColumnIds.includes(column.id),
+      ),
+    [preferences.hiddenColumnIds, sortedColumns],
+  );
+  const hiddenColumns = useMemo(
+    () =>
+      sortedColumns.filter((column) =>
+        preferences.hiddenColumnIds.includes(column.id),
+      ),
+    [preferences.hiddenColumnIds, sortedColumns],
+  );
+
+  function hideColumn(columnId: string) {
+    if (visibleColumns.length <= 1) {
+      toast("Keep at least one column visible");
+      return;
+    }
+    setColumnHidden(columnId, true);
+  }
 
   const handleOpenTask = useCallback((taskId: string) => {
     setFocusedTaskId(taskId);
@@ -653,11 +684,11 @@ export function BoardView({
   // capture stale columns/tasks.
   const navColumns = useMemo(
     () =>
-      sortedColumns.map((c) => ({
+      visibleColumns.map((c) => ({
         id: c.id,
         taskIds: (tasksByColumn.get(c.id) ?? []).map((t) => t.id),
       })),
-    [sortedColumns, tasksByColumn],
+    [tasksByColumn, visibleColumns],
   );
   // aiDraftOpen lives in the shell store (read imperatively in nav handlers so
   // opening the AI dialog never re-renders the board); the rest are local.
@@ -821,33 +852,53 @@ export function BoardView({
         <div className="min-h-0 flex-1 overflow-x-auto">
           <div className="flex h-full min-w-max gap-4 p-6">
             <SortableContext
-              items={sortedColumns.map((c) => c.id)}
+              items={visibleColumns.map((c) => c.id)}
               strategy={horizontalListSortingStrategy}
             >
-              {sortedColumns.map((col) => (
-                <SortableColumn
-                  boardId={boardId}
-                  canWrite={canWrite}
-                  column={col}
-                  dropTarget={
-                    dropTarget?.columnId === col.id ? dropTarget : null
-                  }
-                  focusedTaskId={focusedTaskId}
-                  key={col.id}
-                  labelsByTask={cardLabelsByTask}
-                  membersById={membersById}
-                  onAddTask={handleAddTask}
-                  onOpenTask={handleOpenTask}
-                  projectKey={projectKey}
-                  sortBlocked={sortBlockedColumnId === col.id}
-                  tasks={tasksByColumn.get(col.id) ?? []}
-                  deletionTaskCount={taskCountsByColumn.get(col.id)?.all ?? 0}
-                  totalTaskCount={taskCountsByColumn.get(col.id)?.active ?? 0}
-                  columns={sortedColumns}
-                />
-              ))}
+              {visibleColumns.map((col) => {
+                const sort = preferences.sorts[col.id] ?? {
+                  mode: "manual" as const,
+                  dir: "asc" as const,
+                };
+                return (
+                  <SortableColumn
+                    boardId={boardId}
+                    canWrite={canWrite}
+                    collapsed={preferences.collapsedColumnIds.includes(col.id)}
+                    column={col}
+                    dropTarget={
+                      dropTarget?.columnId === col.id ? dropTarget : null
+                    }
+                    focusedTaskId={focusedTaskId}
+                    key={col.id}
+                    labelsByTask={cardLabelsByTask}
+                    membersById={membersById}
+                    onAddTask={handleAddTask}
+                    onCollapseChange={(collapsed) =>
+                      setColumnCollapsed(col.id, collapsed)
+                    }
+                    onHide={() => hideColumn(col.id)}
+                    onOpenTask={handleOpenTask}
+                    onSortChange={(mode, dir) =>
+                      setColumnSort(col.id, mode, dir)
+                    }
+                    projectKey={projectKey}
+                    sortBlocked={sortBlockedColumnId === col.id}
+                    sortDir={sort.dir}
+                    sortMode={sort.mode}
+                    tasks={tasksByColumn.get(col.id) ?? []}
+                    deletionTaskCount={taskCountsByColumn.get(col.id)?.all ?? 0}
+                    totalTaskCount={taskCountsByColumn.get(col.id)?.active ?? 0}
+                    columns={sortedColumns}
+                  />
+                );
+              })}
             </SortableContext>
             {canWrite ? <AddColumn boardId={boardId} /> : null}
+            <HiddenColumns
+              columns={hiddenColumns}
+              onShow={(columnId) => setColumnHidden(columnId, false)}
+            />
           </div>
         </div>
         <DragOverlay

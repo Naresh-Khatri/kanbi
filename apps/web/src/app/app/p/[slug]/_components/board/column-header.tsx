@@ -5,11 +5,13 @@ import {
   ArrowUp,
   ArrowUpDown,
   GripVertical,
+  EyeOff,
+  PanelLeftClose,
   MoreHorizontal,
   Plus,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +57,12 @@ export function ColumnHeader({
   sortBlocked,
   columns,
   deletionTaskCount,
+  totalTaskCount,
+  sortMode,
+  sortDir,
+  onSortChange,
+  onHide,
+  onCollapse,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -65,6 +73,12 @@ export function ColumnHeader({
   sortBlocked: boolean;
   columns: ColumnRow[];
   deletionTaskCount: number;
+  totalTaskCount: number;
+  sortMode: ColumnSortMode;
+  sortDir: ColumnSortDir;
+  onSortChange: (mode: ColumnSortMode, dir: ColumnSortDir) => void;
+  onHide: () => void;
+  onCollapse: () => void;
 }) {
   const utils = api.useUtils();
   const [renaming, setRenaming] = useState(false);
@@ -85,7 +99,7 @@ export function ColumnHeader({
   const [destinationColumnId, setDestinationColumnId] = useState(
     otherColumns[0]?.id ?? "",
   );
-  const setSort = api.column.setSort.useMutation({
+  const setWipLimit = api.column.setWipLimit.useMutation({
     onMutate: async (vars) => {
       await utils.board.get.cancel({ boardId });
       const previous = utils.board.get.getData({ boardId });
@@ -94,9 +108,7 @@ export function ColumnHeader({
         return {
           ...old,
           columns: old.columns.map((c) =>
-            c.id === vars.columnId
-              ? { ...c, sortMode: vars.sortMode, sortDir: vars.sortDir }
-              : c,
+            c.id === vars.columnId ? { ...c, wipLimit: vars.wipLimit } : c,
           ),
         };
       });
@@ -104,37 +116,28 @@ export function ColumnHeader({
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
-      toast.error("Couldn't update sort");
+      toast.error("Couldn't update the WIP limit");
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
-
-  const sortMode = column.sortMode as ColumnSortMode;
-  const sortDir = column.sortDir as ColumnSortDir;
   const sorted = sortMode !== "manual";
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cancelClose = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-  const scheduleClose = () => {
-    cancelClose();
-    closeTimer.current = setTimeout(() => setMenuOpen(false), 150);
-  };
-  useEffect(() => () => cancelClose(), []);
+  const [wipDialogOpen, setWipDialogOpen] = useState(false);
+  const [wipLimit, setWipLimitValue] = useState(
+    column.wipLimit?.toString() ?? "",
+  );
 
   function applySort(mode: ColumnSortMode, dir: ColumnSortDir = sortDir) {
-    setSort.mutate({
-      boardId,
-      columnId: column.id,
-      sortMode: mode,
-      sortDir: dir,
-    });
+    onSortChange(mode, dir);
   }
+
+  const countLabel =
+    taskCount < totalTaskCount
+      ? `${taskCount} of ${totalTaskCount}${column.wipLimit != null ? ` · ${column.wipLimit} max` : ""}`
+      : column.wipLimit != null
+        ? `${totalTaskCount}/${column.wipLimit}`
+        : String(totalTaskCount);
+  const overWipLimit =
+    column.wipLimit != null && totalTaskCount > column.wipLimit;
 
   return (
     <div className="flex items-center gap-1 px-1">
@@ -172,7 +175,21 @@ export function ColumnHeader({
             type="button"
           >
             {column.name}
-            <span className="ml-2 text-xs text-white/40">{taskCount}</span>
+            <span
+              className={cn(
+                "ml-2 text-xs text-white/40",
+                overWipLimit && "text-amber-300",
+              )}
+              title={
+                overWipLimit
+                  ? `${totalTaskCount - column.wipLimit!} over the WIP limit`
+                  : taskCount < totalTaskCount
+                    ? `${taskCount} visible out of ${totalTaskCount}`
+                    : undefined
+              }
+            >
+              {countLabel}
+            </span>
           </button>
         </div>
       )}
@@ -201,7 +218,6 @@ export function ColumnHeader({
               sortBlocked &&
                 "bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/50 hover:bg-amber-400/20",
             )}
-            disabled={!canWrite}
             size="icon"
             title={
               sortBlocked
@@ -264,47 +280,109 @@ export function ColumnHeader({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      {canWrite ? (
-        <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            onMouseEnter={cancelClose}
-            onMouseLeave={scheduleClose}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label={`More actions for ${column.name}`}
+            size="icon"
+            title={`More actions for ${column.name}`}
+            variant="ghost"
           >
-            <DropdownMenuItem onSelect={() => setRenaming(true)}>
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={otherColumns.length === 0}
-              destructive
-              onSelect={() => {
-                if (deletionTaskCount > 0) {
-                  setConfirmDelete(true);
-                } else {
-                  void remove({
-                    kind: "column",
-                    id: column.id,
-                    name: column.name,
-                  });
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canWrite ? (
+            <>
+              <DropdownMenuItem onSelect={() => setRenaming(true)}>
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setWipDialogOpen(true)}>
+                Set WIP limit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <DropdownMenuItem onSelect={onCollapse}>
+            <PanelLeftClose className="h-3.5 w-3.5" />
+            Collapse column
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onHide}>
+            <EyeOff className="h-3.5 w-3.5" />
+            Hide column
+          </DropdownMenuItem>
+          {canWrite ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={otherColumns.length === 0}
+                destructive
+                onSelect={() => {
+                  if (deletionTaskCount > 0) {
+                    setConfirmDelete(true);
+                  } else {
+                    void remove({
+                      kind: "column",
+                      id: column.id,
+                      name: column.name,
+                    });
+                  }
+                }}
+                title={
+                  otherColumns.length === 0
+                    ? "A board must have at least one column"
+                    : undefined
                 }
-              }}
-              title={
-                otherColumns.length === 0
-                  ? "A board must have at least one column"
-                  : undefined
+              >
+                Delete column
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog onOpenChange={setWipDialogOpen} open={wipDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set a WIP limit</DialogTitle>
+            <DialogDescription>
+              Highlight this column when active work exceeds the limit. Leave it
+              blank to remove the limit.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            inputMode="numeric"
+            min={1}
+            onChange={(event) => setWipLimitValue(event.target.value)}
+            placeholder="No limit"
+            type="number"
+            value={wipLimit}
+          />
+          <DialogFooter>
+            <Button onClick={() => setWipDialogOpen(false)} variant="ghost">
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                wipLimit.trim() !== "" &&
+                (!Number.isInteger(Number(wipLimit)) ||
+                  Number(wipLimit) < 1 ||
+                  Number(wipLimit) > 999)
               }
+              onClick={() => {
+                setWipLimit.mutate({
+                  boardId,
+                  columnId: column.id,
+                  wipLimit: wipLimit.trim() ? Number(wipLimit) : null,
+                });
+                setWipDialogOpen(false);
+              }}
             >
-              Delete column
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+              Save limit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog onOpenChange={setConfirmDelete} open={confirmDelete}>
         <DialogContent className="max-w-sm">
           <DialogHeader>

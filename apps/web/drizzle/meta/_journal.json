@@ -71,6 +71,13 @@
       "when": 1786523124254,
       "tag": "0009_skinny_sprite",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786543497141,
+      "tag": "0010_nostalgic_starfox",
+      "breakpoints": true
     }
   ]
 }
