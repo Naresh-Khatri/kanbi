@@ -2,6 +2,7 @@
 
 import { formatDateTime, formatRelative } from "@kanbi/shared";
 import {
+  ArrowUp,
   BookOpen,
   ChevronRight,
   Clock3,
@@ -10,10 +11,14 @@ import {
   FolderInput,
   History,
   Loader2,
+  PanelRightClose,
   Pencil,
   Plus,
   Search,
+  Sparkles,
+  X,
 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -28,7 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import {
   RichTextContent,
   RichTextEditor,
@@ -90,7 +95,7 @@ export function DocsWorkspace({
   );
 
   return (
-    <main className="flex min-h-[calc(100vh-57px)] flex-col bg-[#0b0b0f] md:h-[calc(100vh-57px)] md:flex-row md:overflow-hidden">
+    <main className="relative flex min-h-[calc(100vh-57px)] flex-col overflow-x-clip bg-[#0b0b0f] md:h-[calc(100vh-57px)] md:flex-row md:overflow-hidden">
       <DocsSidebar
         activeId={initialDocumentId}
         canWrite={canWrite}
@@ -136,6 +141,12 @@ export function DocsWorkspace({
           />
         )}
       </section>
+      <AskDocsChat
+        currentDocumentId={initialDocumentId}
+        disabled={!documents.data || documents.data.length === 0}
+        projectId={projectId}
+        slug={slug}
+      />
     </main>
   );
 }
@@ -240,6 +251,226 @@ function DocsSidebar({
   );
 }
 
+function AskDocsChat({
+  projectId,
+  slug,
+  currentDocumentId,
+  disabled,
+}: {
+  projectId: string;
+  slug: string;
+  currentDocumentId?: string;
+  disabled: boolean;
+}) {
+  const reduceMotion = useReducedMotion();
+  const [expanded, setExpanded] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [askedQuestion, setAskedQuestion] = useState<string | null>(null);
+  const ask = api.document.ask.useMutation({
+    onError: (error) => toast.error(error.message),
+  });
+
+  const submit = () => {
+    const trimmed = question.trim();
+    if (trimmed.length < 2 || ask.isPending || disabled) return;
+    ask.reset();
+    setAskedQuestion(trimmed);
+    setQuestion("");
+    ask.mutate({ projectId, question: trimmed, currentDocumentId });
+  };
+
+  return (
+    <AnimatePresence initial={false} mode="popLayout">
+      {!expanded ? (
+        <motion.button
+          animate={{ opacity: 1, transform: "translateY(0) scale(1)" }}
+          aria-label="Open Ask Docs"
+          className="fixed right-5 bottom-5 z-40 flex h-9 items-center gap-2 rounded-md border border-white/10 bg-[#121217] px-3 text-xs text-white/55 transition-colors duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-[#18181e] hover:text-white/85 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+          exit={{
+            opacity: 0,
+            transform: reduceMotion
+              ? "translateY(0) scale(1)"
+              : "translateY(4px) scale(0.97)",
+            transition: {
+              duration: 0.1,
+              ease: [0.23, 1, 0.32, 1],
+            },
+          }}
+          initial={{
+            opacity: 0,
+            transform: reduceMotion
+              ? "translateY(0) scale(1)"
+              : "translateY(6px) scale(0.97)",
+          }}
+          key="ask-docs-trigger"
+          onClick={() => setExpanded(true)}
+          title="Open Ask Docs"
+          transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+          type="button"
+          whileTap={{ transform: "translateY(0) scale(0.97)" }}
+        >
+          <Sparkles className="h-3.5 w-3.5 text-white/30" />
+          Ask docs
+        </motion.button>
+      ) : (
+        <motion.aside
+          animate={{ opacity: 1, transform: "translateX(0)" }}
+          className="flex h-96 w-full shrink-0 flex-col border-t border-white/[0.06] bg-[#0b0b0f] md:h-auto md:w-80 md:border-t-0 md:border-l xl:w-96"
+          exit={{
+            opacity: 0,
+            transform: reduceMotion ? "translateX(0)" : "translateX(16px)",
+            transition: {
+              duration: 0.16,
+              ease: [0.23, 1, 0.32, 1],
+            },
+          }}
+          initial={{
+            opacity: 0,
+            transform: reduceMotion ? "translateX(0)" : "translateX(24px)",
+          }}
+          key="ask-docs-panel"
+          transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+        >
+          <header className="flex h-11 shrink-0 items-center justify-between border-b border-white/[0.06] px-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-white/25" />
+              <h2 className="text-xs font-medium text-white/60">Ask docs</h2>
+            </div>
+            <div className="flex items-center gap-1">
+              {askedQuestion ? (
+                <button
+                  aria-label="Clear conversation"
+                  className="rounded-md p-1.5 text-white/25 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-white/5 hover:text-white/55 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none active:scale-[0.97]"
+                  onClick={() => {
+                    setAskedQuestion(null);
+                    ask.reset();
+                  }}
+                  title="Clear conversation"
+                  type="button"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+              <button
+                aria-label="Collapse Ask Docs"
+                className="rounded-md p-1.5 text-white/25 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-white/5 hover:text-white/55 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none active:scale-[0.97]"
+                onClick={() => setExpanded(false)}
+                title="Collapse Ask Docs"
+                type="button"
+              >
+                <PanelRightClose className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </header>
+
+          <div
+            aria-live="polite"
+            className="min-h-0 flex-1 overflow-y-auto p-4"
+          >
+            {askedQuestion ? (
+              <>
+                <div className="flex justify-end pl-8">
+                  <p className="max-w-[90%] rounded-md bg-white/[0.06] px-3 py-2 text-xs leading-5 text-white/70">
+                    {askedQuestion}
+                  </p>
+                </div>
+                <div className="mt-4 flex items-start gap-2.5">
+                  <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-white/25" />
+                  <div className="min-w-0 flex-1">
+                    {ask.isPending ? (
+                      <p className="text-xs leading-5 text-white/35">
+                        Looking through project docs…
+                      </p>
+                    ) : ask.data ? (
+                      <>
+                        <p className="text-sm leading-6 whitespace-pre-wrap text-white/75">
+                          {ask.data.answer}
+                        </p>
+                        {ask.data.citations.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {ask.data.citations.map((citation) => (
+                              <Link
+                                className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border border-white/10 px-2.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+                                href={`/app/p/${slug}/docs/${citation.documentId}`}
+                                key={citation.documentId}
+                              >
+                                <FileText className="h-3 w-3 shrink-0 text-white/25" />
+                                <span className="truncate">
+                                  {citation.title}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : ask.error ? (
+                      <p className="text-xs leading-5 text-white/35">
+                        I couldn&apos;t answer that right now. Try again in a
+                        moment.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex h-full min-h-28 flex-col items-center justify-center text-center">
+                <Sparkles className="h-4 w-4 text-white/15" />
+                <p className="mt-3 max-w-48 text-xs leading-5 text-white/30">
+                  {disabled
+                    ? "Create a page before asking project docs."
+                    : "Ask a question and get an answer grounded in project pages."}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-white/[0.06] p-3">
+            <div className="relative">
+              <Textarea
+                aria-label="Ask project docs"
+                className="max-h-32 min-h-20 resize-none border-white/[0.08] bg-white/[0.02] py-2 pr-10 text-xs leading-5 placeholder:text-white/25 focus-visible:ring-white/20"
+                disabled={disabled || ask.isPending}
+                maxLength={500}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    submit();
+                  }
+                }}
+                placeholder={
+                  disabled ? "Create a page to ask docs" : "Ask project docs…"
+                }
+                rows={3}
+                value={question}
+              />
+              <button
+                aria-label="Ask"
+                className="absolute right-1.5 bottom-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-white text-black transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none active:scale-[0.97] disabled:opacity-25"
+                disabled={
+                  disabled || ask.isPending || question.trim().length < 2
+                }
+                onClick={submit}
+                title="Ask (Enter)"
+                type="button"
+              >
+                {ask.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </div>
+            <p className="mt-1.5 px-1 text-[10px] text-white/20">
+              Answers cite project pages.
+            </p>
+          </div>
+        </motion.aside>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function DocumentLink({
   href,
   title,
@@ -284,8 +515,15 @@ function DocsHome({
   creating: boolean;
   onCreate: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 py-12 md:px-12 md:py-16">
+    <motion.div
+      className="mx-auto w-full max-w-4xl px-6 py-12 md:px-12 md:py-16"
+      layout={reduceMotion ? false : "position"}
+      transition={{
+        layout: { duration: 0.22, ease: [0.77, 0, 0.175, 1] },
+      }}
+    >
       <header className="border-b border-white/10 pb-8">
         <div className="flex items-start justify-between gap-6">
           <div>
@@ -357,7 +595,7 @@ function DocsHome({
           </p>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -381,6 +619,7 @@ function DocumentSurface({
     Array<{ href?: string }>;
   onCreateChild: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const searchParams = useSearchParams();
   const utils = api.useUtils();
@@ -499,7 +738,13 @@ function DocumentSurface({
   const breadcrumbs = documentBreadcrumbs(documents, document.data.id);
 
   return (
-    <article className="mx-auto w-full max-w-4xl px-6 py-8 md:px-12 md:py-12">
+    <motion.article
+      className="mx-auto w-full max-w-4xl px-6 py-8 md:px-12 md:py-12"
+      layout={reduceMotion ? false : "position"}
+      transition={{
+        layout: { duration: 0.22, ease: [0.77, 0, 0.175, 1] },
+      }}
+    >
       <div className="flex min-h-6 flex-wrap items-center gap-1 text-xs text-white/35">
         <Link
           className="transition hover:text-white/70"
@@ -686,7 +931,7 @@ function DocumentSurface({
         open={moveOpen}
         projectId={projectId}
       />
-    </article>
+    </motion.article>
   );
 }
 

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  documentExcerpt,
+  documentRelevance,
+  documentSearchTerms,
   extractTicketIds,
   richTextToPlainText,
   wouldCreateDocumentCycle,
@@ -22,6 +25,42 @@ describe("document content", () => {
       '<span data-type="ticket" data-id="bad id">bad</span>',
     ].join("");
     expect(extractTicketIds(html)).toEqual(["task_abc123"]);
+  });
+
+  it("builds a compact lexical query for project questions", () => {
+    expect(
+      documentSearchTerms("Where is the CI deploy runbook for S3?"),
+    ).toEqual(["ci", "deploy", "runbook", "s3"]);
+    expect(documentSearchTerms("Why is it?")).toEqual([]);
+  });
+
+  it("ranks title matches ahead of incidental body matches", () => {
+    const terms = ["deploy", "runbook"];
+    const titleMatch = documentRelevance({
+      title: "Deploy runbook",
+      text: "Production steps",
+      question: "deploy runbook",
+      terms,
+      current: false,
+    });
+    const bodyMatch = documentRelevance({
+      title: "Engineering notes",
+      text: "The deploy runbook was discussed once.",
+      question: "deploy runbook",
+      terms,
+      current: false,
+    });
+    expect(titleMatch).toBeGreaterThan(bodyMatch);
+  });
+
+  it("extracts model context around the matching passage", () => {
+    const excerpt = documentExcerpt(
+      `${"Opening context ".repeat(30)}production deploy checklist${" trailing notes".repeat(30)}`,
+      ["production", "deploy"],
+      180,
+    );
+    expect(excerpt).toContain("production deploy checklist");
+    expect(excerpt.length).toBeLessThanOrEqual(182);
   });
 
   it("sanitizes unsafe markup while preserving canonical mentions", () => {
