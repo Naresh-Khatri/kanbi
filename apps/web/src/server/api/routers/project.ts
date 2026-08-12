@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, max, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -85,7 +85,7 @@ export const projectRouter = createTRPCRouter({
     const lastActivity = await ctx.db
       .select({
         projectId: board.projectId,
-        lastActivityAt: sql<Date>`max(${activity.createdAt})`,
+        lastActivityAt: max(activity.createdAt),
       })
       .from(activity)
       .innerJoin(board, eq(board.id, activity.boardId))

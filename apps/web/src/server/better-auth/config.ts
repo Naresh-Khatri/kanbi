@@ -67,6 +67,11 @@ export const auth = betterAuth({
       advertisedMetadata: {
         scopes_supported: [...MCP_SCOPES],
       },
+      // Both the root mirror and the RFC 8414 path-aware metadata route are
+      // provided under app/.well-known, so this startup reminder is satisfied.
+      silenceWarnings: {
+        oauthAuthServerConfig: true,
+      },
       // Resources we'll mint a JWT for (RFC 8707). Must include whatever host
       // the client is pointed at, or the token comes back opaque.
       validAudiences: MCP_AUDIENCES,
