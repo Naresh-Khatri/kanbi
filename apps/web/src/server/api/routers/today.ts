@@ -24,6 +24,7 @@ export const todayRouter = createTRPCRouter({
         addedAt: todayItem.addedAt,
         title: task.title,
         priority: task.priority,
+        estimatePomodoros: task.estimatePomodoros,
         columnId: task.columnId,
         number: task.number,
         columnName: boardColumn.name,

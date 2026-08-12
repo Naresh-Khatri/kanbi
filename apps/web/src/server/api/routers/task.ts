@@ -60,6 +60,10 @@ const draftVariantSchema = z.object({
   checklist: z.array(z.string().min(1).max(280)).max(20).default([]),
 });
 
+// 25-min focus blocks. model is instructed to always estimate; catch -> mid-size fallback
+// if it ever emits something out of range.
+const draftEstimateSchema = z.number().int().min(1).max(8).catch(3);
+
 const draftIssueSchema = z.object({
   summary: z.string().min(1).max(300),
   confidence: confidenceEnum.default("med"),
@@ -67,6 +71,7 @@ const draftIssueSchema = z.object({
   labelIds: z.array(z.string()).default([]),
   assigneeId: z.string().nullable().default(null),
   dueAt: draftDueAtSchema,
+  estimatePomodoros: draftEstimateSchema,
   variants: z.array(draftVariantSchema).min(1).max(3),
 });
 
@@ -120,6 +125,7 @@ export const taskRouter = createTRPCRouter({
         priority: priorityEnum.optional(),
         assigneeId: z.string().nullable().optional(),
         dueAt: z.date().nullable().optional(),
+        estimatePomodoros: z.number().int().min(1).max(16).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -155,6 +161,7 @@ export const taskRouter = createTRPCRouter({
           reporterId: ctx.session.user.id,
           assigneeId: input.assigneeId ?? null,
           dueAt: input.dueAt ?? null,
+          estimatePomodoros: input.estimatePomodoros ?? null,
         })
         .returning();
       bus.emitBoard(input.boardId, { scope: "task", ids: row ? [row.id] : [] });
@@ -209,6 +216,7 @@ export const taskRouter = createTRPCRouter({
         priority: priorityEnum.optional(),
         assigneeId: z.string().nullable().optional(),
         dueAt: z.date().nullable().optional(),
+        estimatePomodoros: z.number().int().min(1).max(16).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -481,10 +489,11 @@ export const taskRouter = createTRPCRouter({
         `Project members (use exact ids, never invent):\n${memberList}`,
         `Today's date is ${today}.`,
         "Output JSON matching this shape exactly:",
-        `{"issues":[{"summary":string,"confidence":"high"|"med"|"low","priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[],"assigneeId":string|null,"dueAt":string|null,"variants":[{"kind":"concise"|"medium"|"verbose","title":string,"description":string,"checklist":string[]}]}]}`,
+        `{"issues":[{"summary":string,"confidence":"high"|"med"|"low","priority":"urgent"|"high"|"medium"|"low"|"none","labelIds":string[],"assigneeId":string|null,"dueAt":string|null,"estimatePomodoros":number,"variants":[{"kind":"concise"|"medium"|"verbose","title":string,"description":string,"checklist":string[]}]}]}`,
         "Rules:",
         "- One issue per distinct problem/request. If the message is a single issue, return one.",
-        "- priority, labelIds, assigneeId, and dueAt describe the issue as a whole — set them once per issue, NOT per variant.",
+        "- priority, labelIds, assigneeId, dueAt, and estimatePomodoros describe the issue as a whole — set them once per issue, NOT per variant.",
+        "- estimatePomodoros: always provide an integer estimate of effort in 25-minute focus blocks (1-8). A small fix ≈ 1, a typical feature slice ≈ 2-4, large or vague work ≈ 6-8. Never omit this.",
         "- Produce exactly 3 variants per issue, tagged with `kind` in this order: \"concise\" (tightest title, 1-2 sentence description, minimal or empty checklist), \"medium\" (balanced detail and a practical checklist), and \"verbose\" (fullest description with rationale/acceptance criteria and the most thorough checklist). Variants differ ONLY in title, description, and checklist depth.",
         "- title: imperative, under 80 chars.",
         "- description: simple HTML only (use <p>, <strong>, <em>, <code>, <a href>, and <ul>/<ol> with <li>). No markdown, no <script>/<style>/<img>. It doesn't have to be one linear paragraph — use multiple paragraphs and bullet lists when they make it clearer (context, rationale, acceptance criteria, edge cases), but don't pad a simple task; a sentence or two is fine. Keep implementation steps in the checklist, not here, and don't restate the checklist items.",
@@ -649,6 +658,13 @@ export const taskRouter = createTRPCRouter({
               labelIds: z.array(z.string()).optional(),
               assigneeId: z.string().nullable().optional(),
               dueAt: z.date().nullable().optional(),
+              estimatePomodoros: z
+                .number()
+                .int()
+                .min(1)
+                .max(16)
+                .nullable()
+                .optional(),
               checklist: z.array(z.string().min(1).max(280)).max(20).optional(),
             }),
           )
@@ -718,6 +734,7 @@ export const taskRouter = createTRPCRouter({
           reporterId: ctx.session.user.id,
           assigneeId: t.assigneeId ?? null,
           dueAt: t.dueAt ?? null,
+          estimatePomodoros: t.estimatePomodoros ?? null,
         };
       });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Timer, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -51,6 +51,9 @@ export function TodayQueue() {
   });
 
   const doneCount = data.filter((t) => isDoneLikeColumn(t.columnName)).length;
+  const totalEstimate = data
+    .filter((t) => !isDoneLikeColumn(t.columnName))
+    .reduce((sum, t) => sum + (t.estimatePomodoros ?? 0), 0);
 
   return (
     <section className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4">
@@ -59,6 +62,11 @@ export function TodayQueue() {
         {doneCount > 0 ? (
           <span className="text-xs text-white/40">
             {doneCount}/{data.length} done
+          </span>
+        ) : null}
+        {totalEstimate > 0 ? (
+          <span className="text-xs text-white/40">
+            ~{totalEstimate} pomodoro{totalEstimate === 1 ? "" : "s"}
           </span>
         ) : null}
         {doneCount > 0 ? (
@@ -116,6 +124,12 @@ function TodayRow({
         >
           {item.title}
         </span>
+        {item.estimatePomodoros != null ? (
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-white/40">
+            <Timer className="h-3 w-3" />
+            {item.estimatePomodoros}
+          </span>
+        ) : null}
         <span className="max-w-[7rem] shrink-0 truncate text-xs text-white/40">
           {item.projectName}
         </span>

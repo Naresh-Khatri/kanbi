@@ -8,6 +8,7 @@ import {
   Link2,
   MoreHorizontal,
   Sun,
+  Timer,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
@@ -235,6 +236,12 @@ export function TaskCard({
               />
               {PRIORITY_META[task.priority as Priority].label}
             </div>
+          ) : null}
+          {task.estimatePomodoros != null ? (
+            <span className="inline-flex items-center gap-1 text-xs text-white/40">
+              <Timer className="h-3 w-3" />
+              {task.estimatePomodoros}
+            </span>
           ) : null}
         </div>
         {assignee ? (

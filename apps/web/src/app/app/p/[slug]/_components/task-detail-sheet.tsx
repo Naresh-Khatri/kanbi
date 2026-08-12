@@ -7,6 +7,7 @@ import {
   GitBranch,
   Link2,
   Loader2,
+  Minus,
   Paperclip,
   Pencil,
   Plus,
@@ -14,6 +15,7 @@ import {
   SquareKanban,
   Sun,
   Tag,
+  Timer,
   Trash2,
   User as UserIcon,
   X,
@@ -257,6 +259,13 @@ function TaskDetail({
           }
           value={task.assigneeId}
         />
+        <EstimateControl
+          canWrite={canWrite}
+          onChange={(n) =>
+            update.mutate({ boardId, taskId: task.id, estimatePomodoros: n })
+          }
+          value={task.estimatePomodoros}
+        />
         <DueControl
           canWrite={canWrite}
           onChange={(d) =>
@@ -399,6 +408,69 @@ function DueControl({
         type="date"
         value={has ? new Date(value).toISOString().slice(0, 10) : ""}
       />
+    </div>
+  );
+}
+
+// 25-min focus blocks. compact stepper: click the label to start at 1, then +/-, X clears.
+function EstimateControl({
+  value,
+  onChange,
+  canWrite,
+}: {
+  value: number | null;
+  onChange: (n: number | null) => void;
+  canWrite: boolean;
+}) {
+  const has = value != null;
+  const dec = () => {
+    if (!has) return;
+    onChange(value > 1 ? value - 1 : null);
+  };
+  const inc = () => onChange(has ? Math.min(16, value + 1) : 1);
+  return (
+    <div className="inline-flex items-center">
+      {has && canWrite ? (
+        <button
+          aria-label="Decrease estimate"
+          className="rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white"
+          onClick={dec}
+          type="button"
+        >
+          <Minus className="h-3 w-3" />
+        </button>
+      ) : null}
+      <button
+        className={PROP_BTN}
+        disabled={!canWrite}
+        onClick={inc}
+        type="button"
+      >
+        <Timer className={PROP_ICON} />
+        <span className={cn("truncate", !has && PROP_PLACEHOLDER)}>
+          {has ? `${value} pomodoro${value === 1 ? "" : "s"}` : "Estimate"}
+        </span>
+      </button>
+      {has && canWrite ? (
+        <>
+          <button
+            aria-label="Increase estimate"
+            className="rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white"
+            onClick={inc}
+            type="button"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+          <button
+            aria-label="Clear estimate"
+            className="-ml-1 rounded p-1 text-white/40 transition hover:bg-white/10 hover:text-white"
+            onClick={() => onChange(null)}
+            type="button"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -378,6 +378,8 @@ export const task = createTable(
       onDelete: "set null",
     }),
     dueAt: timestamp("due_at", { withTimezone: true }),
+    // 25-min focus blocks; null = unestimated. AI drafter proposes 1-8, manual entry allows up to 16.
+    estimatePomodoros: integer("estimate_pomodoros"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

@@ -5,9 +5,11 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Minus,
   Plus,
   Sparkles,
   Tag,
+  Timer,
   User as UserIcon,
   X,
 } from "lucide-react";
@@ -60,6 +62,7 @@ type EditableIssue = {
   labelIds: string[];
   assigneeId: string | null;
   dueAt: string | null;
+  estimatePomodoros: number;
   variantIndex: number;
   variants: EditableVariant[];
   skip: boolean;
@@ -201,6 +204,7 @@ export function AiDraftDialog({
             labelIds: issue.labelIds,
             assigneeId: issue.assigneeId,
             dueAt: issue.dueAt,
+            estimatePomodoros: issue.estimatePomodoros,
             variantIndex: 0,
             variants: issue.variants.map((v, vi) => ({
               ...v,
@@ -237,6 +241,7 @@ export function AiDraftDialog({
           labelIds: i.labelIds,
           assigneeId: i.assigneeId ?? undefined,
           dueAt: i.dueAt ? new Date(i.dueAt) : undefined,
+          estimatePomodoros: i.estimatePomodoros,
           checklist: v.checklist.length > 0 ? v.checklist : undefined,
         };
       })
@@ -363,8 +368,8 @@ export function AiDraftDialog({
           {view === "input" ? (
             <>
               <span className="max-w-[60%] text-[11px] leading-relaxed text-white/35">
-                Each issue comes with a priority, assignee, due date, labels, and
-                a checklist.
+                Each issue comes with a priority, assignee, due date, labels, a
+                pomodoro estimate, and a checklist.
               </span>
               <div className="flex items-center gap-2">
                 {issues ? (
@@ -581,6 +586,12 @@ function IssueCard({
               onChange={(dueAt) => onIssueEdit({ dueAt })}
               value={issue.dueAt}
             />
+            <EstimateChip
+              onChange={(estimatePomodoros) =>
+                onIssueEdit({ estimatePomodoros })
+              }
+              value={issue.estimatePomodoros}
+            />
             <LabelsChip
               labels={labels}
               onToggle={(id, on) => {
@@ -689,6 +700,39 @@ function PriorityChip({
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function EstimateChip({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-white/[0.04] px-1 py-1 text-[11px] text-white/55">
+      <button
+        aria-label="Decrease estimate"
+        className="rounded p-0.5 transition hover:bg-white/[0.07] hover:text-white/85 disabled:pointer-events-none disabled:opacity-30"
+        disabled={value <= 1}
+        onClick={() => onChange(Math.max(1, value - 1))}
+        type="button"
+      >
+        <Minus className="h-3 w-3" />
+      </button>
+      <Timer className="h-3 w-3" />
+      {value}
+      <button
+        aria-label="Increase estimate"
+        className="rounded p-0.5 transition hover:bg-white/[0.07] hover:text-white/85 disabled:pointer-events-none disabled:opacity-30"
+        disabled={value >= 8}
+        onClick={() => onChange(Math.min(8, value + 1))}
+        type="button"
+      >
+        <Plus className="h-3 w-3" />
+      </button>
+    </span>
   );
 }
 
