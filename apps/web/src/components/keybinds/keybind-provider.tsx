@@ -1,11 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { CommandPalette } from "@/components/command/command-palette";
 import { KeybindCheatsheet } from "@/components/keybinds/keybind-cheatsheet";
 import { useAppShell } from "@/components/keybinds/shell-store";
+import { api } from "@/trpc/react";
+
+const JUMP_KEYS = Array.from({ length: 9 }, (_, i) => i + 1)
+  .flatMap((n) => [`g>${n}`, `alt+${n}`])
+  .join(",");
 
 export function KeybindProvider() {
   const router = useRouter();
@@ -16,6 +22,13 @@ export function KeybindProvider() {
     requestCreateProject,
     requestCreateTask,
   } = useAppShell();
+
+  // shared cache w/ dashboard + palette; active projects, server order = jump-target order
+  const projects = api.project.list.useQuery();
+  const activeProjects = useMemo(
+    () => projects.data?.filter((p) => p.status === "active") ?? [],
+    [projects.data],
+  );
 
   useHotkeys(
     "mod+k",
@@ -39,6 +52,18 @@ export function KeybindProvider() {
     e.preventDefault();
     requestCreateTask();
   });
+
+  useHotkeys(
+    JUMP_KEYS,
+    (e, handler) => {
+      const n = Number(/\d+$/.exec(handler.hotkey)?.[0]);
+      const project = activeProjects[n - 1];
+      if (!project) return;
+      e.preventDefault();
+      router.push(`/app/p/${project.slug}`);
+    },
+    [activeProjects],
+  );
 
   return (
     <>

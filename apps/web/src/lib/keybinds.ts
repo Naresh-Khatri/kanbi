@@ -9,6 +9,10 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
     entries: [
       { keys: "⌘K / Ctrl+K", description: "Open command palette" },
       { keys: "g then h", description: "Go to dashboard" },
+      {
+        keys: "g then 1-9 / Alt+1-9",
+        description: "Jump to Nth active project",
+      },
       { keys: "?", description: "Show this cheatsheet" },
     ],
   },

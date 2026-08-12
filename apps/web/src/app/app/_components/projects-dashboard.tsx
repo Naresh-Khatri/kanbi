@@ -75,8 +75,12 @@ export function ProjectsDashboard() {
         <>
           {active.length > 0 ? (
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {active.map((p) => (
-                <ProjectCardItem key={p.id} project={p} />
+              {active.map((p, i) => (
+                <ProjectCardItem
+                  jumpNumber={i < 9 ? i + 1 : undefined}
+                  key={p.id}
+                  project={p}
+                />
               ))}
             </ul>
           ) : (
@@ -101,7 +105,13 @@ export function ProjectsDashboard() {
   );
 }
 
-function ProjectCardItem({ project }: { project: ProjectCard }) {
+function ProjectCardItem({
+  project,
+  jumpNumber,
+}: {
+  project: ProjectCard;
+  jumpNumber?: number;
+}) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const isOwner = project.role === "owner";
   const pct =
@@ -159,6 +169,11 @@ function ProjectCardItem({ project }: { project: ProjectCard }) {
           project={project}
         />
       </div>
+      {jumpNumber ? (
+        <span className="pointer-events-none absolute right-3 bottom-3 font-mono text-[10px] text-white/25">
+          {jumpNumber}
+        </span>
+      ) : null}
       {isOwner ? (
         <DeleteProjectDialog
           onOpenChange={setDeleteOpen}

@@ -3,8 +3,9 @@
 import { Command } from "cmdk";
 import { ArrowRight, Layers, ListTodo, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { useRecentProjects } from "@/components/keybinds/recents-store";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { api } from "@/trpc/react";
 
@@ -22,6 +23,24 @@ export function CommandPalette() {
   const projects = api.project.list.useQuery(undefined, {
     enabled: paletteOpen,
   });
+  const recentSlugs = useRecentProjects((s) => s.slugs);
+
+  // recents-first, then rest in server order (active-first, most-recently-active first)
+  const orderedProjects = useMemo(() => {
+    const all = projects.data ?? [];
+    const bySlug = new Map(all.map((p) => [p.slug, p]));
+    const recent = recentSlugs
+      .map((slug) => bySlug.get(slug))
+      .filter((p) => p !== undefined);
+    const recentSlugSet = new Set(recent.map((p) => p.slug));
+    return [...recent, ...all.filter((p) => !recentSlugSet.has(p.slug))];
+  }, [projects.data, recentSlugs]);
+
+  // jump-shortcut numbers, keyed by slug: first 9 active projects in server order
+  const jumpNumberBySlug = useMemo(() => {
+    const active = (projects.data ?? []).filter((p) => p.status === "active");
+    return new Map(active.slice(0, 9).map((p, i) => [p.slug, i + 1]));
+  }, [projects.data]);
 
   const trimmed = query.trim();
   const taskSearch = api.task.search.useQuery(
@@ -96,19 +115,26 @@ export function CommandPalette() {
             </PaletteItem>
           </Command.Group>
 
-          {projects.data && projects.data.length > 0 ? (
+          {orderedProjects.length > 0 ? (
             <Command.Group
               className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
               heading="Projects"
             >
-              {projects.data.map((p) => (
+              {orderedProjects.map((p) => (
                 <PaletteItem
+                  hint={jumpNumberBySlug.get(p.slug)}
                   icon={<Layers className="h-4 w-4" />}
                   key={p.id}
                   onSelect={() => go(() => router.push(`/app/p/${p.slug}`))}
                   value={`project ${p.name} ${p.slug}`}
                 >
-                  {p.name}
+                  <span
+                    className={
+                      p.status === "on_hold" ? "text-white/50" : undefined
+                    }
+                  >
+                    {p.name}
+                  </span>
                 </PaletteItem>
               ))}
             </Command.Group>
@@ -154,11 +180,13 @@ function PaletteItem({
   children,
   value,
   onSelect,
+  hint,
 }: {
   icon: React.ReactNode;
   children: React.ReactNode;
   value: string;
   onSelect: () => void;
+  hint?: number;
 }) {
   return (
     <Command.Item
@@ -168,6 +196,11 @@ function PaletteItem({
     >
       <span className="text-white/60">{icon}</span>
       {children}
+      {hint ? (
+        <span className="ml-auto shrink-0 text-xs text-white/40">
+          {hint}
+        </span>
+      ) : null}
     </Command.Item>
   );
 }

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AiDraftController } from "@/app/app/p/[slug]/_components/ai-draft-controller";
 import { BoardView } from "@/app/app/p/[slug]/_components/board/board-view";
+import { RecentProjectTracker } from "@/app/app/p/[slug]/_components/recent-project-tracker";
 import { resolveProject } from "@/app/app/p/[slug]/_lib/resolve-project";
 
 export default async function ProjectPage({
@@ -22,6 +23,7 @@ export default async function ProjectPage({
         projectSlug={project.slug}
       />
       <AiDraftController boardId={project.boardId} projectId={project.id} />
+      <RecentProjectTracker slug={project.slug} />
     </>
   );
 }
