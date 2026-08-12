@@ -40,6 +40,9 @@ export const SortableColumn = memo(function SortableColumn({
   focusedTaskId,
   projectKey,
   sortBlocked,
+  totalTaskCount,
+  columns,
+  deletionTaskCount,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -53,6 +56,9 @@ export const SortableColumn = memo(function SortableColumn({
   focusedTaskId: string | null;
   projectKey: string;
   sortBlocked: boolean;
+  totalTaskCount: number;
+  columns: ColumnRow[];
+  deletionTaskCount: number;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -82,13 +88,15 @@ export const SortableColumn = memo(function SortableColumn({
         boardId={boardId}
         canWrite={canWrite}
         column={column}
+        columns={columns}
+        deletionTaskCount={deletionTaskCount}
         dragHandleProps={{
           ...sortable.attributes,
           ...sortable.listeners,
         }}
         onAddTask={onAddTask}
         sortBlocked={sortBlocked}
-        taskCount={tasks.length}
+        taskCount={totalTaskCount}
       />
       <ScrollArea className="-mx-1 min-h-0 flex-1">
         <div

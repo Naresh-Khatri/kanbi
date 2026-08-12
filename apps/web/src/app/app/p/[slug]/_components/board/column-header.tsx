@@ -53,6 +53,8 @@ export function ColumnHeader({
   dragHandleProps,
   onAddTask,
   sortBlocked,
+  columns,
+  deletionTaskCount,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -61,6 +63,8 @@ export function ColumnHeader({
   dragHandleProps: React.HTMLAttributes<HTMLButtonElement>;
   onAddTask: (columnId: string) => void;
   sortBlocked: boolean;
+  columns: ColumnRow[];
+  deletionTaskCount: number;
 }) {
   const utils = api.useUtils();
   const [renaming, setRenaming] = useState(false);
@@ -75,6 +79,12 @@ export function ColumnHeader({
   });
   const remove = useUndoableBoardDelete(boardId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const otherColumns = columns.filter(
+    (candidate) => candidate.id !== column.id,
+  );
+  const [destinationColumnId, setDestinationColumnId] = useState(
+    otherColumns[0]?.id ?? "",
+  );
   const setSort = api.column.setSort.useMutation({
     onMutate: async (vars) => {
       await utils.board.get.cancel({ boardId });
@@ -271,9 +281,10 @@ export function ColumnHeader({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              disabled={otherColumns.length === 0}
               destructive
               onSelect={() => {
-                if (taskCount > 0) {
+                if (deletionTaskCount > 0) {
                   setConfirmDelete(true);
                 } else {
                   void remove({
@@ -283,6 +294,11 @@ export function ColumnHeader({
                   });
                 }
               }}
+              title={
+                otherColumns.length === 0
+                  ? "A board must have at least one column"
+                  : undefined
+              }
             >
               Delete column
             </DropdownMenuItem>
@@ -294,11 +310,27 @@ export function ColumnHeader({
           <DialogHeader>
             <DialogTitle>Delete &ldquo;{column.name}&rdquo;?</DialogTitle>
             <DialogDescription>
-              This column has {taskCount} {taskCount === 1 ? "task" : "tasks"}.
-              Deleting it removes {taskCount === 1 ? "it" : "them"} too. You can
-              undo for a few seconds.
+              This column has {deletionTaskCount}{" "}
+              {deletionTaskCount === 1 ? "task" : "tasks"}
+              {deletionTaskCount > taskCount ? ", including archived work" : ""}
+              . Move {deletionTaskCount === 1 ? "it" : "them"} to another column
+              before deleting. You can undo for a few seconds.
             </DialogDescription>
           </DialogHeader>
+          <label className="space-y-2 text-sm">
+            <span className="text-white/70">Move tasks to</span>
+            <select
+              className="h-9 w-full rounded-md border border-white/10 bg-[#14151c] px-3 text-sm outline-none focus:border-white/20 focus:ring-2 focus:ring-white/20"
+              onChange={(event) => setDestinationColumnId(event.target.value)}
+              value={destinationColumnId}
+            >
+              {otherColumns.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <DialogFooter>
             <Button onClick={() => setConfirmDelete(false)} variant="ghost">
               Cancel
@@ -310,11 +342,13 @@ export function ColumnHeader({
                   kind: "column",
                   id: column.id,
                   name: column.name,
+                  moveTasksToColumnId: destinationColumnId,
                 });
               }}
+              disabled={!destinationColumnId}
               variant="destructive"
             >
-              Delete column
+              Move tasks and delete
             </Button>
           </DialogFooter>
         </DialogContent>

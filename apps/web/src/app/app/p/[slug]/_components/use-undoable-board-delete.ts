@@ -6,7 +6,12 @@ import { api } from "@/trpc/react";
 const UNDO_WINDOW_MS = 6000;
 
 type DeleteTarget =
-  | { kind: "column"; id: string; name: string }
+  | {
+      kind: "column";
+      id: string;
+      name: string;
+      moveTasksToColumnId?: string;
+    }
   | { kind: "task"; id: string; name: string };
 
 /**
@@ -41,7 +46,13 @@ export function useUndoableBoardDelete(boardId: string) {
         return {
           ...old,
           columns: old.columns.filter((c) => c.id !== target.id),
-          tasks: old.tasks.filter((t) => t.columnId !== target.id),
+          tasks: target.moveTasksToColumnId
+            ? old.tasks.map((task) =>
+                task.columnId === target.id
+                  ? { ...task, columnId: target.moveTasksToColumnId! }
+                  : task,
+              )
+            : old.tasks.filter((task) => task.columnId !== target.id),
         };
       }
       return { ...old, tasks: old.tasks.filter((t) => t.id !== target.id) };
@@ -52,7 +63,11 @@ export function useUndoableBoardDelete(boardId: string) {
     const commit = setTimeout(() => {
       if (undone) return;
       if (target.kind === "column") {
-        deleteColumn.mutate({ boardId, columnId: target.id });
+        deleteColumn.mutate({
+          boardId,
+          columnId: target.id,
+          moveTasksToColumnId: target.moveTasksToColumnId,
+        });
       } else {
         deleteTask.mutate({ boardId, taskId: target.id });
       }
@@ -69,7 +84,43 @@ export function useUndoableBoardDelete(boardId: string) {
           onClick: () => {
             undone = true;
             clearTimeout(commit);
-            if (snapshot) utils.board.get.setData({ boardId }, snapshot);
+            if (!snapshot) return;
+            utils.board.get.setData({ boardId }, (current) => {
+              if (!current) return snapshot;
+              if (target.kind === "column") {
+                const removedColumn = snapshot.columns.find(
+                  (column) => column.id === target.id,
+                );
+                const removedTasks = snapshot.tasks.filter(
+                  (task) => task.columnId === target.id,
+                );
+                return {
+                  ...current,
+                  columns:
+                    removedColumn &&
+                    !current.columns.some(
+                      (column) => column.id === removedColumn.id,
+                    )
+                      ? [...current.columns, removedColumn]
+                      : current.columns,
+                  tasks: current.tasks
+                    .filter(
+                      (task) =>
+                        !removedTasks.some(
+                          (removedTask) => removedTask.id === task.id,
+                        ),
+                    )
+                    .concat(removedTasks),
+                };
+              }
+              const removedTask = snapshot.tasks.find(
+                (task) => task.id === target.id,
+              );
+              return removedTask &&
+                !current.tasks.some((task) => task.id === removedTask.id)
+                ? { ...current, tasks: [...current.tasks, removedTask] }
+                : current;
+            });
           },
         },
       },

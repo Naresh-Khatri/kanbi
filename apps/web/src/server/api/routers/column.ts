@@ -1,14 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { positionAtEnd, positionBetween } from "@/lib/position";
+import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
 import {
   assertCanWrite,
   boardProcedure,
   createTRPCRouter,
 } from "@/server/api/trpc";
-import { boardColumn } from "@/server/db/schema";
+import { boardColumn, task } from "@/server/db/schema";
 import { bus } from "@/server/realtime/bus";
 
 export const columnRouter = createTRPCRouter({
@@ -112,21 +112,91 @@ export const columnRouter = createTRPCRouter({
     }),
 
   delete: boardProcedure
-    .input(z.object({ columnId: z.string().min(1) }))
+    .input(
+      z.object({
+        columnId: z.string().min(1),
+        moveTasksToColumnId: z.string().min(1).nullable().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
-      const existing = await ctx.db
-        .select({ id: boardColumn.id, boardId: boardColumn.boardId })
-        .from(boardColumn)
-        .where(eq(boardColumn.id, input.columnId))
-        .limit(1);
-      const hit = existing[0];
-      if (!hit || hit.boardId !== input.boardId) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      await ctx.db
-        .delete(boardColumn)
-        .where(eq(boardColumn.id, input.columnId));
+      await ctx.db.transaction(async (tx) => {
+        const columns = await tx
+          .select({ id: boardColumn.id })
+          .from(boardColumn)
+          .where(eq(boardColumn.boardId, input.boardId))
+          .for("update");
+        if (!columns.some((column) => column.id === input.columnId)) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+        if (columns.length <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A board must have at least one column.",
+          });
+        }
+
+        const sourceTasks = await tx
+          .select({ id: task.id })
+          .from(task)
+          .where(
+            and(
+              eq(task.boardId, input.boardId),
+              eq(task.columnId, input.columnId),
+            ),
+          )
+          .orderBy(asc(task.position));
+
+        if (sourceTasks.length > 0) {
+          const destinationId = input.moveTasksToColumnId;
+          if (
+            !destinationId ||
+            destinationId === input.columnId ||
+            !columns.some((column) => column.id === destinationId)
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Choose another column for these tasks.",
+            });
+          }
+
+          const destinationTasks = await tx
+            .select({ position: task.position })
+            .from(task)
+            .where(
+              and(
+                eq(task.boardId, input.boardId),
+                eq(task.columnId, destinationId),
+              ),
+            )
+            .orderBy(asc(task.position));
+          const firstPosition = positionAtEnd(destinationTasks);
+
+          for (const [index, sourceTask] of sourceTasks.entries()) {
+            await tx
+              .update(task)
+              .set({
+                columnId: destinationId,
+                position: firstPosition + index * POSITION_STEP,
+              })
+              .where(
+                and(
+                  eq(task.id, sourceTask.id),
+                  eq(task.boardId, input.boardId),
+                ),
+              );
+          }
+        }
+
+        await tx
+          .delete(boardColumn)
+          .where(
+            and(
+              eq(boardColumn.id, input.columnId),
+              eq(boardColumn.boardId, input.boardId),
+            ),
+          );
+      });
       bus.emitBoard(input.boardId, {
         scope: "column",
         ids: [input.columnId],

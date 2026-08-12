@@ -315,6 +315,19 @@ export function BoardView({
 
   const filtersActive = hasActiveFilters(filters);
 
+  const taskCountsByColumn = useMemo(() => {
+    const counts = new Map(
+      columns.map((column) => [column.id, { active: 0, all: 0 }]),
+    );
+    for (const task of tasks) {
+      const count = counts.get(task.columnId) ?? { active: 0, all: 0 };
+      count.all++;
+      if (!task.archivedAt) count.active++;
+      counts.set(task.columnId, count);
+    }
+    return counts;
+  }, [columns, tasks]);
+
   const { tasksByColumn, visibleCount, totalCount } = useMemo(() => {
     const map = new Map<string, TaskRow[]>();
     for (const c of columns) map.set(c.id, []);
@@ -828,6 +841,9 @@ export function BoardView({
                   projectKey={projectKey}
                   sortBlocked={sortBlockedColumnId === col.id}
                   tasks={tasksByColumn.get(col.id) ?? []}
+                  deletionTaskCount={taskCountsByColumn.get(col.id)?.all ?? 0}
+                  totalTaskCount={taskCountsByColumn.get(col.id)?.active ?? 0}
+                  columns={sortedColumns}
                 />
               ))}
             </SortableContext>
