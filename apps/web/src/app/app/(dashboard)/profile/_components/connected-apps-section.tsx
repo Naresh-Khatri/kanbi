@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { formatRelative } from "@kanbi/shared";
 
 import { authClient } from "@/server/better-auth/client";
+import { api } from "@/trpc/react";
 
 /** A single granted OAuth consent, as returned by the provider client. */
 type Consent = NonNullable<
@@ -31,6 +32,7 @@ const SCOPE_LABEL: Record<string, string> = {
  * tRPC, mirroring the consent flow.
  */
 export function ConnectedAppsSection() {
+  const revokeConnectedApp = api.user.revokeConnectedApp.useMutation();
   const [consents, setConsents] = useState<Consent[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -67,14 +69,19 @@ export function ConnectedAppsSection() {
       return;
     }
     setRevoking(c.id);
-    const res = await authClient.oauth2.deleteConsent({ id: c.id });
-    setRevoking(null);
-    if (res.error) {
-      toast.error(res.error.message ?? "Failed to revoke access");
-      return;
+    try {
+      await revokeConnectedApp.mutateAsync({ consentId: c.id });
+      setConsents(
+        (prev) => prev?.filter((x) => x.clientId !== c.clientId) ?? prev,
+      );
+      toast.success("Access revoked");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to revoke access",
+      );
+    } finally {
+      setRevoking(null);
     }
-    setConsents((prev) => prev?.filter((x) => x.id !== c.id) ?? prev);
-    toast.success("Access revoked");
   }
 
   return (
