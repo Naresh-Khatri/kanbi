@@ -621,6 +621,7 @@ export const taskRouter = createTRPCRouter({
           title: task.title,
           number: task.number,
           updatedAt: task.updatedAt,
+          createdAt: task.createdAt,
           boardId: task.boardId,
           projectId: project.id,
           projectSlug: project.slug,

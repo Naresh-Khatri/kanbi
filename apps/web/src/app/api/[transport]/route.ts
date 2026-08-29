@@ -8,7 +8,7 @@ import {
   MCP_JWKS_URL,
   MCP_PROTECTED_RESOURCE_METADATA_URL,
 } from "@/server/mcp/config";
-import { registerTools } from "@/server/mcp/tools";
+import { KANBI_MCP_INSTRUCTIONS, registerTools } from "@/server/mcp/tools";
 
 /**
  * MCP server over Streamable HTTP at `/api/mcp` (the `[transport]` segment
@@ -37,8 +37,11 @@ const handler = mcpHandler(
     }
 
     return createMcpHandler(
-      (server) => registerTools(server, jwt),
-      { serverInfo: { name: "Kanbi", version: "0.1.0" } },
+      (server) => registerTools(server, authorization),
+      {
+        serverInfo: { name: "Kanbi", version: "0.1.0" },
+        instructions: KANBI_MCP_INSTRUCTIONS,
+      },
       {
         basePath: "/api",
         maxDuration: 60,
