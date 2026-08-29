@@ -39,6 +39,7 @@ import {
 import { createNotifications } from "@/server/notifications/create";
 import { resolveMentions } from "@/server/notifications/mentions";
 import { bus } from "@/server/realtime/bus";
+import { missingReferenceIds } from "@/server/tasks/validation";
 
 const priorityEnum = z.enum(taskPriority.enumValues);
 const confidenceEnum = z.enum(["high", "med", "low"]);
@@ -91,28 +92,70 @@ const enhanceResponseSchema = z.object({
 
 /**
  * Atomically issue `count` consecutive ticket numbers for a board's project and
- * return them alongside the project key. A single `UPDATE … RETURNING` bumps the
- * counter under a row lock, so concurrent creators never collide; the unique
- * index on (board_id, number) is the final backstop. A failed insert afterwards
- * just leaves a gap in the sequence, which is fine (Jira behaves the same way).
+ * return them alongside the project identity. A single `UPDATE … RETURNING`
+ * bumps the counter under a row lock, so concurrent creators never collide; the
+ * unique index on (board_id, number) is the final backstop. A failed insert
+ * afterwards just leaves a gap in the sequence, which is fine (Jira behaves the
+ * same way).
  */
 async function reserveTaskNumbers(
   db: typeof Database,
   boardId: string,
   count: number,
-): Promise<{ key: string; numbers: number[] }> {
+): Promise<{ key: string; slug: string; numbers: number[] }> {
   const [row] = await db
     .update(project)
     .set({ taskCounter: sql`${project.taskCounter} + ${count}` })
     .from(board)
     .where(and(eq(board.id, boardId), eq(board.projectId, project.id)))
-    .returning({ key: project.key, counter: project.taskCounter });
+    .returning({
+      key: project.key,
+      slug: project.slug,
+      counter: project.taskCounter,
+    });
   if (!row) throw new TRPCError({ code: "NOT_FOUND" });
   const start = row.counter - count + 1;
   return {
     key: row.key,
+    slug: row.slug,
     numbers: Array.from({ length: count }, (_, i) => start + i),
   };
+}
+
+async function assertProjectAssignees(
+  db: typeof Database,
+  projectId: string,
+  assigneeIds: readonly string[],
+) {
+  const requestedIds = Array.from(new Set(assigneeIds));
+  if (requestedIds.length === 0) return;
+
+  const [ownerRows, memberRows] = await Promise.all([
+    db
+      .select({ id: project.ownerId })
+      .from(project)
+      .where(eq(project.id, projectId))
+      .limit(1),
+    db
+      .select({ id: projectMember.userId })
+      .from(projectMember)
+      .where(
+        and(
+          eq(projectMember.projectId, projectId),
+          inArray(projectMember.userId, requestedIds),
+        ),
+      ),
+  ]);
+  const missing = missingReferenceIds(requestedIds, [
+    ...ownerRows,
+    ...memberRows,
+  ]);
+  if (missing.length > 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "One or more assignees do not belong to this project.",
+    });
+  }
 }
 
 export const taskRouter = createTRPCRouter({
@@ -138,6 +181,11 @@ export const taskRouter = createTRPCRouter({
         .limit(1);
       if (!col[0] || col[0].boardId !== input.boardId) {
         throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      if (input.assigneeId) {
+        await assertProjectAssignees(ctx.db, ctx.access.projectId, [
+          input.assigneeId,
+        ]);
       }
 
       const existing = await ctx.db
@@ -221,6 +269,11 @@ export const taskRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
+      if (input.assigneeId) {
+        await assertProjectAssignees(ctx.db, ctx.access.projectId, [
+          input.assigneeId,
+        ]);
+      }
       const { taskId, boardId, ...rest } = input;
 
       const existingRows = await ctx.db
@@ -555,6 +608,7 @@ export const taskRouter = createTRPCRouter({
     .input(
       z.object({
         query: z.string().trim().min(1).max(100),
+        projectId: z.string().min(1).optional(),
         limit: z.number().int().min(1).max(20).default(8),
       }),
     )
@@ -568,13 +622,17 @@ export const taskRouter = createTRPCRouter({
           number: task.number,
           updatedAt: task.updatedAt,
           boardId: task.boardId,
+          projectId: project.id,
           projectSlug: project.slug,
           projectKey: project.key,
           projectName: project.name,
+          columnName: boardColumn.name,
+          columnCategory: boardColumn.category,
         })
         .from(task)
         .innerJoin(board, eq(board.id, task.boardId))
         .innerJoin(project, eq(project.id, board.projectId))
+        .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
         .leftJoin(
           projectMember,
           and(
@@ -588,6 +646,7 @@ export const taskRouter = createTRPCRouter({
             ne(project.status, "archived"),
             ilike(task.title, term),
             or(eq(project.ownerId, userId), eq(projectMember.userId, userId)),
+            input.projectId ? eq(project.id, input.projectId) : undefined,
           ),
         )
         .orderBy(desc(task.updatedAt))
@@ -855,7 +914,6 @@ export const taskRouter = createTRPCRouter({
       const allLabelIds = Array.from(
         new Set(input.tasks.flatMap((t) => t.labelIds ?? [])),
       );
-      const validLabels = new Set<string>();
       if (allLabelIds.length > 0) {
         const rows = await ctx.db
           .select({ id: label.id })
@@ -866,10 +924,23 @@ export const taskRouter = createTRPCRouter({
               inArray(label.id, allLabelIds),
             ),
           );
-        for (const r of rows) validLabels.add(r.id);
+        if (missingReferenceIds(allLabelIds, rows).length > 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "One or more labels do not belong to this board.",
+          });
+        }
       }
 
-      const { numbers } = await reserveTaskNumbers(
+      await assertProjectAssignees(
+        ctx.db,
+        ctx.access.projectId,
+        input.tasks.flatMap((taskInput) =>
+          taskInput.assigneeId ? [taskInput.assigneeId] : [],
+        ),
+      );
+
+      const { key, slug, numbers } = await reserveTaskNumbers(
         ctx.db,
         input.boardId,
         input.tasks.length,
@@ -899,9 +970,7 @@ export const taskRouter = createTRPCRouter({
       inserted.forEach((row, i) => {
         const ids = input.tasks[i]?.labelIds ?? [];
         for (const labelId of ids) {
-          if (validLabels.has(labelId)) {
-            labelRows.push({ taskId: row.id, labelId });
-          }
+          labelRows.push({ taskId: row.id, labelId });
         }
       });
       if (labelRows.length > 0) {
@@ -969,6 +1038,16 @@ export const taskRouter = createTRPCRouter({
         await createNotifications(ctx.db, assignmentNotifications);
       }
 
-      return { count: inserted.length, ids: inserted.map((r) => r.id) };
+      return {
+        count: inserted.length,
+        ids: inserted.map((row) => row.id),
+        tasks: inserted.map((row) => ({
+          id: row.id,
+          title: row.title,
+          number: row.number,
+          projectKey: key,
+          projectSlug: slug,
+        })),
+      };
     }),
 });
