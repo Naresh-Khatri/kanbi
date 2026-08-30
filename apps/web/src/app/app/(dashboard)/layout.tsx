@@ -10,7 +10,7 @@ export default function DashboardLayout({
 
   return (
     <HydrateClient>
-      <AppHeader />
+      <AppHeader showAgentLink />
       {children}
     </HydrateClient>
   );

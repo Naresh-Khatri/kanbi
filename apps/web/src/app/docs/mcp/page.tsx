@@ -7,22 +7,30 @@ import { CodeBlock } from "../_components/code-block";
 export const metadata: Metadata = {
   title: "Connect an AI agent · Kanbi",
   description:
-    "Connect Claude Code, opencode, or any MCP client to read and write your Kanbi boards over OAuth.",
+    "Connect an AI agent to capture reviewed Kanbi tasks over OAuth.",
 };
 
 const TOOLS = [
-  { name: "list_projects", scope: "read", purpose: "List projects you can access." },
-  { name: "list_boards", scope: "read", purpose: "List boards across your projects." },
-  { name: "get_board", scope: "read", purpose: "A board's columns, tasks, and labels." },
-  { name: "search_tasks", scope: "read", purpose: "Full-text search across tasks." },
   {
-    name: "get_board_context",
+    name: "list_projects",
     scope: "read",
-    purpose: "Column, label, and member ids plus valid priorities, for authoring.",
+    purpose: "Resolve the target project when it is not unambiguous.",
   },
-  { name: "create_tasks", scope: "write", purpose: "Create one or more tasks on a board." },
-  { name: "update_task", scope: "write", purpose: "Update fields on a task." },
-  { name: "add_comment", scope: "write", purpose: "Add a comment to a task." },
+  {
+    name: "get_project_context",
+    scope: "read",
+    purpose: "Get canonical authoring IDs, guidance, and priorities.",
+  },
+  {
+    name: "search_tasks",
+    scope: "read",
+    purpose: "Search task titles for likely duplicates.",
+  },
+  {
+    name: "create_tasks",
+    scope: "write",
+    purpose: "Create only the exact task set the user approved.",
+  },
 ] as const;
 
 /** Build the live origin so the copy-paste commands match this deployment. */
@@ -31,7 +39,8 @@ async function getEndpoint() {
   const host =
     h.get("x-forwarded-host") ?? h.get("host") ?? "kanbi.localhost:3333";
   const proto =
-    h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
+    h.get("x-forwarded-proto") ??
+    (host.includes("localhost") ? "http" : "https");
   return `${proto}://${host}/api/mcp`;
 }
 
@@ -63,25 +72,39 @@ export default async function McpDocsPage() {
         Connect an AI agent
       </h1>
       <p className="mt-3 text-lg text-white/70">
-        Kanbi exposes a Model Context Protocol server so coding agents — Claude
-        Code, opencode, any MCP client — can read and write your boards from your
-        editor or terminal. Auth is OAuth with a browser consent screen; there
-        are no API keys to copy.
+        Kanbi exposes a Model Context Protocol server so coding agents — Codex,
+        Claude Code, Grok Build, opencode, or another MCP client — can turn a
+        finished discussion into reviewed Kanbi tasks from your editor or
+        terminal. Auth is OAuth with a browser consent screen; there are no API
+        keys to copy.
       </p>
 
       <div className="mt-6 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-        <p className="text-xs tracking-wide text-white/40 uppercase">Endpoint</p>
+        <p className="text-xs tracking-wide text-white/40 uppercase">
+          Endpoint
+        </p>
         <p className="mt-1 font-mono text-sm text-white/90">{endpoint}</p>
       </div>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">Claude Code</h2>
+      <h2 className="mt-12 text-lg font-semibold tracking-tight">
+        Claude Code
+      </h2>
       <p className="mt-2 text-sm text-white/70">
         Add the server, then run any kanbi tool (or <code>/mcp</code>) — Claude
         opens the consent screen, and after you approve the tools are live.
       </p>
       <div className="mt-3">
+        <CodeBlock code={`claude mcp add --transport http kanbi ${endpoint}`} />
+      </div>
+
+      <h2 className="mt-12 text-lg font-semibold tracking-tight">Codex</h2>
+      <p className="mt-2 text-sm text-white/70">
+        Add the remote server, then start the OAuth login. The same MCP setup is
+        shared by the Codex CLI, desktop app, and IDE extension.
+      </p>
+      <div className="mt-3">
         <CodeBlock
-          code={`claude mcp add --transport http kanbi ${endpoint}`}
+          code={`codex mcp add kanbi --url ${endpoint}\ncodex mcp login kanbi`}
         />
       </div>
 
@@ -101,13 +124,27 @@ export default async function McpDocsPage() {
         <CodeBlock code={`opencode mcp auth kanbi`} />
       </div>
 
+      <h2 className="mt-12 text-lg font-semibold tracking-tight">Grok Build</h2>
+      <p className="mt-2 text-sm text-white/70">
+        Add Kanbi as a remote server. Grok opens the OAuth flow when the server
+        is first used.
+      </p>
+      <div className="mt-3">
+        <CodeBlock code={`grok mcp add --transport http kanbi ${endpoint}`} />
+      </div>
+      <p className="mt-3 text-sm text-white/70">
+        For Grok&apos;s hosted custom connector, use a publicly reachable HTTPS
+        deployment, then add it at <code>grok.com/connectors</code>. A local
+        development URL cannot be reached by the hosted service.
+      </p>
+
       <h2 className="mt-12 text-lg font-semibold tracking-tight">
         What an agent can do
       </h2>
       <p className="mt-2 text-sm text-white/70">
         Each tool wraps the same procedures the web app uses, so permissions,
         validation, and realtime updates apply identically. The agent acts as
-        you, limited to the boards you can access.
+        you, limited to the projects you can access.
       </p>
       <ul className="mt-4 divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10">
         {TOOLS.map((tool) => (
@@ -124,13 +161,36 @@ export default async function McpDocsPage() {
         ))}
       </ul>
 
+      <h2 className="mt-12 text-lg font-semibold tracking-tight">
+        Capture approved work
+      </h2>
+      <p className="mt-2 text-sm text-white/70">
+        The connected agent writes the task content; Kanbi does not make a
+        second model call. The agent searches for likely duplicates, shows the
+        exact project, column, title, description, checklist, priority, labels,
+        assignee, and due date, then waits for your explicit approval before it
+        creates anything.
+      </p>
+      <div className="mt-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 font-mono text-xs leading-6 text-white/70">
+        User and agent finish a feature decision
+        <br />→ agent searches for duplicates
+        <br />→ agent shows the proposed Kanbi task
+        <br />→ user says “put this in Kanbi”
+        <br />→ agent creates it and returns KAN-42 plus its link
+      </div>
+      <p className="mt-3 text-sm text-white/70">
+        One useful task with a description and checklist is the default. Work is
+        split only when each item can be delivered independently, and the full
+        split is shown before approval. Task management after creation is not
+        available over MCP.
+      </p>
+
       <h2 className="mt-12 text-lg font-semibold tracking-tight">Scopes</h2>
       <p className="mt-2 text-sm text-white/70">
         Two scopes are enforced on every tool call: <code>kanbi:read</code> for
         the read tools and <code>kanbi:write</code> for the write tools. A
-        read-only grant cannot create or edit anything. Add{" "}
-        <code>offline_access</code> and the agent renews silently instead of
-        reopening the browser.
+        read-only grant cannot create anything. Add <code>offline_access</code>{" "}
+        and the agent renews silently instead of reopening the browser.
       </p>
 
       <h2 className="mt-12 text-lg font-semibold tracking-tight">
@@ -152,14 +212,16 @@ export default async function McpDocsPage() {
         Troubleshooting
       </h2>
       <p className="mt-2 text-sm text-white/70">
-        <span className="text-white">Tools 401, or an endless re-auth loop.</span>{" "}
+        <span className="text-white">
+          Tools 401, or an endless re-auth loop.
+        </span>{" "}
         The token came back opaque instead of a JWT. Re-authorize with a clean
-        token — for Claude Code, <code>claude mcp remove kanbi</code> then add it
-        again.
+        token — for Claude Code, <code>claude mcp remove kanbi</code> then add
+        it again.
       </p>
       <p className="mt-2 text-sm text-white/70">
-        <span className="text-white">Host mismatch.</span> Point the agent at the
-        same host this page is served from, so OAuth discovery, the token
+        <span className="text-white">Host mismatch.</span> Point the agent at
+        the same host this page is served from, so OAuth discovery, the token
         audience, and your browser session all line up on one origin.
       </p>
     </article>

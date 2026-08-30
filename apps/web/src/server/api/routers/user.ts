@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
@@ -6,6 +7,9 @@ import {
   board,
   boardColumn,
   notification,
+  oauthAccessToken,
+  oauthConsent,
+  oauthRefreshToken,
   project,
   task,
   user as userTable,
@@ -101,5 +105,50 @@ export const userRouter = createTRPCRouter({
         })
         .where(eq(userTable.id, ctx.session.user.id));
       return { ok: true };
+    }),
+
+  revokeConnectedApp: protectedProcedure
+    .input(z.object({ consentId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      return ctx.db.transaction(async (tx) => {
+        const [consent] = await tx
+          .select({ clientId: oauthConsent.clientId })
+          .from(oauthConsent)
+          .where(
+            and(
+              eq(oauthConsent.id, input.consentId),
+              eq(oauthConsent.userId, userId),
+            ),
+          )
+          .limit(1);
+        if (!consent) throw new TRPCError({ code: "NOT_FOUND" });
+
+        const grant = and(
+          eq(oauthAccessToken.clientId, consent.clientId),
+          eq(oauthAccessToken.userId, userId),
+        );
+        await tx.delete(oauthAccessToken).where(grant);
+        await tx
+          .update(oauthRefreshToken)
+          .set({ revoked: new Date() })
+          .where(
+            and(
+              eq(oauthRefreshToken.clientId, consent.clientId),
+              eq(oauthRefreshToken.userId, userId),
+              isNull(oauthRefreshToken.revoked),
+            ),
+          );
+        await tx
+          .delete(oauthConsent)
+          .where(
+            and(
+              eq(oauthConsent.clientId, consent.clientId),
+              eq(oauthConsent.userId, userId),
+            ),
+          );
+
+        return { ok: true };
+      });
     }),
 });

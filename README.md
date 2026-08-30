@@ -31,8 +31,8 @@ kanbi/
   actionable issues with title, description, label, and priority.
 - **Focus app**: an Expo companion that pairs to your account over a QR code and
   authenticates with per-device tokens.
-- **MCP server**: connect AI agents (Claude Code, opencode) over OAuth so they
-  can read and write your boards. See
+- **MCP server**: connect AI agents (Claude Code, opencode) over OAuth to
+  capture approved tasks from finished discussions. See
   [`apps/web/src/server/mcp/README.md`](apps/web/src/server/mcp/README.md).
 - **Auth**: email/password plus Google and GitHub OAuth, via Better Auth.
 
@@ -106,8 +106,9 @@ There is no test suite.
 
 ## Connect an AI agent
 
-Kanbi ships an MCP server at `/api/mcp` so agents can manage your boards from an
-editor or terminal. Quick version for Claude Code:
+Kanbi ships an MCP server at `/api/mcp` so agents can capture reviewed tasks
+from finished discussions in an editor or terminal. Quick version for Claude
+Code:
 
 ```bash
 claude mcp add --transport http kanbi http://kanbi.localhost:3333/api/mcp

@@ -30,6 +30,16 @@ export const MCP_ISSUER = `${baseUrl}/api/auth`;
  */
 export const MCP_RESOURCE_URL = env.MCP_RESOURCE_URL ?? `${baseUrl}/api/mcp`;
 
+/** Stable public origin for URLs returned by MCP tools. */
+export const MCP_ORIGIN = new URL(MCP_RESOURCE_URL).origin;
+
+/** RFC 9728 metadata URL used when a previously valid grant has been revoked. */
+export const MCP_PROTECTED_RESOURCE_METADATA_URL = (() => {
+  const resource = new URL(MCP_RESOURCE_URL);
+  const path = resource.pathname.replace(/\/$/, "");
+  return `${resource.origin}/.well-known/oauth-protected-resource${path}`;
+})();
+
 /**
  * Accepted token audiences. A JWT access token is only minted when the client's
  * requested `resource` matches one of these (otherwise the provider falls back

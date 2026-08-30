@@ -3,6 +3,7 @@
 import { Command } from "cmdk";
 import {
   ArrowRight,
+  Bot,
   FileText,
   Layers,
   ListTodo,
@@ -123,6 +124,13 @@ export function CommandPalette() {
               value="dashboard"
             >
               Go to dashboard
+            </PaletteItem>
+            <PaletteItem
+              icon={<Bot className="h-4 w-4" />}
+              onSelect={() => go(() => router.push("/docs/mcp"))}
+              value="connect agent ai mcp integration codex claude grok"
+            >
+              Connect an AI agent
             </PaletteItem>
           </Command.Group>
 

@@ -1,8 +1,14 @@
 import { mcpHandler } from "@better-auth/oauth-provider";
 import { createMcpHandler } from "mcp-handler";
 
-import { MCP_AUDIENCES, MCP_ISSUER, MCP_JWKS_URL } from "@/server/mcp/config";
-import { registerTools } from "@/server/mcp/tools";
+import { authorizeMcpGrant } from "@/server/mcp/authorization";
+import {
+  MCP_AUDIENCES,
+  MCP_ISSUER,
+  MCP_JWKS_URL,
+  MCP_PROTECTED_RESOURCE_METADATA_URL,
+} from "@/server/mcp/config";
+import { KANBI_MCP_INSTRUCTIONS, registerTools } from "@/server/mcp/tools";
 
 /**
  * MCP server over Streamable HTTP at `/api/mcp` (the `[transport]` segment
@@ -19,17 +25,31 @@ const handler = mcpHandler(
     jwksUrl: MCP_JWKS_URL,
     verifyOptions: { issuer: MCP_ISSUER, audience: MCP_AUDIENCES },
   },
-  (req, jwt) =>
-    createMcpHandler(
-      (server) => registerTools(server, jwt),
-      { serverInfo: { name: "Kanbi", version: "0.1.0" } },
+  async (req, jwt) => {
+    const authorization = await authorizeMcpGrant(jwt);
+    if (!authorization) {
+      return new Response("OAuth grant is no longer valid.", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": `Bearer resource_metadata="${MCP_PROTECTED_RESOURCE_METADATA_URL}", error="invalid_token"`,
+        },
+      });
+    }
+
+    return createMcpHandler(
+      (server) => registerTools(server, authorization),
+      {
+        serverInfo: { name: "Kanbi", version: "0.1.0" },
+        instructions: KANBI_MCP_INSTRUCTIONS,
+      },
       {
         basePath: "/api",
         maxDuration: 60,
         verboseLogs: false,
         disableSse: true,
       },
-    )(req),
+    )(req);
+  },
 );
 
 export { handler as GET, handler as POST, handler as DELETE };
