@@ -5,12 +5,17 @@ import { jwt } from "better-auth/plugins";
 
 import { env } from "@/env";
 import { db } from "@/server/db";
+import * as schema from "@/server/db/schema";
 import { MCP_AUDIENCES, MCP_SCOPES } from "@/server/mcp/config";
 import { sendPasswordResetEmail } from "@/server/mail";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
-    provider: "pg", // or "pg" or "mysql"
+    provider: "pg",
+    // Do not rely on Drizzle's private `db._.fullSchema` at runtime. The OAuth
+    // provider needs every oauthClient field, especially redirectUris, when it
+    // validates dynamically registered MCP clients in the standalone server.
+    schema,
   }),
   session: {
     cookieCache: { enabled: true, maxAge: 5 * 60 },

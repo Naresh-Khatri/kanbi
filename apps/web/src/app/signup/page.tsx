@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { socialProvidersEnabled } from "@/server/better-auth/config";
 
 import { SignupForm } from "./_components/signup-form";
@@ -7,5 +9,9 @@ import { SignupForm } from "./_components/signup-form";
 export const dynamic = "force-dynamic";
 
 export default function SignupPage() {
-  return <SignupForm providers={socialProvidersEnabled} />;
+  return (
+    <Suspense>
+      <SignupForm providers={socialProvidersEnabled} />
+    </Suspense>
+  );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
+
+import { MCP_RESOURCE_URL } from "@/server/mcp/config";
 
 import { CodeBlock } from "../_components/code-block";
 
@@ -33,17 +34,6 @@ const TOOLS = [
   },
 ] as const;
 
-/** Build the live origin so the copy-paste commands match this deployment. */
-async function getEndpoint() {
-  const h = await headers();
-  const host =
-    h.get("x-forwarded-host") ?? h.get("host") ?? "kanbi.localhost:3333";
-  const proto =
-    h.get("x-forwarded-proto") ??
-    (host.includes("localhost") ? "http" : "https");
-  return `${proto}://${host}/api/mcp`;
-}
-
 function ScopeTag({ scope }: { scope: "read" | "write" }) {
   return (
     <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono text-[11px] text-white/50">
@@ -52,8 +42,8 @@ function ScopeTag({ scope }: { scope: "read" | "write" }) {
   );
 }
 
-export default async function McpDocsPage() {
-  const endpoint = await getEndpoint();
+export default function McpDocsPage() {
+  const endpoint = MCP_RESOURCE_URL;
   const opencodeConfig = `{
   "$schema": "https://opencode.ai/config.json",
   "mcp": {

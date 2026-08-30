@@ -14,7 +14,9 @@ it does not manage tasks after creation.
   immediately, even for an unexpired JWT.
 
 Everything below uses `kanbi.localhost:3333` as the example host. Swap in your
-own deployment origin in production.
+own deployment origin in production, including the exact scheme. Public
+deployments should use `https://`; MCP OAuth clients reject discovery redirects
+that change origin, including an `http://` to `https://` redirect.
 
 ## Connect an agent
 

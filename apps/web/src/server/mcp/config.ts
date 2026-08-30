@@ -51,8 +51,11 @@ function withLocalhostAlias(url: string): string[] {
   const out = [url];
   try {
     const u = new URL(url);
-    if (u.hostname !== "localhost") {
+    if (u.hostname === "kanbi.localhost") {
       u.hostname = "localhost";
+      out.push(u.toString().replace(/\/$/, ""));
+    } else if (u.hostname === "localhost") {
+      u.hostname = "kanbi.localhost";
       out.push(u.toString().replace(/\/$/, ""));
     }
   } catch {
