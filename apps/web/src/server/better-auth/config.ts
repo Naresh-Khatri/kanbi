@@ -2,6 +2,7 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { jwt } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 
 import { env } from "@/env";
 import { db } from "@/server/db";
@@ -9,14 +10,51 @@ import * as schema from "@/server/db/schema";
 import { MCP_AUDIENCES, MCP_SCOPES } from "@/server/mcp/config";
 import { sendPasswordResetEmail } from "@/server/mail";
 
+const drizzleDatabase = drizzleAdapter(db, {
+  provider: "pg",
+  schema,
+});
+
+// The standalone deployment writes DCR redirect URIs correctly but loses them
+// when the adapter reads oauthClient. Read that model directly so Better Auth
+// validates the stored callback instead of rejecting every Codex client.
+const authDatabase: typeof drizzleDatabase = (options) => {
+  const adapter = drizzleDatabase(options);
+  const findOne = adapter.findOne.bind(adapter);
+
+  adapter.findOne = async <T>(query: Parameters<typeof adapter.findOne>[0]) => {
+    const [condition] = query.where;
+    const isOAuthClientIdLookup =
+      query.model === "oauthClient" &&
+      !query.select?.length &&
+      query.where.length === 1 &&
+      condition?.field === "clientId" &&
+      (condition.operator === undefined || condition.operator === "eq");
+
+    if (isOAuthClientIdLookup) {
+      const clientId = condition.value;
+      if (typeof clientId === "string") {
+        const [client] = await db
+          .select()
+          .from(schema.oauthClient)
+          .where(eq(schema.oauthClient.clientId, clientId))
+          .limit(1);
+
+        return (client ?? null) as T | null;
+      }
+    }
+
+    return findOne<T>(query);
+  };
+
+  return adapter;
+};
+
 export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    provider: "pg",
-    // Do not rely on Drizzle's private `db._.fullSchema` at runtime. The OAuth
-    // provider needs every oauthClient field, especially redirectUris, when it
-    // validates dynamically registered MCP clients in the standalone server.
-    schema,
-  }),
+  database: authDatabase,
+  onAPIError: {
+    errorURL: "/oauth-error",
+  },
   session: {
     cookieCache: { enabled: true, maxAge: 5 * 60 },
   },
