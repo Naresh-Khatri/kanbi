@@ -7,6 +7,10 @@ import { eq } from "drizzle-orm";
 import { env } from "@/env";
 import { db } from "@/server/db";
 import * as schema from "@/server/db/schema";
+import {
+  oauthDiagnosticsAfter,
+  oauthDiagnosticsBefore,
+} from "@/server/better-auth/oauth-diagnostics";
 import { MCP_AUDIENCES, MCP_SCOPES } from "@/server/mcp/config";
 import { sendPasswordResetEmail } from "@/server/mail";
 
@@ -52,6 +56,10 @@ const authDatabase: typeof drizzleDatabase = (options) => {
 
 export const auth = betterAuth({
   database: authDatabase,
+  hooks: {
+    before: oauthDiagnosticsBefore,
+    after: oauthDiagnosticsAfter,
+  },
   onAPIError: {
     errorURL: "/oauth-error",
   },
