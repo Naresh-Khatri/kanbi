@@ -1,51 +1,111 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { api } from "@/trpc/react";
 
-export function AcceptInvite({ token }: { token: string }) {
+const ROLE_COPY: Record<string, { label: string; body: string }> = {
+  editor: {
+    label: "Editor",
+    body: "Create, edit and move tasks, and work on the project's docs.",
+  },
+  viewer: {
+    label: "Viewer",
+    body: "See the board and docs, without making changes.",
+  },
+};
+
+export function AcceptInvite({
+  token,
+  projectName,
+  role,
+  name,
+  email,
+  image,
+}: {
+  token: string;
+  projectName: string;
+  role: string;
+  name: string;
+  email: string;
+  image: string | null;
+}) {
   const router = useRouter();
-  const [status, setStatus] = useState<"idle" | "ok" | "err">("idle");
-  const [message, setMessage] = useState("");
+  const [declined, setDeclined] = useState(false);
 
   const accept = api.project.acceptInvite.useMutation({
     onSuccess: (res) => {
-      setStatus("ok");
-      if (res.projectSlug) {
-        router.push(`/app/p/${res.projectSlug}`);
-      } else {
-        router.push("/app");
-      }
+      toast.success(`You joined ${projectName}`);
+      router.replace(res.projectSlug ? `/app/p/${res.projectSlug}` : "/app");
     },
-    onError: (err) => {
-      setStatus("err");
-      setMessage(err.message);
-      toast.error(err.message);
-    },
+    onError: (e) => toast.error(e.message),
   });
+  const decline = api.project.declineInvite.useMutation({
+    onSuccess: () => setDeclined(true),
+    onError: (e) => toast.error(e.message),
+  });
+  const busy = accept.isPending || decline.isPending || accept.isSuccess;
+  const copy = ROLE_COPY[role] ?? { label: role, body: "" };
 
-  useEffect(() => {
-    accept.mutate({ token });
-  }, [token]);
+  if (declined) {
+    return (
+      <div className="flex flex-col gap-4 text-center">
+        <p className="text-sm text-white/60">
+          Invitation declined. You won&apos;t be added to {projectName}.
+        </p>
+        <Button asChild variant="outline">
+          <Link href="/app">Go to dashboard</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex max-w-sm flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-6">
-      <h1 className="text-lg font-semibold">Project invitation</h1>
-      {status === "idle" ? (
-        <p className="text-sm text-white/60">Accepting invite…</p>
-      ) : null}
-      {status === "err" ? (
-        <>
-          <p className="text-sm text-red-400">{message}</p>
-          <Button onClick={() => router.push("/app")} variant="outline">
-            Go to dashboard
-          </Button>
-        </>
-      ) : null}
+    <div className="flex flex-col gap-5">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-white/60">You&apos;ll join as</span>
+          <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium">
+            {copy.label}
+          </span>
+        </div>
+        {copy.body ? (
+          <p className="mt-1.5 text-xs text-white/50">{copy.body}</p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Button
+          className="w-full"
+          disabled={busy}
+          onClick={() => accept.mutate({ token })}
+          size="lg"
+        >
+          {accept.isPending || accept.isSuccess
+            ? "Joining…"
+            : `Join ${projectName}`}
+        </Button>
+        <Button
+          className="w-full"
+          disabled={busy}
+          onClick={() => decline.mutate({ token })}
+          variant="ghost"
+        >
+          {decline.isPending ? "Declining…" : "Decline"}
+        </Button>
+      </div>
+
+      <div className="flex items-center justify-center gap-2 border-t border-white/5 pt-4 text-xs text-white/50">
+        <UserAvatar image={image} name={name} size={18} />
+        <span>
+          Signed in as <span className="text-white/80">{email}</span>
+        </span>
+      </div>
     </div>
   );
 }

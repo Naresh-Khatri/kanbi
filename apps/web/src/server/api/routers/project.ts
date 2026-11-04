@@ -1,5 +1,16 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull, max, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  max,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -15,7 +26,7 @@ import {
   projectProcedure,
   protectedProcedure,
 } from "@/server/api/trpc";
-import type { ProjectRole } from "@/server/api/permissions";
+import { roleCan, type ProjectRole } from "@/server/api/permissions";
 import {
   activity,
   board,
@@ -27,9 +38,41 @@ import {
   task,
   user as userTable,
 } from "@/server/db/schema";
+import { loadInvite, normalizeEmail, sameEmail } from "@/server/invites";
 import { sendProjectInviteEmail } from "@/server/mail";
 import { createNotifications } from "@/server/notifications/create";
 import { bus } from "@/server/realtime/bus";
+
+async function requireOpenInvite(
+  db: Parameters<typeof loadInvite>[0],
+  token: string,
+  viewer: { email: string },
+) {
+  const inv = await loadInvite(db, token);
+  if (!inv) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Invite not found" });
+  }
+  if (inv.status === "used") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This invite has already been used",
+    });
+  }
+  if (inv.status === "expired") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This invite has expired",
+    });
+  }
+  // link alone isn't enough -> must be signed in as the invited email
+  if (!sameEmail(inv.email, viewer.email)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `This invite was sent to ${inv.email}. Sign in with that account to respond.`,
+    });
+  }
+  return inv;
+}
 
 export const projectRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -189,7 +232,7 @@ export const projectRouter = createTRPCRouter({
           status: project.status,
           ownerId: project.ownerId,
           boardId: board.id,
-          role: projectMember.role,
+          role: sql<ProjectRole | null>`case when ${project.ownerId} = ${userId} then 'owner'::kanbi_project_role else ${projectMember.role} end`,
         })
         .from(project)
         .innerJoin(board, eq(board.projectId, project.id))
@@ -478,6 +521,58 @@ export const projectRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+      const email = normalizeEmail(input.email);
+
+      const [member] = await ctx.db
+        .select({ userId: userTable.id })
+        .from(userTable)
+        .innerJoin(project, eq(project.id, input.projectId))
+        .leftJoin(
+          projectMember,
+          and(
+            eq(projectMember.projectId, project.id),
+            eq(projectMember.userId, userTable.id),
+          ),
+        )
+        .where(
+          and(
+            eq(userTable.email, email),
+            or(
+              eq(project.ownerId, userTable.id),
+              eq(projectMember.userId, userTable.id),
+            ),
+          ),
+        )
+        .limit(1);
+      if (member) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${email} already has access to this project`,
+        });
+      }
+
+      const [pending] = await ctx.db
+        .select({ id: projectInvite.id })
+        .from(projectInvite)
+        .where(
+          and(
+            eq(projectInvite.projectId, input.projectId),
+            eq(projectInvite.email, email),
+            isNull(projectInvite.acceptedAt),
+            or(
+              isNull(projectInvite.expiresAt),
+              gt(projectInvite.expiresAt, new Date()),
+            ),
+          ),
+        )
+        .limit(1);
+      if (pending) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${email} already has a pending invite. Copy its link or revoke it first.`,
+        });
+      }
+
       const expiresAt = new Date(
         Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000,
       );
@@ -485,7 +580,7 @@ export const projectRouter = createTRPCRouter({
         .insert(projectInvite)
         .values({
           projectId: input.projectId,
-          email: input.email.toLowerCase(),
+          email,
           role: input.role,
           token: shareToken(),
           invitedById: ctx.session.user.id,
@@ -560,84 +655,91 @@ export const projectRouter = createTRPCRouter({
   acceptInvite: protectedProcedure
     .input(z.object({ token: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      const now = new Date();
-      const row = await ctx.db
-        .select()
-        .from(projectInvite)
-        .where(eq(projectInvite.token, input.token))
-        .limit(1);
-      const inv = row[0];
-      if (!inv) throw new TRPCError({ code: "NOT_FOUND" });
-      if (inv.acceptedAt) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Invite already used",
-        });
-      }
-      if (inv.expiresAt && inv.expiresAt < now) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Invite expired",
-        });
-      }
-
+      const inv = await requireOpenInvite(
+        ctx.db,
+        input.token,
+        ctx.session.user,
+      );
       const userId = ctx.session.user.id;
-      await ctx.db
-        .insert(projectMember)
-        .values({
+      const now = new Date();
+
+      const joined = await ctx.db.transaction(async (tx) => {
+        // claim first -> two tabs can't both accept
+        const [claimed] = await tx
+          .update(projectInvite)
+          .set({ acceptedAt: now })
+          .where(
+            and(eq(projectInvite.id, inv.id), isNull(projectInvite.acceptedAt)),
+          )
+          .returning({ id: projectInvite.id });
+        if (!claimed) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "This invite has already been used",
+          });
+        }
+        if (inv.ownerId === userId) return false;
+
+        const [existing] = await tx
+          .select({ role: projectMember.role })
+          .from(projectMember)
+          .where(
+            and(
+              eq(projectMember.projectId, inv.projectId),
+              eq(projectMember.userId, userId),
+            ),
+          )
+          .limit(1);
+        if (existing) {
+          // invite may upgrade, never downgrade (owner row incl.)
+          if (!roleCan(existing.role, inv.role)) {
+            await tx
+              .update(projectMember)
+              .set({ role: inv.role })
+              .where(
+                and(
+                  eq(projectMember.projectId, inv.projectId),
+                  eq(projectMember.userId, userId),
+                ),
+              );
+          }
+          return false;
+        }
+        await tx.insert(projectMember).values({
           projectId: inv.projectId,
           userId,
           role: inv.role,
           acceptedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [projectMember.projectId, projectMember.userId],
-          set: { role: inv.role, acceptedAt: now },
         });
+        return true;
+      });
 
-      await ctx.db
-        .update(projectInvite)
-        .set({ acceptedAt: now })
-        .where(eq(projectInvite.id, inv.id));
-
-      const p = await ctx.db
-        .select({ slug: project.slug, name: project.name })
-        .from(project)
-        .where(eq(project.id, inv.projectId))
-        .limit(1);
-
-      await createNotifications(ctx.db, [
-        {
-          userId: inv.invitedById,
-          actorId: userId,
-          type: "project.member_joined",
-          projectId: inv.projectId,
-          data: {
-            projectName: p[0]?.name ?? "a project",
-            memberName: ctx.session.user.name,
+      if (joined) {
+        await createNotifications(ctx.db, [
+          {
+            userId: inv.invitedById,
+            actorId: userId,
+            type: "project.member_joined",
+            projectId: inv.projectId,
+            data: {
+              projectName: inv.projectName,
+              memberName: ctx.session.user.name,
+            },
           },
-        },
-      ]);
+        ]);
+      }
 
-      return { projectSlug: p[0]?.slug ?? null };
+      return { projectSlug: inv.projectSlug };
     }),
 
   declineInvite: protectedProcedure
     .input(z.object({ token: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db
-        .select()
-        .from(projectInvite)
-        .where(eq(projectInvite.token, input.token))
-        .limit(1);
-      const inv = row[0];
-      if (!inv) throw new TRPCError({ code: "NOT_FOUND" });
-      if (inv.acceptedAt) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Invite already used",
-        });
-      }
+      const inv = await requireOpenInvite(
+        ctx.db,
+        input.token,
+        ctx.session.user,
+      );
       await ctx.db.delete(projectInvite).where(eq(projectInvite.id, inv.id));
     }),
 
@@ -645,13 +747,15 @@ export const projectRouter = createTRPCRouter({
     return ctx.db
       .select({
         userId: projectMember.userId,
-        role: projectMember.role,
+        // owner from project.ownerId; member row can be stale
+        role: sql<ProjectRole>`case when ${project.ownerId} = ${projectMember.userId} then 'owner'::kanbi_project_role else ${projectMember.role} end`,
         acceptedAt: projectMember.acceptedAt,
         name: userTable.name,
         email: userTable.email,
         image: userTable.image,
       })
       .from(projectMember)
+      .innerJoin(project, eq(project.id, projectMember.projectId))
       .innerJoin(userTable, eq(userTable.id, projectMember.userId))
       .where(eq(projectMember.projectId, input.projectId));
   }),

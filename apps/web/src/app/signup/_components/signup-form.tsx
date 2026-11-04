@@ -6,23 +6,31 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { LastUsedBadge, useLastUsedAuth } from "@/components/auth/last-used";
+import {
+  AuthInviteBanner,
+  InvitedEmailHint,
+  inviteReturnPath,
+} from "@/components/invite/auth-invite-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/ui/logo";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
 import { authClient } from "@/server/better-auth/client";
+import type { AuthInvite } from "@/server/invites";
 
 export function SignupForm({
   providers,
+  invite,
 }: {
   providers: { github: boolean; google: boolean };
+  invite: AuthInvite | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentQuery = searchParams.toString();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invite?.email ?? "");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const { lastUsed, mark } = useLastUsedAuth();
@@ -32,6 +40,7 @@ export function SignupForm({
     providers.google ? "Google" : null,
   ].filter((n): n is string => n !== null);
   const anySocial = providerNames.length > 0;
+  const afterAuth = invite ? inviteReturnPath(invite) : "/app";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +58,11 @@ export function SignupForm({
       return;
     }
 
+    if (invite) {
+      // full nav -> invite page renders with the fresh session
+      window.location.assign(afterAuth);
+      return;
+    }
     router.replace("/app");
     router.refresh();
   }
@@ -57,7 +71,7 @@ export function SignupForm({
     mark("github");
     await authClient.signIn.social({
       provider: "github",
-      callbackURL: "/app",
+      callbackURL: afterAuth,
     });
   }
 
@@ -65,7 +79,7 @@ export function SignupForm({
     mark("google");
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/app",
+      callbackURL: afterAuth,
     });
   }
 
@@ -76,12 +90,17 @@ export function SignupForm({
           <Logo className="h-8 w-8" />
           <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
         </Link>
+        {invite ? <AuthInviteBanner invite={invite} /> : null}
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">Create your account</h1>
+          <h1 className="text-2xl font-semibold">
+            {invite ? "Create an account to join" : "Create your account"}
+          </h1>
           <p className="text-sm text-white/60">
-            {anySocial
-              ? `It takes about 20 seconds. Or continue with ${providerNames.join(" or ")}.`
-              : "It takes about 20 seconds."}
+            {invite
+              ? "Takes about 20 seconds. You'll confirm joining right after."
+              : anySocial
+                ? `It takes about 20 seconds. Or continue with ${providerNames.join(" or ")}.`
+                : "It takes about 20 seconds."}
           </p>
         </div>
         <form className="flex flex-col gap-3" onSubmit={onSubmit}>
@@ -100,11 +119,16 @@ export function SignupForm({
             <Input
               autoComplete="email"
               id="email"
+              className={
+                invite ? "cursor-not-allowed text-white/60" : undefined
+              }
               onChange={(e) => setEmail(e.target.value)}
+              readOnly={!!invite}
               required
               type="email"
               value={email}
             />
+            {invite ? <InvitedEmailHint providers={providerNames} /> : null}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="password">Password</Label>
