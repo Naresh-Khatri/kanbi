@@ -371,6 +371,8 @@ export const taskRouter = createTRPCRouter({
         toColumnId: z.string().min(1),
         before: z.number().nullable(),
         after: z.number().nullable(),
+        // compare-and-swap: only move if still here (MCP start/finish)
+        expectedColumnId: z.string().min(1).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -400,13 +402,28 @@ export const taskRouter = createTRPCRouter({
         .limit(1);
       const prev = existing[0];
 
-      await ctx.db
+      const moved = await ctx.db
         .update(task)
         .set({
           columnId: input.toColumnId,
           position: positionBetween(input.before, input.after),
         })
-        .where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
+        .where(
+          and(
+            eq(task.id, input.taskId),
+            eq(task.boardId, input.boardId),
+            input.expectedColumnId
+              ? eq(task.columnId, input.expectedColumnId)
+              : undefined,
+          ),
+        )
+        .returning({ id: task.id });
+      if (input.expectedColumnId && moved.length === 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Task moved since it was read.",
+        });
+      }
       bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
       await recordActivity(ctx.db, {
         boardId: input.boardId,

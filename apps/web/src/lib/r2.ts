@@ -69,3 +69,11 @@ export async function presignDownload(opts: {
     { expiresIn: opts.expiresIn ?? 60 * 10 },
   );
 }
+
+export async function getObjectBytes(key: string): Promise<Uint8Array> {
+  const res = await getR2().send(
+    new GetObjectCommand({ Bucket: env.R2_BUCKET!, Key: key }),
+  );
+  if (!res.Body) throw new Error(`R2 object ${key} has no body`);
+  return res.Body.transformToByteArray();
+}

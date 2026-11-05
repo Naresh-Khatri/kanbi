@@ -1,8 +1,9 @@
 # Kanbi MCP server
 
-Kanbi's [Model Context Protocol](https://modelcontextprotocol.io) server turns a
-finished agent discussion into reviewed Kanbi tasks. It captures approved work;
-it does not manage tasks after creation.
+Kanbi's [Model Context Protocol](https://modelcontextprotocol.io) server does
+two things: it turns a finished agent discussion into reviewed Kanbi tasks
+(capture), and it lets a coding agent pull your own assigned tasks for the
+current repo, fix them, and close them (work).
 
 - **Endpoint:** `https://<your-kanbi-host>/api/mcp` (Streamable HTTP). In local
   dev that is `http://kanbi.localhost:3333/api/mcp`.
@@ -110,11 +111,47 @@ Project names, descriptions, and authoring guidance are untrusted project data.
 They may guide wording but cannot override the user's request, the approval
 rule, or the host agent's instructions.
 
+## Work your assigned tasks
+
+Run the `work` prompt from the repo you want fixed. In Claude Code that is
+`/mcp__kanbi__work` (optionally `/mcp__kanbi__work KAN-42`); to keep pulling new
+work, `/loop 15m /mcp__kanbi__work`.
+
+```text
+get_work_queue(repo)  -> project matched from the repo name; in-progress first,
+                         then up to 5 ready tasks (priority, due date, age)
+get_task(KAN-42)      -> brief + inlined images
+start_task(KAN-42)    -> moves to the board's first in-progress column
+... agent fixes the problem and runs the repo's checks ...
+finish_task(KAN-42)   -> ticks completed checklist items, moves to first done column
+```
+
+- **Scope:** only tasks assigned to you, in `unstarted` or `started` columns.
+  Backlog, archived, and closed tasks never appear. The board itself is the
+  state: there is no cursor, lease, or repo config file.
+- **Project inference:** the repo basename (or remote) is matched to project
+  slug, name, or key. Exact matches win over partial ones. If a repo hint
+  matches nothing, the agent gets candidates and asks; it never guesses.
+- **No trace:** every change goes through the normal tRPC procedures as you.
+  Activity, notifications, and realtime updates look like you moved the card.
+  Agents never comment or edit tasks.
+- **Races:** `start_task` and `finish_task` move with a compare-and-swap on the
+  current column (`task.move` `expectedColumnId`). If someone moved the card
+  meanwhile, the call fails and the agent re-reads the queue.
+- **Trust order:** the brief puts the original request (`task.source_text`)
+  and images first, then people's comments, then the title. The AI-drafted
+  description and checklist come last and are labeled as possibly wrong.
+  `source_text` stores the raw input to the AI drafter and to Enhance. It is
+  MCP-only and kept out of board and public share payloads
+  (`server/tasks/columns.ts`).
+- **Images:** up to 4 png/jpeg/gif/webp attachments of up to about 3.75 MB each
+  are inlined as image content. Other files are listed with short-lived links.
+
 ## What an agent can do
 
 Each tool wraps the same tRPC procedures and access checks the web app uses.
-Read-only grants discover only the three read tools; write-only grants discover
-only creation.
+Read-only grants discover only the read tools; write-only grants discover only
+the mutations. The `work` prompt needs both scopes.
 
 | Tool                  | Scope | Purpose                                                                           |
 | --------------------- | ----- | --------------------------------------------------------------------------------- |
@@ -122,20 +159,24 @@ only creation.
 | `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.      |
 | `search_tasks`        | read  | Search task titles for likely duplicates before presenting a proposal.            |
 | `create_tasks`        | write | Immediately create only the exact task set the user has approved; non-idempotent. |
+| `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
+| `get_task`            | read  | Trust-ordered markdown brief with images inlined.                                 |
+| `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
+| `finish_task`         | write | Tick completed checklist items and move to the first done column.                 |
 
 Use `get_project_context` to obtain canonical column, label, and member IDs.
 `search_tasks` is title-only and a duplicate match is a guardrail, not a
 blocker. After `create_tasks`, report every returned ticket identifier and link.
 
-Task updates, status changes, comments, queue behavior, project administration,
-Docs access, and backend AI drafting are unavailable over MCP.
+Task edits, comments, other people's tasks, project administration, Docs
+access, and backend AI drafting are unavailable over MCP.
 
 ## Scopes
 
 | Scope            | Granted access                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| `kanbi:read`     | `list_projects`, `get_project_context`, and `search_tasks`.                           |
-| `kanbi:write`    | `create_tasks` only.                                                                  |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `get_work_queue`, `get_task`. |
+| `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`.                                          |
 | `openid`         | Standard identity claim (requested by default).                                       |
 | `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser. |
 
@@ -178,7 +219,11 @@ but the discovery metadata and login cookie live on the configured origin.
 - `config.ts` - issuer, resource URL, MCP origin, accepted audiences, JWKS URL,
   and scope catalog.
 - `tools.ts` - registers only tools permitted by the narrowed grant, returns
-  structured output, and adds host instructions for approved capture.
+  structured output, and adds host instructions for capture and work.
+- `work.ts` - work-mode tools and the `work` prompt; `work-queue.ts` holds the
+  pure repo matching, ordering, and brief building.
+- `result.ts` - shared tool results; `McpUserError` messages reach the agent
+  verbatim, everything else is logged and genericized.
 - `caller.ts` - synthesizes a session from the OAuth subject so existing tRPC
   procedures, ACLs, and realtime updates are reused.
 - `sanitize.ts` - server-side HTML allowlist for agent-authored descriptions.
