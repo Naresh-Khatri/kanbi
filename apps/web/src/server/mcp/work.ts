@@ -3,7 +3,17 @@ import "server-only";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  notExists,
+  or,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -286,7 +296,7 @@ export function registerWorkTools(
       {
         title: "Get my work queue",
         description:
-          "Return the user's open assigned tasks for the project matching this repository: tasks already in progress, then up to 5 ready tasks ordered by priority and due date. Backlog and finished tasks are excluded.",
+          "Return the user's open assigned tasks for the project matching this repository: tasks already in progress, then up to 5 ready tasks ordered by priority and due date. Ready means a to-do column, or the backlog on boards without one. Finished tasks are excluded.",
         inputSchema: {
           repo: z
             .string()
@@ -327,6 +337,7 @@ export function registerWorkTools(
           }
           const searchIn = matched.length > 0 ? matched : projects;
 
+          const todo = alias(boardColumn, "todo");
           const rows =
             searchIn.length === 0
               ? []
@@ -350,7 +361,26 @@ export function registerWorkTools(
                     and(
                       eq(task.assigneeId, auth.userId),
                       isNull(task.archivedAt),
-                      inArray(boardColumn.category, ["unstarted", "started"]),
+                      inArray(boardColumn.category, [
+                        "backlog",
+                        "unstarted",
+                        "started",
+                      ]),
+                      // default boards ship without a todo column -> backlog is the queue there
+                      or(
+                        ne(boardColumn.category, "backlog"),
+                        notExists(
+                          db
+                            .select({ id: todo.id })
+                            .from(todo)
+                            .where(
+                              and(
+                                eq(todo.boardId, task.boardId),
+                                eq(todo.category, "unstarted"),
+                              ),
+                            ),
+                        ),
+                      ),
                       inArray(
                         project.id,
                         searchIn.map((p) => p.id),
@@ -428,7 +458,7 @@ export function registerWorkTools(
             url: taskUrl(chosen.slug, r.id),
           });
           const inProgress = mine.filter((r) => r.category === "started");
-          const ready = mine.filter((r) => r.category === "unstarted");
+          const ready = mine.filter((r) => r.category !== "started");
 
           return ok({
             project: toRef(chosen),

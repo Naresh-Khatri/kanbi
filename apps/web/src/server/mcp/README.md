@@ -127,7 +127,8 @@ finish_task(KAN-42)   -> ticks completed checklist items, moves to first done co
 ```
 
 - **Scope:** only tasks assigned to you, in `unstarted` or `started` columns.
-  Backlog, archived, and closed tasks never appear. The board itself is the
+  Backlog counts as ready only on boards with no `unstarted` column (the
+  default board). Archived and closed tasks never appear. The board itself is the
   state: there is no cursor, lease, or repo config file.
 - **Project inference:** the repo basename (or remote) is matched to project
   slug, name, or key. Exact matches win over partial ones. If a repo hint
