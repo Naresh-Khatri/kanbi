@@ -15,7 +15,7 @@ const boxVariants = cva(
       },
       checked: { true: "", false: "border-white/20" },
       // opaque backing when overlaying content
-      lifted: { true: "bg-raised", false: "" },
+      lifted: { true: "bg-raised" },
     },
     compoundVariants: [
       {
@@ -29,7 +29,7 @@ const boxVariants = cva(
         class: "border-info bg-info/15 text-info",
       },
     ],
-    defaultVariants: { tone: "neutral", checked: false, lifted: false },
+    defaultVariants: { tone: "neutral", checked: false },
   },
 );
 
