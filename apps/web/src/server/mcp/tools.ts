@@ -20,6 +20,7 @@ import {
 import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
 import { MCP_ORIGIN, SCOPE_READ, SCOPE_WRITE } from "./config";
+import { registerFindTools } from "./find";
 import { ok, toFailure } from "./result";
 import { sanitizeRichText } from "./sanitize";
 import { registerWorkTools, WORK_INSTRUCTIONS } from "./work";
@@ -372,6 +373,8 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
         }),
     );
   }
+
+  if (auth.scopes.includes(SCOPE_READ)) registerFindTools(server, auth);
 
   registerWorkTools(server, auth, {
     read: auth.scopes.includes(SCOPE_READ),

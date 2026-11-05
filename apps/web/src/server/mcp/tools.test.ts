@@ -51,6 +51,7 @@ describe("registerTools", () => {
       "list_projects",
       "get_project_context",
       "search_tasks",
+      "find_tasks",
       "get_work_queue",
       "get_task",
     ]);
@@ -71,6 +72,7 @@ describe("registerTools", () => {
       "get_project_context",
       "search_tasks",
       "create_tasks",
+      "find_tasks",
       "get_work_queue",
       "get_task",
       "start_task",

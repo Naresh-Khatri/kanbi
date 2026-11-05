@@ -160,6 +160,7 @@ the mutations. The `work` prompt needs both scopes.
 | `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.      |
 | `search_tasks`        | read  | Search task titles for likely duplicates before presenting a proposal.            |
 | `create_tasks`        | write | Immediately create only the exact task set the user has approved; non-idempotent. |
+| `find_tasks`          | read  | Ad-hoc questions: who added what, when, status, assignee, label, priority, text.  |
 | `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
 | `get_task`            | read  | Trust-ordered markdown brief with images inlined.                                 |
 | `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
@@ -176,7 +177,7 @@ access, and backend AI drafting are unavailable over MCP.
 
 | Scope            | Granted access                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `get_work_queue`, `get_task`. |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`. |
 | `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`.                                          |
 | `openid`         | Standard identity claim (requested by default).                                       |
 | `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser. |
@@ -223,6 +224,7 @@ but the discovery metadata and login cookie live on the configured origin.
   structured output, and adds host instructions for capture and work.
 - `work.ts` - work-mode tools and the `work` prompt; `work-queue.ts` holds the
   pure repo matching, ordering, and brief building.
+- `find.ts` - `find_tasks`, read-only ad-hoc task lookup.
 - `result.ts` - shared tool results; `McpUserError` messages reach the agent
   verbatim, everything else is logged and genericized.
 - `caller.ts` - synthesizes a session from the OAuth subject so existing tRPC
