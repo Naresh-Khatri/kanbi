@@ -243,6 +243,7 @@ export function AiDraftDialog({
           dueAt: i.dueAt ? new Date(i.dueAt) : undefined,
           estimatePomodoros: i.estimatePomodoros,
           checklist: v.checklist.length > 0 ? v.checklist : undefined,
+          sourceText: message.trim(),
         };
       })
       .filter((v): v is NonNullable<typeof v> => v !== null);

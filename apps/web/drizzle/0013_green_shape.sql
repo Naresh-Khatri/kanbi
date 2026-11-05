@@ -1,0 +1,1 @@
+ALTER TABLE "kanbi_task" ADD COLUMN "source_text" text;

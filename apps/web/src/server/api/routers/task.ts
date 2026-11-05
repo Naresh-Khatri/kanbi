@@ -169,6 +169,7 @@ export const taskRouter = createTRPCRouter({
         assigneeId: z.string().nullable().optional(),
         dueAt: z.date().nullable().optional(),
         estimatePomodoros: z.number().int().min(1).max(16).nullable().optional(),
+        sourceText: z.string().max(10_000).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -210,6 +211,7 @@ export const taskRouter = createTRPCRouter({
           assigneeId: input.assigneeId ?? null,
           dueAt: input.dueAt ?? null,
           estimatePomodoros: input.estimatePomodoros ?? null,
+          sourceText: input.sourceText ?? null,
         })
         .returning();
       bus.emitBoard(input.boardId, { scope: "task", ids: row ? [row.id] : [] });
@@ -881,6 +883,7 @@ export const taskRouter = createTRPCRouter({
                 .nullable()
                 .optional(),
               checklist: z.array(z.string().min(1).max(280)).max(20).optional(),
+              sourceText: z.string().max(10_000).optional(),
             }),
           )
           .min(1)
@@ -962,6 +965,7 @@ export const taskRouter = createTRPCRouter({
           assigneeId: t.assigneeId ?? null,
           dueAt: t.dueAt ?? null,
           estimatePomodoros: t.estimatePomodoros ?? null,
+          sourceText: t.sourceText ?? null,
         };
       });
 

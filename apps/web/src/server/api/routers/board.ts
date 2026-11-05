@@ -9,6 +9,7 @@ import {
   task,
   taskLabel,
 } from "@/server/db/schema";
+import { taskReadColumns } from "@/server/tasks/columns";
 
 const columnSortSchema = z.object({
   mode: z.enum(["manual", "priority", "assignee", "dueAt", "createdAt"]),
@@ -39,7 +40,7 @@ export const boardRouter = createTRPCRouter({
           .where(eq(boardColumn.boardId, input.boardId))
           .orderBy(asc(boardColumn.position)),
         ctx.db
-          .select()
+          .select(taskReadColumns)
           .from(task)
           .where(eq(task.boardId, input.boardId))
           .orderBy(asc(task.position)),

@@ -50,6 +50,7 @@ import {
 import { Input, Textarea } from "@/components/ui/input";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { htmlToMarkdown } from "@/lib/html-to-markdown";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import {
@@ -110,6 +111,8 @@ export function QuickAddTaskDialog({
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const [checklist, setChecklist] = useState<StagedChecklistItem[]>([]);
   const [checklistText, setChecklistText] = useState("");
+  // pre-enhance wording; first enhance wins so re-enhancing keeps the original
+  const [sourceText, setSourceText] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const dueInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +144,7 @@ export function QuickAddTaskDialog({
     setStaged([]);
     setChecklist([]);
     setChecklistText("");
+    setSourceText(null);
     setTitle("");
     setDescription("");
     setPriority("none");
@@ -234,6 +238,7 @@ export function QuickAddTaskDialog({
       dueAt,
       labelIds: new Set(selectedLabelIds),
       checklist,
+      sourceText,
     };
     try {
       const res = await enhance.mutateAsync({
@@ -241,6 +246,13 @@ export function QuickAddTaskDialog({
         title: title.trim(),
         description: isEmptyHtml(description) ? undefined : description,
       });
+      setSourceText(
+        (prev) =>
+          prev ??
+          [title.trim(), isEmptyHtml(description) ? "" : htmlToMarkdown(description)]
+            .filter(Boolean)
+            .join("\n\n"),
+      );
       setTitle(res.title);
       setDescription(res.description ?? "");
       setPriority(res.priority);
@@ -276,6 +288,7 @@ export function QuickAddTaskDialog({
             setDueAt(before.dueAt);
             setSelectedLabelIds(before.labelIds);
             setChecklist(before.checklist);
+            setSourceText(before.sourceText);
           },
         },
       });
@@ -297,6 +310,7 @@ export function QuickAddTaskDialog({
         priority: priority !== "none" ? priority : undefined,
         assigneeId: assigneeId ?? undefined,
         dueAt: dueAt ? new Date(dueAt) : undefined,
+        sourceText: sourceText ?? undefined,
       });
       if (!row) throw new Error("Failed to create task");
 

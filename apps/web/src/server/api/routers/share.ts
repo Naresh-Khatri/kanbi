@@ -18,6 +18,7 @@ import {
   task,
   taskLabel,
 } from "@/server/db/schema";
+import { taskReadColumns } from "@/server/tasks/columns";
 
 export const shareRouter = createTRPCRouter({
   list: boardProcedure.query(({ ctx, input }) =>
@@ -100,7 +101,7 @@ export const shareRouter = createTRPCRouter({
           .where(eq(boardColumn.boardId, hit.boardId))
           .orderBy(asc(boardColumn.position)),
         ctx.db
-          .select()
+          .select(taskReadColumns)
           .from(task)
           .where(eq(task.boardId, hit.boardId))
           .orderBy(asc(task.position)),

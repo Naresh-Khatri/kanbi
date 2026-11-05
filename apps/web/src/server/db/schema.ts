@@ -426,6 +426,8 @@ export const task = createTable(
     dueAt: timestamp("due_at", { withTimezone: true }),
     // 25-min focus blocks; null = unestimated. AI drafter proposes 1-8, manual entry allows up to 16.
     estimatePomodoros: integer("estimate_pomodoros"),
+    // raw request before AI drafting/enhance; MCP-only, kept out of board + share reads
+    sourceText: text("source_text"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
