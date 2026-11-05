@@ -9,6 +9,7 @@ import { ProjectInfo } from "@/app/app/p/[slug]/_components/project-info";
 import { ProjectSectionNav } from "@/app/app/p/[slug]/_components/project-section-nav";
 import { ProjectTeamButton } from "@/app/app/p/[slug]/_components/project-team-button";
 import { resolveProject } from "@/app/app/p/[slug]/_lib/resolve-project";
+import { Button } from "@/components/ui/button";
 import { api, HydrateClient } from "@/trpc/server";
 
 export default async function ProjectLayout({
@@ -43,15 +44,19 @@ export default async function ProjectLayout({
             />
             <ProjectAiButton />
             <ProjectTeamButton />
-            <Link
+            <Button
               aria-label="Project settings"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
-              href={`/app/p/${slug}/settings`}
+              asChild
+              className="gap-1.5"
+              size="sm"
               title="Project settings"
+              variant="toolbar"
             >
-              <Settings className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">Settings</span>
-            </Link>
+              <Link href={`/app/p/${slug}/settings`}>
+                <Settings className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">Settings</span>
+              </Link>
+            </Button>
           </>
         }
         start={

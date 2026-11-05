@@ -3,10 +3,15 @@
 import { Eye } from "lucide-react";
 import { useMemo } from "react";
 
+import { PriorityBadge } from "@/app/app/p/[slug]/_components/priority";
+import { Badge } from "@/components/ui/badge";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { ShareUnavailable } from "./share-unavailable";
 
-type PublicBoard = Extract<RouterOutputs["share"]["getPublic"], { status: "ok" }>;
+type PublicBoard = Extract<
+  RouterOutputs["share"]["getPublic"],
+  { status: "ok" }
+>;
 type PublicTask = PublicBoard["tasks"][number];
 
 export function PublicBoardView({ token }: { token: string }) {
@@ -35,17 +40,17 @@ export function PublicBoardView({ token }: { token: string }) {
 
   return (
     <main className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-[#0b0b0f]/80 px-6 py-3 backdrop-blur">
+      <header className="bg-canvas/70 sticky top-0 z-40 flex items-center justify-between border-b border-white/10 px-6 py-3 backdrop-blur">
         <h1 className="text-lg font-semibold">{board.projectName}</h1>
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs text-white/60">
-          <Eye className="h-3.5 w-3.5" /> View only
-        </div>
+        <Badge>
+          <Eye className="h-3 w-3" /> View only
+        </Badge>
       </header>
       <div className="flex-1 overflow-x-auto">
         <div className="flex min-w-max gap-4 p-6">
           {columns.map((col) => (
             <div
-              className="flex w-72 shrink-0 flex-col gap-3 rounded-xl bg-white/[0.03] p-3"
+              className="flex w-72 shrink-0 flex-col gap-3 rounded-lg bg-white/5 p-3"
               key={col.id}
             >
               <div className="flex items-center gap-2 px-1">
@@ -57,13 +62,13 @@ export function PublicBoardView({ token }: { token: string }) {
               <div className="flex flex-col gap-2">
                 {(tasksByColumn.get(col.id) ?? []).map((t) => (
                   <div
-                    className="rounded-lg border border-white/5 bg-[#14151c] p-3"
+                    className="bg-raised rounded-lg border border-white/10 p-3"
                     key={t.id}
                   >
                     <p className="text-sm leading-snug">{t.title}</p>
                     {t.priority !== "none" ? (
-                      <div className="mt-2 inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[10px] tracking-wide text-white/70 uppercase">
-                        {t.priority}
+                      <div className="mt-2">
+                        <PriorityBadge priority={t.priority} />
                       </div>
                     ) : null}
                   </div>

@@ -22,6 +22,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -69,17 +70,17 @@ const CATEGORY_META = {
   unstarted: {
     label: "Unstarted",
     Icon: Circle,
-    className: "text-white/50",
+    className: "text-white/70",
   },
   started: {
     label: "Started",
     Icon: CircleDot,
-    className: "text-sky-300",
+    className: "text-info",
   },
   completed: {
     label: "Completed",
     Icon: CheckCircle2,
-    className: "text-emerald-300",
+    className: "text-success",
   },
   canceled: {
     label: "Canceled",
@@ -270,14 +271,16 @@ export function ColumnHeader({
       }}
     >
       {canWrite ? (
-        <button
+        <Button
           aria-label={`Drag ${column.name} column`}
-          className="cursor-grab p-2 text-white/40 hover:text-white/80 active:cursor-grabbing"
+          className="cursor-grab active:cursor-grabbing"
+          size="icon-sm"
           type="button"
+          variant="quiet"
           {...dragHandleProps}
         >
           <GripVertical className="size-4" />
-        </button>
+        </Button>
       ) : null}
       {renaming ? (
         <form
@@ -331,7 +334,7 @@ export function ColumnHeader({
             <span
               className={cn(
                 "ml-2 text-xs text-white/40",
-                overWipLimit && "text-amber-300",
+                overWipLimit && "text-warning",
               )}
               title={
                 overWipLimit
@@ -365,12 +368,6 @@ export function ColumnHeader({
                 ? `Sort ${column.name}: ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">]} ${sortDir === "asc" ? "ascending" : "descending"}`
                 : `Sort ${column.name}`
             }
-            className={cn(
-              "transition",
-              sorted && "bg-sky-400/10 text-sky-200 hover:bg-sky-400/15",
-              sortBlocked &&
-                "bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/50 hover:bg-amber-400/20",
-            )}
             size="icon"
             title={
               sortBlocked
@@ -379,7 +376,9 @@ export function ColumnHeader({
                   ? `Sorted by ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">].toLowerCase()}`
                   : "Sort tasks"
             }
-            variant="ghost"
+            variant={
+              sortBlocked ? "selected-warning" : sorted ? "selected" : "ghost"
+            }
           >
             {sorted ? (
               sortDir === "asc" ? (
@@ -398,9 +397,7 @@ export function ColumnHeader({
             return (
               <DropdownMenuItem
                 className={
-                  isActive
-                    ? "bg-sky-400/15 text-sky-200 focus:bg-sky-400/25"
-                    : undefined
+                  isActive ? "bg-info/15 text-info focus:bg-info/20" : undefined
                 }
                 key={mode}
                 onSelect={(event) => {
@@ -605,8 +602,9 @@ export function ColumnHeader({
           </DialogHeader>
           <label className="space-y-2 text-sm">
             <span className="text-white/70">Move tasks to</span>
-            <select
-              className="h-9 w-full rounded-md border border-white/10 bg-[#14151c] px-3 text-sm outline-none focus:border-white/20 focus:ring-2 focus:ring-white/20"
+            <Select
+              className="w-full"
+              size="sm"
               onChange={(event) => setDestinationColumnId(event.target.value)}
               value={destinationColumnId}
             >
@@ -615,7 +613,7 @@ export function ColumnHeader({
                   {candidate.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <DialogFooter>
             <Button onClick={() => setConfirmDelete(false)} variant="ghost">

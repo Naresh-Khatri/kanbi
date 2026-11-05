@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
+import { Card, IconTile, SectionLabel } from "@/components/ui/surface";
 import { authClient } from "@/server/better-auth/client";
 
 const SCOPE_META: Record<string, { label: string; Icon: LucideIcon }> = {
@@ -77,8 +78,8 @@ export function ConsentForm() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-xl border border-white/10 bg-white/[0.02] p-6">
-      <div className="flex items-center gap-2 text-white/80">
+    <Card className="w-full max-w-sm" padding="lg">
+      <div className="flex items-center gap-2 text-white">
         <Logo className="h-5 w-5" />
         <span className="text-sm font-medium">Kanbi</span>
       </div>
@@ -86,7 +87,7 @@ export function ConsentForm() {
       <h1 className="mt-5 text-lg font-semibold text-white">
         Authorize {appName}
       </h1>
-      <p className="mt-1 text-[13px] text-white/50">
+      <p className="mt-1 text-sm text-white/40">
         {appName} wants to access your Kanbi account.
         {session?.user?.email ? (
           <>
@@ -97,12 +98,10 @@ export function ConsentForm() {
         ) : null}
       </p>
 
-      <p className="mt-5 text-[11px] font-medium tracking-wide text-white/40 uppercase">
-        It will be able to
-      </p>
+      <SectionLabel className="mt-5">It will be able to</SectionLabel>
       <ul className="mt-2 flex flex-col gap-2.5">
         {scopes.length === 0 ? (
-          <li className="text-[13px] text-white/40">Basic access.</li>
+          <li className="text-sm text-white/40">Basic access.</li>
         ) : (
           scopes.map((scope) => {
             const meta = SCOPE_META[scope];
@@ -110,11 +109,11 @@ export function ConsentForm() {
             return (
               <li
                 key={scope}
-                className="flex items-center gap-2.5 text-[13px] text-white/70"
+                className="flex items-center gap-2.5 text-sm text-white/70"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]">
-                  <Icon className="h-3.5 w-3.5 text-white/60" />
-                </span>
+                <IconTile size="sm">
+                  <Icon className="h-3.5 w-3.5" />
+                </IconTile>
                 <span>{meta?.label ?? scope}</span>
               </li>
             );
@@ -122,9 +121,7 @@ export function ConsentForm() {
         )}
       </ul>
 
-      {error ? (
-        <p className="mt-4 text-[13px] text-red-400/90">{error}</p>
-      ) : null}
+      {error ? <p className="text-danger mt-4 text-sm">{error}</p> : null}
 
       <div className="mt-6 flex items-center gap-2">
         <Button
@@ -146,9 +143,9 @@ export function ConsentForm() {
         </Button>
       </div>
 
-      <p className="mt-4 text-center text-[11px] text-white/35">
+      <p className="text-2xs mt-4 text-center text-white/40">
         You can revoke access anytime from your Kanbi settings.
       </p>
-    </div>
+    </Card>
   );
 }

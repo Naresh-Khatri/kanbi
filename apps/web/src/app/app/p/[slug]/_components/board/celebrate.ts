@@ -1,8 +1,9 @@
 import confetti from "canvas-confetti";
 
+import { CONFETTI_COLORS } from "@/lib/palette";
+
 export function celebrate() {
   const end = Date.now() + 700;
-  const colors = ["#38bdf8", "#a78bfa", "#f472b6", "#fbbf24", "#34d399"];
   (function frame() {
     confetti({
       particleCount: 4,
@@ -10,7 +11,7 @@ export function celebrate() {
       spread: 70,
       startVelocity: 45,
       origin: { x: 0, y: 0.9 },
-      colors,
+      colors: CONFETTI_COLORS,
     });
     confetti({
       particleCount: 4,
@@ -18,7 +19,7 @@ export function celebrate() {
       spread: 70,
       startVelocity: 45,
       origin: { x: 1, y: 0.9 },
-      colors,
+      colors: CONFETTI_COLORS,
     });
     if (Date.now() < end) requestAnimationFrame(frame);
   })();

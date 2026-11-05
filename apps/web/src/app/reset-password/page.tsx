@@ -8,8 +8,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/ui/logo";
+import { Wordmark } from "@/components/ui/logo";
 import { authClient } from "@/server/better-auth/client";
+import { PageTitle } from "@/components/ui/surface";
 
 export default function ResetPasswordPage() {
   return (
@@ -50,14 +51,13 @@ function ResetPasswordForm() {
 
   if (!token || error) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
+      <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
         <div className="flex w-full max-w-sm flex-col gap-4">
-          <Link className="flex items-center gap-2.5" href="/">
-            <Logo className="h-8 w-8" />
-            <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+          <Link href="/">
+            <Wordmark />
           </Link>
-          <h1 className="text-2xl font-semibold">Link expired</h1>
-          <p className="text-sm text-white/60">
+          <PageTitle>Link expired</PageTitle>
+          <p className="text-sm text-white/70">
             This reset link is invalid or has expired. Request a new one.
           </p>
           <Link className="text-white underline" href="/forgot-password">
@@ -69,14 +69,13 @@ function ResetPasswordForm() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
+    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link className="flex items-center gap-2.5" href="/">
-          <Logo className="h-8 w-8" />
-          <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+        <Link href="/">
+          <Wordmark />
         </Link>
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">Choose a new password</h1>
+          <PageTitle>Choose a new password</PageTitle>
         </div>
         <form className="flex flex-col gap-3" onSubmit={onSubmit}>
           <div className="flex flex-col gap-1.5">

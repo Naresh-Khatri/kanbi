@@ -4,7 +4,7 @@ import { FileText, SquareKanban } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { cn } from "@/lib/utils";
+import { segmentVariants } from "@/components/ui/tabs";
 
 export function ProjectSectionNav({ slug }: { slug: string }) {
   const pathname = usePathname();
@@ -35,12 +35,7 @@ function SectionLink({
   return (
     <Link
       aria-current={active ? "page" : undefined}
-      className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs transition focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none",
-        active
-          ? "bg-white/10 text-white"
-          : "text-white/50 hover:bg-white/5 hover:text-white/80",
-      )}
+      className={segmentVariants({ size: "sm", active })}
       href={href}
     >
       {children}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { APP_VERSION, releases } from "@/changelog";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -47,7 +48,7 @@ export function WhatsNewDialog() {
         <ul className="flex flex-col gap-2 text-sm text-white/70">
           {latest.entries.map((entry) => (
             <li className="flex gap-2" key={entry}>
-              <span aria-hidden className="text-white/25">
+              <span aria-hidden className="text-white/40">
                 —
               </span>
               <span>{entry}</span>
@@ -55,20 +56,19 @@ export function WhatsNewDialog() {
           ))}
         </ul>
         <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-          <Link
-            className="text-sm text-white/40 transition hover:text-white/70"
-            href="/app/changelog"
+          <Button asChild size="inline" variant="link">
+            <Link href="/app/changelog" onClick={() => onOpenChange(false)}>
+              All releases
+            </Link>
+          </Button>
+          <Button
             onClick={() => onOpenChange(false)}
-          >
-            All releases
-          </Link>
-          <button
-            className="rounded-md border border-white/10 px-3 py-1.5 text-sm transition hover:bg-white/5"
-            onClick={() => onOpenChange(false)}
+            size="sm"
             type="button"
+            variant="outline"
           >
             Got it
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

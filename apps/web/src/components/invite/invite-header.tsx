@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 
+import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +22,9 @@ export function ProjectTile({
 }) {
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-lg font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
+      className="flex shrink-0 items-center justify-center rounded-lg font-semibold text-white ring-1 ring-white/10 ring-inset"
       style={{
-        background: color ?? "#6366f1",
+        background: color ?? DEFAULT_PROJECT_COLOR,
         width: size,
         height: size,
         fontSize: size * 0.42,
@@ -52,12 +53,12 @@ export function InviteHeader({
     >
       <div className="flex items-center gap-2">
         <UserAvatar
-          className="ring-2 ring-[#111118]"
+          className="ring-canvas ring-2"
           image={invite.inviterImage}
           name={invite.inviterName}
           size={size}
         />
-        <Plus className="h-3.5 w-3.5 text-white/30" />
+        <Plus className="h-3.5 w-3.5 text-white/40" />
         <ProjectTile
           color={invite.projectColor}
           name={invite.projectName}

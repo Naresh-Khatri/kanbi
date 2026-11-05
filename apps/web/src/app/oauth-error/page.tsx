@@ -1,6 +1,8 @@
 import Link from "next/link";
 
-import { Logo } from "@/components/ui/logo";
+import { Button } from "@/components/ui/button";
+import { Wordmark } from "@/components/ui/logo";
+import { PageTitle } from "@/components/ui/surface";
 
 type OAuthErrorPageProps = {
   searchParams: Promise<{
@@ -23,32 +25,25 @@ export default async function OAuthErrorPage({
     "Kanbi could not complete the authorization request.";
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
+    <main className="bg-marketing flex min-h-screen items-center justify-center px-6 text-white">
       <div className="flex w-full max-w-sm flex-col gap-5 text-center">
-        <Link className="mx-auto flex items-center gap-2.5" href="/">
-          <Logo className="h-8 w-8" />
-          <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+        <Link className="mx-auto" href="/">
+          <Wordmark />
         </Link>
 
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold">Authorization failed</h1>
+          <PageTitle>Authorization failed</PageTitle>
           <p className="text-sm text-white/70">{description}</p>
           <code className="text-xs text-white/40">{error}</code>
         </div>
 
         <div className="flex justify-center gap-3">
-          <Link
-            className="rounded-full bg-white px-5 py-2 text-sm font-medium text-black transition hover:bg-white/90"
-            href="/docs/mcp"
-          >
-            View setup guide
-          </Link>
-          <Link
-            className="rounded-full border border-white/20 px-5 py-2 text-sm font-medium transition hover:bg-white/10"
-            href="/app"
-          >
-            Back to app
-          </Link>
+          <Button asChild shape="pill">
+            <Link href="/docs/mcp">View setup guide</Link>
+          </Button>
+          <Button asChild shape="pill" variant="outline">
+            <Link href="/app">Back to app</Link>
+          </Button>
         </div>
       </div>
     </main>

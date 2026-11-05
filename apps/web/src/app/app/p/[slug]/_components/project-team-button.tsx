@@ -4,6 +4,8 @@ import { ChevronDown, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
+import { Badge, Dot } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,11 +21,11 @@ type Role = "owner" | "editor" | "viewer";
 
 const ROLE_RANK: Record<Role, number> = { owner: 0, editor: 1, viewer: 2 };
 
-const ROLE_BADGE: Record<Role, string> = {
-  owner: "bg-violet-400/10 text-violet-300",
-  editor: "bg-sky-400/10 text-sky-300",
-  viewer: "bg-white/5 text-white/70",
-};
+const ROLE_TONE = {
+  owner: "ai",
+  editor: "info",
+  viewer: "neutral",
+} as const satisfies Record<Role, "ai" | "info" | "neutral">;
 
 /**
  * Single header control that folds together members, presence, the caller's
@@ -83,19 +85,19 @@ export function ProjectTeamButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           aria-label="Team & presence"
-          className="inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 pr-2 pl-1.5 text-sm text-white/80 transition outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30"
+          className="gap-2 pr-2 pl-1.5"
+          size="sm"
           type="button"
+          variant="toolbar"
         >
           <span className="flex -space-x-1.5">
             {shown.map((m) => (
               <span
                 className={cn(
                   "rounded-full ring-2",
-                  online.has(m.userId)
-                    ? "ring-emerald-400/80"
-                    : "ring-[#0b0b0f]",
+                  online.has(m.userId) ? "ring-success/70" : "ring-canvas",
                 )}
                 key={m.userId}
               >
@@ -103,34 +105,27 @@ export function ProjectTeamButton() {
               </span>
             ))}
             {extra > 0 ? (
-              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-white/10 text-[10px] text-white/80 ring-2 ring-[#0b0b0f]">
+              <span className="text-2xs ring-canvas flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/70 ring-2">
                 +{extra}
               </span>
             ) : null}
           </span>
-          {pending > 0 ? (
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-          ) : null}
+          {pending > 0 ? <Dot className="bg-warning h-1.5 w-1.5" /> : null}
           <ChevronDown className="h-3.5 w-3.5 text-white/40" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-72">
         <div className="flex items-center justify-between px-2 py-1.5">
-          <span className="text-xs text-white/50">
+          <span className="text-xs text-white/70">
             {onlineCount > 0
               ? `${onlineCount} online · ${members.length} member${members.length === 1 ? "" : "s"}`
               : `${members.length} member${members.length === 1 ? "" : "s"}`}
           </span>
           {role ? (
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] capitalize",
-                ROLE_BADGE[role],
-              )}
-            >
+            <Badge className="capitalize" tone={ROLE_TONE[role]}>
               {role}
-            </span>
+            </Badge>
           ) : null}
         </div>
 
@@ -152,16 +147,19 @@ export function ProjectTeamButton() {
                     size={24}
                   />
                   {isOnline ? (
-                    <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0b0b0f]" />
+                    <Dot
+                      className="bg-success ring-canvas absolute -right-0.5 -bottom-0.5 ring-2"
+                      size="md"
+                    />
                   ) : null}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-white/85">
+                <span className="min-w-0 flex-1 truncate text-sm text-white">
                   {m.name}
                   {m.userId === me?.id ? (
                     <span className="text-white/40"> (you)</span>
                   ) : null}
                 </span>
-                <span className="shrink-0 text-[11px] text-white/40 capitalize">
+                <span className="text-2xs shrink-0 text-white/40 capitalize">
                   {m.role}
                 </span>
               </div>
@@ -174,7 +172,7 @@ export function ProjectTeamButton() {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link
-                className="text-amber-300"
+                className="text-warning"
                 href={`/app/p/${slug}/settings#members`}
               >
                 <UserPlus className="h-4 w-4" />

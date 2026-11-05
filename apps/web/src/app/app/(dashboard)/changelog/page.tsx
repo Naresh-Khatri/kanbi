@@ -19,13 +19,15 @@ export default function ChangelogPage() {
               <h2 className="font-mono text-sm">v{release.version}</h2>
               <time className="text-xs text-white/40" dateTime={release.date}>
                 {/* bare YYYY-MM-DD parses as UTC midnight -> renders a day early west of UTC */}
-                {formatDate(`${release.date}T00:00:00`, { relativeDays: false })}
+                {formatDate(`${release.date}T00:00:00`, {
+                  relativeDays: false,
+                })}
               </time>
             </div>
             <ul className="mt-3 flex flex-col gap-2 text-sm text-white/70">
               {release.entries.map((entry) => (
                 <li className="flex gap-2" key={entry}>
-                  <span aria-hidden className="text-white/25">
+                  <span aria-hidden className="text-white/40">
                     —
                   </span>
                   <span>{entry}</span>

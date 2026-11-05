@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+
 const STORAGE_KEY = "kanbi:last-used-auth";
 const PROVIDERS = ["email", "github", "google"] as const;
 export type LastUsedProvider = (typeof PROVIDERS)[number];
@@ -25,8 +27,8 @@ export function useLastUsedAuth() {
 
 export function LastUsedBadge() {
   return (
-    <span className="absolute -top-2 right-2 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-black shadow-sm">
+    <Badge className="absolute -top-2 right-2" tone="inverse">
       Last used
-    </span>
+    </Badge>
   );
 }

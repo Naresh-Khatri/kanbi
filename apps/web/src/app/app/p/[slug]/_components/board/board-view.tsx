@@ -27,6 +27,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
+import { CountBadge } from "@/components/ui/badge";
 import { OPEN_TASK_EVENT } from "@/components/ui/rich-text-mention";
 import { POSITION_STEP, positionBetween } from "@/lib/position";
 import { compareTasks } from "@/lib/task-sort";
@@ -1099,7 +1100,7 @@ export function BoardView({
   );
 
   return (
-    <main className="relative flex h-[calc(100vh-57px)] flex-col">
+    <main className="h-below-header relative flex flex-col">
       <BoardToolbar
         archivedCount={archivedTasks.length}
         expanded={toolbarExpanded}
@@ -1197,13 +1198,16 @@ export function BoardView({
               />
               {selectedTaskIds.has(active.task.id) &&
               selectedTaskIds.size > 1 ? (
-                <span className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                <CountBadge
+                  className="absolute -top-2 -right-2"
+                  tone="info-solid"
+                >
                   +{selectedTaskIds.size - 1}
-                </span>
+                </CountBadge>
               ) : null}
             </div>
           ) : active?.kind === "column" ? (
-            <div className="w-72 rounded-xl bg-white/[0.06] p-3 shadow-xl">
+            <div className="w-72 rounded-lg bg-white/10 p-3">
               <div className="text-sm font-medium">{active.column.name}</div>
             </div>
           ) : null}

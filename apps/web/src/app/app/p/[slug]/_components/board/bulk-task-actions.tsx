@@ -28,7 +28,7 @@ export function BulkTaskActions({
   onPriorityChange: (priority: Priority) => void;
 }) {
   return (
-    <div className="absolute bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-white/15 bg-[#14151c] p-1.5 shadow-lg">
+    <div className="bg-raised absolute bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-white/20 p-1.5">
       <span className="shrink-0 px-2 text-sm font-medium">
         {count} selected
       </span>

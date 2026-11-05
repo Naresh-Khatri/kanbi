@@ -1,24 +1,15 @@
 "use client";
 
+import { Swatch } from "@/components/ui/swatch";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DEFAULT_PROJECT_COLOR, PROJECT_COLORS } from "@/lib/palette";
 import { api } from "@/trpc/react";
 import { Section } from "./section";
-
-const COLORS = [
-  "#6366f1",
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#f43f5e",
-  "#8b5cf6",
-  "#14b8a6",
-  "#ec4899",
-];
 
 export function GeneralSection({
   projectId,
@@ -131,33 +122,32 @@ export function GeneralSection({
         <div className="flex flex-col gap-1.5">
           <Label>Color</Label>
           <div className="flex flex-wrap gap-2">
-            {COLORS.map((c) => {
-              const active = (color ?? "#6366f1") === c;
+            {PROJECT_COLORS.map((c) => {
+              const active = (color ?? DEFAULT_PROJECT_COLOR) === c;
               return (
-                <button
+                <Swatch
                   aria-label={`Color ${c}`}
-                  className={`h-7 w-7 rounded-full border transition ${
-                    active
-                      ? "border-white/80 ring-2 ring-white/30"
-                      : "border-white/10 hover:border-white/40"
-                  } ${!canWrite ? "cursor-not-allowed opacity-50" : ""}`}
+                  className="size-7"
+                  color={c}
                   disabled={!canWrite}
                   key={c}
                   onClick={() => setColor(c)}
-                  style={{ background: c }}
-                  type="button"
+                  selected={active}
                 />
               );
             })}
           </div>
         </div>
         <div className="flex justify-end">
-          <Button disabled={!canWrite || !dirty || update.isPending} type="submit">
+          <Button
+            disabled={!canWrite || !dirty || update.isPending}
+            type="submit"
+          >
             {update.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>
         {!canWrite ? (
-          <p className="text-xs text-white/50">
+          <p className="text-xs text-white/70">
             Read-only — viewers can&apos;t edit project details.
           </p>
         ) : null}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/trpc/react";
 import { Section } from "./section";
 
@@ -39,31 +39,17 @@ export function NotificationsSection({ projectId }: { projectId: string }) {
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col">
-          <span className="text-sm text-white/90">Weekly digest email</span>
-          <span className="text-xs text-white/50">
+          <span className="text-sm text-white">Weekly digest email</span>
+          <span className="text-xs text-white/40">
             An AI summary of the week&apos;s activity, sent once a week.
           </span>
         </div>
-        <button
-          aria-checked={enabled}
+        <Switch
           aria-label="Weekly digest email"
-          className={cn(
-            "relative h-5 w-9 shrink-0 rounded-full transition",
-            enabled ? "bg-white" : "bg-white/15",
-            busy && "opacity-50",
-          )}
+          checked={enabled}
           disabled={busy}
-          onClick={() => toggle(!enabled)}
-          role="switch"
-          type="button"
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 h-4 w-4 rounded-full transition-all",
-              enabled ? "left-[18px] bg-black" : "left-0.5 bg-white/70",
-            )}
-          />
-        </button>
+          onCheckedChange={toggle}
+        />
       </div>
     </Section>
   );

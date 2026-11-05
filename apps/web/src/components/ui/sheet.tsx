@@ -18,14 +18,14 @@ export const SheetContent = React.forwardRef<
     <DialogPrimitive.Overlay className="data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=open]:animate-in fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
     <DialogPrimitive.Content
       className={cn(
-        "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=open]:animate-in fixed top-0 right-0 z-50 flex h-full w-full max-w-xl flex-col gap-4 border-l border-white/10 bg-[#0f1016] p-6 text-white shadow-xl transition",
+        "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=open]:animate-in bg-overlay fixed top-0 right-0 z-50 flex h-full w-full max-w-xl flex-col gap-4 border-l border-white/10 p-6 text-white shadow-xl transition",
         className,
       )}
       ref={ref}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute top-4 right-4 rounded-sm text-white/60 transition-opacity hover:opacity-100 focus:outline-none">
+      <DialogPrimitive.Close className="absolute top-4 right-4 rounded-sm text-white/70 transition-opacity hover:opacity-100 focus:outline-none">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
@@ -60,7 +60,7 @@ export const SheetDescription = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
-    className={cn("text-sm text-white/60", className)}
+    className={cn("text-sm text-white/70", className)}
     ref={ref}
     {...props}
   />

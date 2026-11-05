@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/surface";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -31,17 +32,17 @@ export function SwitchAccount({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm">
-        <p className="text-white/80">
+      <Card className="flex flex-col gap-2 text-sm" tone="warning">
+        <p className="text-white">
           This invite was sent to{" "}
           <span className="font-medium text-white">{invitedEmail}</span>.
         </p>
-        <p className="text-white/60">
+        <p className="text-white/70">
           You&apos;re signed in as{" "}
-          <span className="text-white/80">{currentEmail}</span>. Switch to the
+          <span className="text-white">{currentEmail}</span>. Switch to the
           invited account to accept.
         </p>
-      </div>
+      </Card>
       <Button className="w-full" disabled={pending} onClick={onSwitch}>
         {pending ? "Signing out…" : `Sign in as ${invitedEmail}`}
       </Button>

@@ -6,6 +6,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/surface";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { api } from "@/trpc/react";
 
@@ -55,7 +57,7 @@ export function AcceptInvite({
   if (declined) {
     return (
       <div className="flex flex-col gap-4 text-center">
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-white/70">
           Invitation declined. You won&apos;t be added to {projectName}.
         </p>
         <Button asChild variant="outline">
@@ -67,17 +69,17 @@ export function AcceptInvite({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 text-sm">
+      <Card className="py-3 text-sm">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-white/60">You&apos;ll join as</span>
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium">
+          <span className="text-white/70">You&apos;ll join as</span>
+          <Badge className="text-xs font-medium" tone="neutral">
             {copy.label}
-          </span>
+          </Badge>
         </div>
         {copy.body ? (
-          <p className="mt-1.5 text-xs text-white/50">{copy.body}</p>
+          <p className="mt-1.5 text-xs text-white/40">{copy.body}</p>
         ) : null}
-      </div>
+      </Card>
 
       <div className="flex flex-col gap-2">
         <Button
@@ -100,10 +102,10 @@ export function AcceptInvite({
         </Button>
       </div>
 
-      <div className="flex items-center justify-center gap-2 border-t border-white/5 pt-4 text-xs text-white/50">
+      <div className="flex items-center justify-center gap-2 border-t border-white/10 pt-4 text-xs text-white/40">
         <UserAvatar image={image} name={name} size={18} />
         <span>
-          Signed in as <span className="text-white/80">{email}</span>
+          Signed in as <span className="text-white">{email}</span>
         </span>
       </div>
     </div>

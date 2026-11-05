@@ -18,6 +18,7 @@ import {
 import { useMemo } from "react";
 import { toast } from "sonner";
 
+import { Dot } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Card, EmptyState, SectionLabel } from "@/components/ui/surface";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import type { DigestCategory, DigestHighlight } from "@/server/db/schema";
@@ -67,7 +69,7 @@ function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
         })}`;
         return (
           <div
-            className="flex-1 rounded-sm bg-white/15 transition-colors hover:bg-white/25"
+            className="flex-1 rounded-md bg-white/10 transition-colors hover:bg-white/15"
             key={i}
             style={{ height: `${Math.max(6, (v / max) * 100)}%` }}
             title={`${label}: ${v} update${v === 1 ? "" : "s"}`}
@@ -98,7 +100,7 @@ function FormattedSummary({ text, names }: { text: string; names: string[] }) {
         );
       if (nameSet.has(part.toLowerCase()))
         return (
-          <span className="font-medium text-white/90" key={i}>
+          <span className="font-medium text-white" key={i}>
             {part}
           </span>
         );
@@ -123,15 +125,15 @@ function HighlightRow({
       {h.actor ? (
         <UserAvatar className="mt-0.5" image={image} name={h.actor} size={22} />
       ) : (
-        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/25" />
+        <Dot className="mt-2 h-1.5 w-1.5 bg-white/15" />
       )}
-      <p className="text-sm leading-relaxed text-white/55">
+      <p className="text-sm leading-relaxed text-white/70">
         {h.actor ? (
-          <span className="font-medium text-white/90">{h.actor} </span>
+          <span className="font-medium text-white">{h.actor} </span>
         ) : null}
         {h.action}
         {h.task ? (
-          <span className="font-medium text-white/90"> “{h.task}”</span>
+          <span className="font-medium text-white"> “{h.task}”</span>
         ) : null}
       </p>
     </>
@@ -206,16 +208,21 @@ export function DigestPanel({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium tracking-wide text-white/45 uppercase">
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> Weekly digest
-            </span>
-            {digest ? (
-              <span className="flex items-center gap-2 tracking-normal normal-case text-white/45">
-                <span className="text-white/20">·</span>
-                {formatDateRange(digest.periodStart, digest.periodEnd)}
+          <DialogTitle asChild>
+            <SectionLabel
+              as="h2"
+              className="flex flex-wrap items-center gap-x-2 gap-y-1"
+            >
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" /> Weekly digest
               </span>
-            ) : null}
+              {digest ? (
+                <span className="flex items-center gap-2 tracking-normal text-white/40 normal-case">
+                  <span className="text-white/40">·</span>
+                  {formatDateRange(digest.periodStart, digest.periodEnd)}
+                </span>
+              ) : null}
+            </SectionLabel>
           </DialogTitle>
           <DialogDescription className="sr-only">
             An AI summary of the last 7 days of board activity.
@@ -237,39 +244,47 @@ export function DigestPanel({
                 const value = digest.content.stats[key];
                 if (!value) return null;
                 return (
-                  <span
+                  <Card
+                    as="span"
                     className={cn(
-                      "flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs",
-                      accent
-                        ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-200/70"
-                        : "border-white/10 bg-white/[0.03] text-white/60",
+                      "flex items-center gap-1 px-2 py-0.5 text-xs",
+                      accent ? "text-success" : "text-white/70",
                     )}
                     key={key}
+                    padding="none"
+                    radius="md"
+                    tone={accent ? "success" : "muted"}
                   >
                     <Icon
                       className={cn(
                         "h-3 w-3",
-                        accent ? "text-emerald-300/80" : "text-white/40",
+                        accent ? "text-success" : "text-white/40",
                       )}
                     />
                     <span
                       className={cn(
                         "font-medium",
-                        accent ? "text-emerald-200/90" : "text-white/80",
+                        accent ? "text-success" : "text-white",
                       )}
                     >
                       {value}
                     </span>
                     {label}
-                  </span>
+                  </Card>
                 );
               })}
               {people.length > 0 ? (
-                <span className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] py-0.5 pr-2 pl-1 text-xs text-white/60">
+                <Card
+                  as="span"
+                  className="flex items-center gap-1.5 py-0.5 pr-2 pl-1 text-xs text-white/70"
+                  padding="none"
+                  radius="md"
+                  tone="muted"
+                >
                   <span className="flex -space-x-1.5">
                     {people.slice(0, 5).map((p) => (
                       <UserAvatar
-                        className="ring-2 ring-[#0f1016]"
+                        className="ring-overlay ring-2"
                         image={imageById.get(p.id) ?? null}
                         key={p.id}
                         name={p.name}
@@ -278,12 +293,12 @@ export function DigestPanel({
                     ))}
                   </span>
                   <span>
-                    <span className="font-medium text-white/80">
+                    <span className="font-medium text-white">
                       {people.length}
                     </span>{" "}
                     {people.length === 1 ? "person" : "people"}
                   </span>
-                </span>
+                </Card>
               ) : null}
             </div>
 
@@ -291,23 +306,22 @@ export function DigestPanel({
               <Sparkline data={activity} start={digest.periodStart} />
             ) : null}
 
-            <FormattedSummary names={memberNames} text={digest.content.summary} />
+            <FormattedSummary
+              names={memberNames}
+              text={digest.content.summary}
+            />
 
             {groups.length > 0 ? (
-              <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
+              <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
                 {groups.map((g) => (
                   <div className="flex flex-col gap-1.5" key={g.category}>
                     {showLabels ? (
-                      <span
-                        className={cn(
-                          "text-[11px] font-medium tracking-wide uppercase",
-                          g.category === "shipped"
-                            ? "text-emerald-300/70"
-                            : "text-white/35",
-                        )}
+                      <SectionLabel
+                        as="span"
+                        tone={g.category === "shipped" ? "success" : "neutral"}
                       >
                         {g.label}
-                      </span>
+                      </SectionLabel>
                     ) : null}
                     <ul className="flex flex-col gap-1">
                       {g.items.map((h, i) => (
@@ -336,17 +350,19 @@ export function DigestPanel({
             ) : null}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-white/50">
-            No digest yet.
-            {canWrite
-              ? " Generate one to see what happened this week."
-              : " Ask an editor to generate one."}
-          </div>
+          <EmptyState size="md">
+            <p>
+              No digest yet.
+              {canWrite
+                ? " Generate one to see what happened this week."
+                : " Ask an editor to generate one."}
+            </p>
+          </EmptyState>
         )}
 
         {digest || canWrite ? (
           <div className="flex items-center justify-between gap-2 pt-1">
-            <span className="text-xs text-white/35">
+            <span className="text-xs text-white/40">
               {digest ? `Generated ${formatRelative(digest.createdAt)}` : ""}
             </span>
             {canWrite ? (

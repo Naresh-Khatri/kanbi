@@ -20,6 +20,7 @@ import {
   slugify,
   slugSuffix,
 } from "@/lib/ids";
+import { DEFAULT_LABELS } from "@/lib/palette";
 import {
   assertCanAdmin,
   createTRPCRouter,
@@ -345,12 +346,9 @@ export const projectRouter = createTRPCRouter({
           ])
           .returning();
 
-        await tx.insert(label).values([
-          { boardId: boardRow.id, name: "Bug", color: "#f43f5e" },
-          { boardId: boardRow.id, name: "Feature", color: "#3b82f6" },
-          { boardId: boardRow.id, name: "Improvement", color: "#10b981" },
-          { boardId: boardRow.id, name: "Design", color: "#8b5cf6" },
-        ]);
+        await tx
+          .insert(label)
+          .values(DEFAULT_LABELS.map((l) => ({ boardId: boardRow.id, ...l })));
 
         if (backlog && inProgress) {
           // Seed tickets take the first numbers; keep the counter in sync.

@@ -4,7 +4,6 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Archive,
-  Check,
   GitBranch,
   Link2,
   MoreHorizontal,
@@ -13,7 +12,9 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +28,7 @@ import { api } from "@/trpc/react";
 import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
 import { copyBranchCommand, defaultBranchType } from "../copy-branch-command";
 import { copyTaskLink } from "../copy-task-link";
-import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
+import { type Priority, PriorityBadge } from "../priority";
 import { useArchiveTask } from "../use-archive-task";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
 
@@ -82,7 +83,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   return (
     <div className="relative flex flex-col gap-2">
       {showDropIndicatorBefore ? (
-        <DropIndicator className="inset-x-0 -top-[5px]" />
+        <DropIndicator className="inset-x-0 -top-1" />
       ) : null}
       <div
         className="touch-none select-none"
@@ -117,7 +118,7 @@ export function DropIndicator({ className }: { className?: string }) {
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute z-10 h-0.5 rounded-full bg-sky-400/80",
+        "bg-info/70 pointer-events-none absolute z-10 h-0.5 rounded-full",
         className,
       )}
     />
@@ -135,56 +136,57 @@ export function TaskCardPreview({
   labels: LabelInfo[];
   projectKey: string;
 }) {
-  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
-  const overflowCount = labels.length - visibleLabels.length;
-
   return (
-    <div className="w-72 rounded-lg border border-white/20 bg-[#14151c] p-3 shadow-lg will-change-transform">
+    <div className="bg-raised w-72 rounded-lg border border-white/20 p-3 will-change-transform">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm leading-snug">{task.title}</p>
         <div className="h-9 w-9 shrink-0" />
       </div>
+      <CardBody
+        assignee={assignee}
+        labels={labels}
+        projectKey={projectKey}
+        task={task}
+      />
+    </div>
+  );
+}
+
+const MAX_VISIBLE_LABELS = 2;
+
+function CardBody({
+  task,
+  assignee,
+  labels,
+  projectKey,
+}: {
+  task: TaskRow;
+  assignee: MemberInfo | null;
+  labels: LabelInfo[];
+  projectKey: string;
+}) {
+  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
+  const overflowCount = labels.length - visibleLabels.length;
+  const priority = task.priority as Priority;
+
+  return (
+    <>
       {labels.length > 0 ? (
         <div className="mt-2 flex flex-wrap items-center gap-1">
-          {visibleLabels.map((label) => (
-            <span
-              className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              key={label.id}
-              style={{
-                borderColor: `${label.color}55`,
-                color: label.color,
-              }}
-            >
-              {label.name}
-            </span>
+          {visibleLabels.map((l) => (
+            <Badge color={l.color} key={l.id}>
+              {l.name}
+            </Badge>
           ))}
-          {overflowCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] tracking-wide text-white/60">
-              +{overflowCount}
-            </span>
-          ) : null}
+          {overflowCount > 0 ? <Badge>+{overflowCount}</Badge> : null}
         </div>
       ) : null}
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="font-mono text-[10px] tracking-wide text-white/40">
+          <span className="text-2xs font-mono tracking-wide text-white/40">
             {projectKey}-{task.number}
           </span>
-          {task.priority !== "none" ? (
-            <div
-              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              style={{
-                borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
-                color: PRIORITY_META[task.priority as Priority].color,
-              }}
-            >
-              <PriorityIcon
-                className="h-3 w-3"
-                priority={task.priority as Priority}
-              />
-              {PRIORITY_META[task.priority as Priority].label}
-            </div>
-          ) : null}
+          {priority !== "none" ? <PriorityBadge priority={priority} /> : null}
           {task.estimatePomodoros != null ? (
             <span className="inline-flex items-center gap-1 text-xs text-white/40">
               <Timer className="h-3 w-3" />
@@ -196,11 +198,9 @@ export function TaskCardPreview({
           <UserAvatar image={assignee.image} name={assignee.name} size={20} />
         ) : null}
       </div>
-    </div>
+    </>
   );
 }
-
-const MAX_VISIBLE_LABELS = 2;
 
 export const TaskCard = memo(function TaskCard({
   boardId,
@@ -229,8 +229,6 @@ export const TaskCard = memo(function TaskCard({
   const archiveTask = useArchiveTask(boardId);
   const toggleToday = useToggleToday(task.id);
   const ref = useRef<HTMLDivElement>(null);
-  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
-  const overflowCount = labels.length - visibleLabels.length;
 
   useEffect(() => {
     if (focused) ref.current?.scrollIntoView({ block: "nearest" });
@@ -239,9 +237,9 @@ export const TaskCard = memo(function TaskCard({
   return (
     <div
       className={cn(
-        "group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20",
-        focused && "border-sky-400/60 ring-2 ring-sky-400/50",
-        selected && "border-sky-300/60 bg-sky-400/[0.08]",
+        "group bg-raised w-full cursor-pointer rounded-lg border border-white/10 p-3 transition hover:border-white/20",
+        focused && "border-info/70 ring-info/40 ring-2",
+        selected && "border-info/70 bg-info/10",
       )}
       onClick={(event) => {
         if (event.shiftKey && onToggleSelection) {
@@ -255,22 +253,22 @@ export const TaskCard = memo(function TaskCard({
     >
       <div className="flex items-start justify-between gap-2">
         {onToggleSelection ? (
-          <button
+          <Checkbox
             aria-label={selected ? "Deselect task" : "Select task"}
-            aria-pressed={selected}
+            checked={selected}
             className={cn(
-              "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-white/20 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100",
-              selected && "border-sky-300/60 bg-sky-400/20 opacity-100",
+              "mt-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+              selected && "opacity-100",
             )}
+            onCheckedChange={() => {}}
             onClick={(event) => {
               event.stopPropagation();
+              event.preventDefault(); // skip onCheckedChange; shiftKey needed
               onToggleSelection(event.shiftKey);
             }}
             onPointerDown={(event) => event.stopPropagation()}
-            type="button"
-          >
-            {selected ? <Check className="h-3 w-3" /> : null}
-          </button>
+            tone="info"
+          />
         ) : null}
         <p className="min-w-0 flex-1 text-sm leading-snug">{task.title}</p>
         <DropdownMenu>
@@ -333,55 +331,12 @@ export const TaskCard = memo(function TaskCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {labels.length > 0 ? (
-        <div className="mt-2 flex flex-wrap items-center gap-1">
-          {visibleLabels.map((l) => (
-            <span
-              className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              key={l.id}
-              style={{ borderColor: `${l.color}55`, color: l.color }}
-            >
-              {l.name}
-            </span>
-          ))}
-          {overflowCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] tracking-wide text-white/60">
-              +{overflowCount}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="font-mono text-[10px] tracking-wide text-white/40">
-            {projectKey}-{task.number}
-          </span>
-          {task.priority !== "none" ? (
-            <div
-              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              style={{
-                borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
-                color: PRIORITY_META[task.priority as Priority].color,
-              }}
-            >
-              <PriorityIcon
-                className="h-3 w-3"
-                priority={task.priority as Priority}
-              />
-              {PRIORITY_META[task.priority as Priority].label}
-            </div>
-          ) : null}
-          {task.estimatePomodoros != null ? (
-            <span className="inline-flex items-center gap-1 text-xs text-white/40">
-              <Timer className="h-3 w-3" />
-              {task.estimatePomodoros}
-            </span>
-          ) : null}
-        </div>
-        {assignee ? (
-          <UserAvatar image={assignee.image} name={assignee.name} size={20} />
-        ) : null}
-      </div>
+      <CardBody
+        assignee={assignee}
+        labels={labels}
+        projectKey={projectKey}
+        task={task}
+      />
     </div>
   );
 });

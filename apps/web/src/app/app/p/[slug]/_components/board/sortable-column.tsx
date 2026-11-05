@@ -10,6 +10,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight, Plus } from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/surface";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   ColumnRow,
@@ -108,8 +109,8 @@ export const SortableColumn = memo(function SortableColumn({
     return (
       <div
         className={cn(
-          "flex h-full w-12 shrink-0 snap-center flex-col items-center rounded-lg bg-white/[0.03] py-2 md:[scroll-snap-align:none]",
-          dropTarget && "bg-white/[0.08] ring-1 ring-white/20",
+          "flex h-full w-12 shrink-0 snap-center flex-col items-center rounded-lg bg-white/5 py-2 md:[scroll-snap-align:none]",
+          dropTarget && "bg-white/10 ring-1 ring-white/20",
         )}
         ref={sortable.setNodeRef}
         style={style}
@@ -136,7 +137,7 @@ export const SortableColumn = memo(function SortableColumn({
               "rotate-180 text-xs text-white/40",
               column.wipLimit != null &&
                 totalTaskCount > column.wipLimit &&
-                "text-amber-300",
+                "text-warning",
             )}
           >
             {column.wipLimit != null
@@ -151,10 +152,10 @@ export const SortableColumn = memo(function SortableColumn({
   return (
     <div
       className={cn(
-        "flex h-full w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-3 rounded-lg bg-white/[0.03] p-3 md:w-72 md:[scroll-snap-align:none]",
+        "flex h-full w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-3 rounded-lg bg-white/5 p-3 md:w-72 md:[scroll-snap-align:none]",
         column.wipLimit != null &&
           totalTaskCount > column.wipLimit &&
-          "ring-1 ring-amber-300/40",
+          "ring-warning/40 ring-1",
       )}
       ref={sortable.setNodeRef}
       style={style}
@@ -215,21 +216,18 @@ export const SortableColumn = memo(function SortableColumn({
             ))}
           </SortableContext>
           {tasks.length === 0 && !dropTarget ? (
-            <div className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-white/10 px-3 text-center">
-              <p className="text-xs text-white/40">
-                {totalTaskCount > 0 ? "No matching tasks" : "No tasks yet"}
-              </p>
+            <EmptyState size="sm">
+              <p>{totalTaskCount > 0 ? "No matching tasks" : "No tasks yet"}</p>
               {canWrite && totalTaskCount === 0 ? (
                 <Button
-                  className="text-white/70"
                   onClick={() => onAddTask(column.id)}
                   size="sm"
-                  variant="ghost"
+                  variant="property"
                 >
                   <Plus className="h-3.5 w-3.5" /> Add task
                 </Button>
               ) : null}
-            </div>
+            </EmptyState>
           ) : null}
           {!sortBlocked &&
           dropTarget &&
@@ -238,16 +236,16 @@ export const SortableColumn = memo(function SortableColumn({
             <DropIndicator className="inset-x-1 -bottom-px" />
           ) : null}
           {tasks.length === 0 && dropTarget ? (
-            <div className="pointer-events-none absolute inset-0 rounded-md border border-dashed border-white/40 bg-white/[0.04]" />
+            <div className="pointer-events-none absolute inset-0 rounded-md border border-dashed border-white/20 bg-white/5" />
           ) : null}
         </div>
       </ScrollArea>
       {canWrite && tasks.length > 0 ? (
         <Button
-          className="justify-start text-white/70"
+          className="justify-start"
           onClick={() => onAddTask(column.id)}
           size="sm"
-          variant="ghost"
+          variant="property"
         >
           <Plus className="h-4 w-4" /> Add task
         </Button>

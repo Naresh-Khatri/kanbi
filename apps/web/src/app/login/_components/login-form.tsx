@@ -14,10 +14,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/ui/logo";
+import { Wordmark } from "@/components/ui/logo";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
+import { PageTitle } from "@/components/ui/surface";
 
 export function LoginForm({
   providers,
@@ -88,18 +89,17 @@ export function LoginForm({
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
+    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link className="flex items-center gap-2.5" href="/">
-          <Logo className="h-8 w-8" />
-          <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+        <Link href="/">
+          <Wordmark />
         </Link>
         {invite ? <AuthInviteBanner invite={invite} /> : null}
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">
+          <PageTitle>
             {invite ? "Sign in to accept" : "Sign in to Kanbi"}
-          </h1>
-          <p className="text-sm text-white/60">
+          </PageTitle>
+          <p className="text-sm text-white/70">
             {invite
               ? "Sign in with the invited account, then confirm joining."
               : anySocial
@@ -113,9 +113,6 @@ export function LoginForm({
             <Input
               autoComplete="email"
               id="email"
-              className={
-                invite ? "cursor-not-allowed text-white/60" : undefined
-              }
               onChange={(e) => setEmail(e.target.value)}
               readOnly={!!invite}
               required
@@ -127,12 +124,9 @@ export function LoginForm({
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Link
-                className="text-xs text-white/60 hover:text-white"
-                href="/forgot-password"
-              >
-                Forgot password?
-              </Link>
+              <Button asChild size="inline" variant="link">
+                <Link href="/forgot-password">Forgot password?</Link>
+              </Button>
             </div>
             <Input
               autoComplete="current-password"
@@ -189,7 +183,7 @@ export function LoginForm({
             </div>
           </>
         )}
-        <p className="text-center text-sm text-white/60">
+        <p className="text-center text-sm text-white/70">
           No account?{" "}
           <Link
             className="text-white underline"

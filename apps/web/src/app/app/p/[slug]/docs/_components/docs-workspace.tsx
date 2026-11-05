@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   RichTextContent,
   RichTextEditor,
@@ -45,6 +46,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Card, IconTile, SectionLabel } from "@/components/ui/surface";
+import { segmentVariants } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 
@@ -95,7 +98,7 @@ export function DocsWorkspace({
   );
 
   return (
-    <main className="relative flex min-h-[calc(100vh-57px)] flex-col overflow-x-clip bg-[#0b0b0f] md:h-[calc(100vh-57px)] md:flex-row md:overflow-hidden">
+    <main className="bg-canvas min-h-below-header md:h-below-header relative flex flex-col overflow-x-clip md:flex-row md:overflow-hidden">
       <DocsSidebar
         activeId={initialDocumentId}
         canWrite={canWrite}
@@ -174,37 +177,36 @@ function DocsSidebar({
 }) {
   const flattened = useMemo(() => flattenDocuments(documents), [documents]);
   return (
-    <aside className="flex max-h-72 w-full shrink-0 flex-col border-b border-white/10 bg-white/[0.015] md:max-h-none md:w-64 md:border-r md:border-b-0">
+    <aside className="flex max-h-72 w-full shrink-0 flex-col border-b border-white/10 bg-white/5 md:max-h-none md:w-64 md:border-r md:border-b-0">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <div>
-          <p className="text-[10px] font-medium tracking-[0.16em] text-white/35 uppercase">
-            Project knowledge
-          </p>
-          <h2 className="mt-1 text-sm font-semibold text-white/90">Docs</h2>
+          <SectionLabel>Project knowledge</SectionLabel>
+          <h2 className="mt-1 text-sm font-semibold text-white">Docs</h2>
         </div>
         {canWrite ? (
-          <button
+          <Button
             aria-label="New root page"
-            className="rounded-md p-1.5 text-white/50 transition hover:bg-white/5 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
             disabled={creating}
             onClick={() => onCreate(null)}
+            size="icon-sm"
             title="New page"
             type="button"
+            variant="quiet"
           >
             {creating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Plus className="h-4 w-4" />
             )}
-          </button>
+          </Button>
         ) : null}
       </div>
       <div className="px-3 pb-3">
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
           <Input
             aria-label="Search docs"
-            className="h-8 border-white/10 bg-transparent pl-8 text-xs"
+            className="h-8 pl-8 text-xs"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search docs"
             value={query}
@@ -227,7 +229,7 @@ function DocsSidebar({
               />
             ))
           ) : (
-            <p className="px-2 py-6 text-center text-xs text-white/35">
+            <p className="px-2 py-6 text-center text-xs text-white/40">
               No matching pages
             </p>
           )
@@ -242,7 +244,7 @@ function DocsSidebar({
             />
           ))
         ) : (
-          <p className="px-2 py-6 text-center text-xs leading-relaxed text-white/35">
+          <p className="px-2 py-6 text-center text-xs leading-relaxed text-white/40">
             Pages you create will form a quiet, shared project index.
           </p>
         )}
@@ -282,40 +284,46 @@ function AskDocsChat({
   return (
     <AnimatePresence initial={false} mode="popLayout">
       {!expanded ? (
-        <motion.button
-          animate={{ opacity: 1, transform: "translateY(0) scale(1)" }}
-          aria-label="Open Ask Docs"
-          className="fixed right-5 bottom-5 z-40 flex h-9 items-center gap-2 rounded-md border border-white/10 bg-[#121217] px-3 text-xs text-white/55 transition-colors duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-[#18181e] hover:text-white/85 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
-          exit={{
-            opacity: 0,
-            transform: reduceMotion
-              ? "translateY(0) scale(1)"
-              : "translateY(4px) scale(0.97)",
-            transition: {
-              duration: 0.1,
-              ease: [0.23, 1, 0.32, 1],
-            },
-          }}
-          initial={{
-            opacity: 0,
-            transform: reduceMotion
-              ? "translateY(0) scale(1)"
-              : "translateY(6px) scale(0.97)",
-          }}
-          key="ask-docs-trigger"
-          onClick={() => setExpanded(true)}
-          title="Open Ask Docs"
-          transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-          type="button"
-          whileTap={{ transform: "translateY(0) scale(0.97)" }}
+        <Button
+          asChild
+          className="bg-raised fixed right-5 bottom-5 z-40"
+          size="sm"
+          variant="toolbar"
         >
-          <Sparkles className="h-3.5 w-3.5 text-white/30" />
-          Ask docs
-        </motion.button>
+          <motion.button
+            animate={{ opacity: 1, transform: "translateY(0) scale(1)" }}
+            aria-label="Open Ask Docs"
+            exit={{
+              opacity: 0,
+              transform: reduceMotion
+                ? "translateY(0) scale(1)"
+                : "translateY(4px) scale(0.97)",
+              transition: {
+                duration: 0.1,
+                ease: [0.23, 1, 0.32, 1],
+              },
+            }}
+            initial={{
+              opacity: 0,
+              transform: reduceMotion
+                ? "translateY(0) scale(1)"
+                : "translateY(6px) scale(0.97)",
+            }}
+            key="ask-docs-trigger"
+            onClick={() => setExpanded(true)}
+            title="Open Ask Docs"
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+            type="button"
+            whileTap={{ transform: "translateY(0) scale(0.97)" }}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-white/40" />
+            Ask docs
+          </motion.button>
+        </Button>
       ) : (
         <motion.aside
           animate={{ opacity: 1, transform: "translateX(0)" }}
-          className="flex h-96 w-full shrink-0 flex-col border-t border-white/[0.06] bg-[#0b0b0f] md:h-auto md:w-80 md:border-t-0 md:border-l xl:w-96"
+          className="bg-canvas flex h-96 w-full shrink-0 flex-col border-t border-white/10 md:h-auto md:w-80 md:border-t-0 md:border-l xl:w-96"
           exit={{
             opacity: 0,
             transform: reduceMotion ? "translateX(0)" : "translateX(16px)",
@@ -331,35 +339,37 @@ function AskDocsChat({
           key="ask-docs-panel"
           transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
         >
-          <header className="flex h-11 shrink-0 items-center justify-between border-b border-white/[0.06] px-3">
+          <header className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 px-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5 text-white/25" />
-              <h2 className="text-xs font-medium text-white/60">Ask docs</h2>
+              <Sparkles className="h-3.5 w-3.5 text-white/40" />
+              <h2 className="text-xs font-medium text-white/70">Ask docs</h2>
             </div>
             <div className="flex items-center gap-1">
               {askedQuestion ? (
-                <button
+                <Button
                   aria-label="Clear conversation"
-                  className="rounded-md p-1.5 text-white/25 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-white/5 hover:text-white/55 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none active:scale-[0.97]"
                   onClick={() => {
                     setAskedQuestion(null);
                     ask.reset();
                   }}
+                  size="icon-sm"
                   title="Clear conversation"
                   type="button"
+                  variant="quiet"
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               ) : null}
-              <button
+              <Button
                 aria-label="Collapse Ask Docs"
-                className="rounded-md p-1.5 text-white/25 transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-white/5 hover:text-white/55 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none active:scale-[0.97]"
                 onClick={() => setExpanded(false)}
+                size="icon-sm"
                 title="Collapse Ask Docs"
                 type="button"
+                variant="quiet"
               >
                 <PanelRightClose className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             </div>
           </header>
 
@@ -370,41 +380,47 @@ function AskDocsChat({
             {askedQuestion ? (
               <>
                 <div className="flex justify-end pl-8">
-                  <p className="max-w-[90%] rounded-md bg-white/[0.06] px-3 py-2 text-xs leading-5 text-white/70">
+                  <p className="max-w-[90%] rounded-md bg-white/5 px-3 py-2 text-xs leading-5 text-white/70">
                     {askedQuestion}
                   </p>
                 </div>
                 <div className="mt-4 flex items-start gap-2.5">
-                  <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-white/25" />
+                  <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-white/40" />
                   <div className="min-w-0 flex-1">
                     {ask.isPending ? (
-                      <p className="text-xs leading-5 text-white/35">
+                      <p className="text-xs leading-5 text-white/40">
                         Looking through project docs…
                       </p>
                     ) : ask.data ? (
                       <>
-                        <p className="text-sm leading-6 whitespace-pre-wrap text-white/75">
+                        <p className="text-sm leading-6 whitespace-pre-wrap text-white/70">
                           {ask.data.answer}
                         </p>
                         {ask.data.citations.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {ask.data.citations.map((citation) => (
-                              <Link
-                                className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border border-white/10 px-2.5 text-xs text-white/50 transition hover:bg-white/5 hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
-                                href={`/app/p/${slug}/docs/${citation.documentId}`}
+                              <Button
+                                asChild
+                                className="max-w-full"
                                 key={citation.documentId}
+                                size="xs"
+                                variant="toolbar"
                               >
-                                <FileText className="h-3 w-3 shrink-0 text-white/25" />
-                                <span className="truncate">
-                                  {citation.title}
-                                </span>
-                              </Link>
+                                <Link
+                                  href={`/app/p/${slug}/docs/${citation.documentId}`}
+                                >
+                                  <FileText className="h-3 w-3 shrink-0 text-white/40" />
+                                  <span className="truncate">
+                                    {citation.title}
+                                  </span>
+                                </Link>
+                              </Button>
                             ))}
                           </div>
                         ) : null}
                       </>
                     ) : ask.error ? (
-                      <p className="text-xs leading-5 text-white/35">
+                      <p className="text-xs leading-5 text-white/40">
                         I couldn&apos;t answer that right now. Try again in a
                         moment.
                       </p>
@@ -414,8 +430,8 @@ function AskDocsChat({
               </>
             ) : (
               <div className="flex h-full min-h-28 flex-col items-center justify-center text-center">
-                <Sparkles className="h-4 w-4 text-white/15" />
-                <p className="mt-3 max-w-48 text-xs leading-5 text-white/30">
+                <Sparkles className="h-4 w-4 text-white/40" />
+                <p className="mt-3 max-w-48 text-xs leading-5 text-white/40">
                   {disabled
                     ? "Create a page before asking project docs."
                     : "Ask a question and get an answer grounded in project pages."}
@@ -424,11 +440,11 @@ function AskDocsChat({
             )}
           </div>
 
-          <div className="shrink-0 border-t border-white/[0.06] p-3">
+          <div className="shrink-0 border-t border-white/10 p-3">
             <div className="relative">
               <Textarea
                 aria-label="Ask project docs"
-                className="max-h-32 min-h-20 resize-none border-white/[0.08] bg-white/[0.02] py-2 pr-10 text-xs leading-5 placeholder:text-white/25 focus-visible:ring-white/20"
+                className="max-h-32 resize-none pr-10 text-xs leading-5"
                 disabled={disabled || ask.isPending}
                 maxLength={500}
                 onChange={(event) => setQuestion(event.target.value)}
@@ -444,13 +460,14 @@ function AskDocsChat({
                 rows={3}
                 value={question}
               />
-              <button
+              <Button
                 aria-label="Ask"
-                className="absolute right-1.5 bottom-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-white text-black transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none active:scale-[0.97] disabled:opacity-25"
+                className="absolute right-1.5 bottom-1.5"
                 disabled={
                   disabled || ask.isPending || question.trim().length < 2
                 }
                 onClick={submit}
+                size="icon-sm"
                 title="Ask (Enter)"
                 type="button"
               >
@@ -459,9 +476,9 @@ function AskDocsChat({
                 ) : (
                   <ArrowUp className="h-3.5 w-3.5" />
                 )}
-              </button>
+              </Button>
             </div>
-            <p className="mt-1.5 px-1 text-[10px] text-white/20">
+            <p className="text-2xs mt-1.5 px-1 text-white/40">
               Answers cite project pages.
             </p>
           </div>
@@ -486,15 +503,13 @@ function DocumentLink({
     <Link
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex h-8 items-center gap-2 rounded-md pr-2 text-xs transition focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none",
-        active
-          ? "bg-white/10 text-white"
-          : "text-white/55 hover:bg-white/5 hover:text-white/85",
+        segmentVariants({ active, size: "sm" }),
+        "group justify-start pr-2",
       )}
       href={href}
       style={{ paddingLeft: `${8 + Math.min(depth, 5) * 14}px` }}
     >
-      <FileText className="h-3.5 w-3.5 shrink-0 text-white/30 group-hover:text-white/50" />
+      <FileText className="h-3.5 w-3.5 shrink-0 text-white/40 group-hover:text-white/70" />
       <span className="truncate">{title}</span>
     </Link>
   );
@@ -527,13 +542,11 @@ function DocsHome({
       <header className="border-b border-white/10 pb-8">
         <div className="flex items-start justify-between gap-6">
           <div>
-            <p className="text-[10px] font-medium tracking-[0.18em] text-white/35 uppercase">
-              Shared context
-            </p>
+            <SectionLabel>Shared context</SectionLabel>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">
               Project docs
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/50">
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70">
               Keep decisions, briefs, and runbooks beside the work they explain.
             </p>
           </div>
@@ -552,39 +565,37 @@ function DocsHome({
 
       {recent.length > 0 ? (
         <section className="mt-10">
-          <h2 className="text-xs font-medium tracking-wide text-white/40 uppercase">
-            Recently updated
-          </h2>
-          <div className="mt-3 divide-y divide-white/[0.06] border-y border-white/[0.06]">
+          <SectionLabel as="h2">Recently updated</SectionLabel>
+          <div className="mt-3 divide-y divide-white/10 border-y border-white/10">
             {recent.map((document) => (
               <Link
-                className="group flex items-center gap-4 py-4 transition hover:bg-white/[0.02] focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+                className="group flex items-center gap-4 py-4 transition hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
                 href={`/app/p/${slug}/docs/${document.id}`}
                 key={document.id}
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]">
+                <IconTile size="sm">
                   <FileText className="h-3.5 w-3.5 text-white/40" />
-                </div>
+                </IconTile>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-white/85 group-hover:text-white">
+                  <p className="truncate text-sm text-white group-hover:text-white">
                     {document.title}
                   </p>
-                  <p className="mt-0.5 text-xs text-white/35">
+                  <p className="mt-0.5 text-xs text-white/40">
                     {document.updatedByName} ·{" "}
                     {formatRelative(document.updatedAt ?? document.createdAt)}
                   </p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-white/20" />
+                <ChevronRight className="h-4 w-4 text-white/40" />
               </Link>
             ))}
           </div>
         </section>
       ) : (
         <div className="flex min-h-80 flex-col items-center justify-center text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]">
+          <IconTile size="lg">
             <BookOpen className="h-5 w-5 text-white/40" />
-          </div>
-          <h2 className="mt-5 text-base font-medium text-white/85">
+          </IconTile>
+          <h2 className="mt-5 text-base font-medium text-white">
             {hasDocuments
               ? "Nothing updated recently"
               : "Start the project record"}
@@ -714,15 +725,12 @@ function DocumentSurface({
   if (document.isError) {
     return (
       <div className="mx-auto max-w-4xl p-12">
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-white/70">
           This page does not exist or you no longer have access.
         </p>
-        <Link
-          className="mt-3 inline-block text-sm text-white/40 underline underline-offset-4 hover:text-white/70"
-          href={`/app/p/${slug}/docs`}
-        >
-          Return to Docs
-        </Link>
+        <Button asChild className="mt-3" size="inline" variant="link">
+          <Link href={`/app/p/${slug}/docs`}>Return to Docs</Link>
+        </Button>
       </div>
     );
   }
@@ -745,7 +753,7 @@ function DocumentSurface({
         layout: { duration: 0.22, ease: [0.77, 0, 0.175, 1] },
       }}
     >
-      <div className="flex min-h-6 flex-wrap items-center gap-1 text-xs text-white/35">
+      <div className="flex min-h-6 flex-wrap items-center gap-1 text-xs text-white/40">
         <Link
           className="transition hover:text-white/70"
           href={`/app/p/${slug}/docs`}
@@ -754,7 +762,7 @@ function DocumentSurface({
         </Link>
         {breadcrumbs.slice(0, -1).map((crumb) => (
           <span className="flex items-center gap-1" key={crumb.id}>
-            <ChevronRight className="h-3 w-3 text-white/20" />
+            <ChevronRight className="h-3 w-3 text-white/40" />
             <Link
               className="max-w-36 truncate transition hover:text-white/70"
               href={`/app/p/${slug}/docs/${crumb.id}`}
@@ -770,14 +778,15 @@ function DocumentSurface({
           <Input
             aria-label="Page title"
             autoFocus
-            className="h-auto border-0 bg-transparent px-0 text-3xl font-semibold tracking-tight focus-visible:ring-0"
+            className="h-auto text-3xl font-semibold tracking-tight"
             maxLength={160}
             onChange={(event) => setTitle(event.target.value)}
             value={title}
+            variant="bare"
           />
           <div className="mt-5 border-t border-white/10 pt-1">
             <RichTextEditor
-              className="prose-headings:mt-8 prose-headings:mb-3 prose-h1:text-2xl prose-h2:text-xl min-h-[50vh] text-[15px] leading-7"
+              className="prose-headings:mt-8 prose-headings:mb-3 prose-h1:text-2xl prose-h2:text-xl min-h-96 text-base leading-7"
               mentions={members}
               minHeight="50vh"
               onChange={setBody}
@@ -788,7 +797,12 @@ function DocumentSurface({
             />
           </div>
           {conflict ? (
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-xs text-amber-100/80">
+            <Card
+              className="text-warning mt-5 flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs"
+              padding="none"
+              radius="md"
+              tone="warning"
+            >
               <span>
                 A newer version exists. Copy your draft or reload before saving.
               </span>
@@ -817,7 +831,7 @@ function DocumentSurface({
                   Reload latest
                 </Button>
               </span>
-            </div>
+            </Card>
           ) : null}
           <div className="mt-6 flex items-center justify-end gap-2 border-t border-white/10 pt-4">
             <Button
@@ -841,7 +855,7 @@ function DocumentSurface({
               {save.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : null}
-              Save <span className="text-black/50">⌘S</span>
+              Save <span className="text-black/70">⌘S</span>
             </Button>
           </div>
         </div>
@@ -854,7 +868,7 @@ function DocumentSurface({
                   {document.data.title}
                 </h1>
                 <p
-                  className="mt-3 text-xs text-white/35"
+                  className="mt-3 text-xs text-white/40"
                   title={formatDateTime(
                     document.data.updatedAt ?? document.data.createdAt,
                   )}
@@ -907,7 +921,7 @@ function DocumentSurface({
           </header>
           <div className="py-8">
             <RichTextContent
-              className="prose-headings:mt-8 prose-headings:mb-3 prose-h1:text-2xl prose-h2:text-xl text-[15px] leading-7"
+              className="prose-headings:mt-8 prose-headings:mb-3 prose-h1:text-2xl prose-h2:text-xl text-base leading-7"
               mentions={members}
               tickets={tickets}
               value={document.data.body}
@@ -988,10 +1002,11 @@ function HistorySheet({
             {history.data?.map((item) => (
               <button
                 className={cn(
-                  "w-full rounded-md px-2 py-2 text-left text-xs transition",
-                  selectedVersion === item.version
-                    ? "bg-white/10 text-white"
-                    : "text-white/55 hover:bg-white/5 hover:text-white/80",
+                  segmentVariants({
+                    active: selectedVersion === item.version,
+                    size: "sm",
+                  }),
+                  "h-auto w-full flex-col items-start py-2 text-left whitespace-normal",
                 )}
                 key={item.id}
                 onClick={() => setSelectedVersion(item.version)}
@@ -1000,7 +1015,7 @@ function HistorySheet({
                 <span className="block font-medium">
                   Version {item.version}
                 </span>
-                <span className="mt-0.5 block text-[11px] text-white/35">
+                <span className="text-2xs mt-0.5 block text-white/40">
                   {item.editorName} · {formatRelative(item.createdAt)}
                 </span>
               </button>
@@ -1014,7 +1029,7 @@ function HistorySheet({
                     <h3 className="text-sm font-medium">
                       {revision.data.title}
                     </h3>
-                    <p className="mt-1 text-xs text-white/35">
+                    <p className="mt-1 text-xs text-white/40">
                       Version {revision.data.version} by{" "}
                       {revision.data.editorName}
                     </p>
@@ -1040,7 +1055,7 @@ function HistorySheet({
                 <RichTextContent value={revision.data.body} />
               </>
             ) : (
-              <div className="flex min-h-52 flex-col items-center justify-center text-center text-xs text-white/35">
+              <div className="flex min-h-52 flex-col items-center justify-center text-center text-xs text-white/40">
                 <Clock3 className="mb-3 h-5 w-5" />
                 Select a version to preview it
               </div>
@@ -1090,8 +1105,8 @@ function MovePageDialog({
             Choose a new parent. The page moves to the end of that section.
           </DialogDescription>
         </DialogHeader>
-        <select
-          className="h-10 w-full rounded-md border border-white/15 bg-[#14151c] px-3 text-sm text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+        <Select
+          className="w-full"
           onChange={(event) => setParentId(event.target.value)}
           value={parentId}
         >
@@ -1106,7 +1121,7 @@ function MovePageDialog({
                 {document.title}
               </option>
             ))}
-        </select>
+        </Select>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} variant="ghost">
             Cancel

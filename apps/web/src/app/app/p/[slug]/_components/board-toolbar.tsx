@@ -3,7 +3,6 @@
 import {
   Archive,
   CalendarClock,
-  Check,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -12,15 +11,19 @@ import {
   X,
 } from "lucide-react";
 import { forwardRef } from "react";
+import { CountBadge, Dot } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CheckboxBox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { cn } from "@/lib/utils";
 import {
   PRIORITIES,
   PRIORITY_META,
@@ -196,42 +199,32 @@ export const BoardToolbar = forwardRef<
   }
 
   return (
-    <div className="border-b border-white/5">
+    <div className="border-b border-white/10">
       <div className="flex items-center gap-1 px-6 py-2">
         <Button
           aria-controls="board-search-filters"
           aria-expanded={showControls}
-          className={cn(
-            "h-8 gap-1.5 text-white/60 hover:text-white",
-            filters.query && "text-sky-200",
-          )}
+          className="gap-1.5"
           onClick={openSearch}
           size="sm"
-          variant="ghost"
+          variant={filters.query ? "selected" : "toolbar"}
         >
           <Search className="h-3.5 w-3.5" />
           <span>Search</span>
-          <kbd className="rounded border border-white/10 px-1 font-sans text-[10px] text-white/40">
-            /
-          </kbd>
+          <Kbd variant="hint">/</Kbd>
         </Button>
         <Button
           aria-controls="board-search-filters"
           aria-expanded={showControls}
-          className={cn(
-            "h-8 gap-1.5 text-white/60 hover:text-white",
-            filterCount > 0 && "text-sky-200",
-          )}
+          className="gap-1.5"
           onClick={() => onExpandedChange(!expanded)}
           size="sm"
-          variant="ghost"
+          variant={filterCount > 0 ? "selected" : "toolbar"}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
           <span>Filters</span>
           {filterCount > 0 ? (
-            <span className="rounded bg-sky-400/15 px-1 text-[10px]">
-              {filterCount}
-            </span>
+            <CountBadge tone="info">{filterCount}</CountBadge>
           ) : null}
         </Button>
         {active ? (
@@ -242,26 +235,24 @@ export const BoardToolbar = forwardRef<
 
         <div className="ml-auto flex items-center gap-1">
           <Button
-            className="h-8 gap-1.5 text-white/70 hover:text-white"
+            className="gap-1.5"
             onClick={onOpenDigest}
             size="sm"
-            variant="ghost"
+            variant="property"
           >
             <Sparkles className="h-3.5 w-3.5" />
             <span>Digest</span>
           </Button>
           {archivedCount > 0 ? (
             <Button
-              className="h-8 gap-1.5 text-white/60 hover:text-white"
+              className="gap-1.5"
               onClick={onOpenArchive}
               size="sm"
-              variant="ghost"
+              variant="property"
             >
               <Archive className="h-3.5 w-3.5" />
               <span>Archive</span>
-              <span className="rounded bg-white/10 px-1 text-[10px]">
-                {archivedCount}
-              </span>
+              <CountBadge>{archivedCount}</CountBadge>
             </Button>
           ) : null}
         </div>
@@ -269,10 +260,10 @@ export const BoardToolbar = forwardRef<
 
       {showControls ? (
         <div
-          className="flex flex-wrap items-center gap-2 border-t border-white/5 px-6 py-2"
+          className="flex flex-wrap items-center gap-2 border-t border-white/10 px-6 py-2"
           id="board-search-filters"
         >
-          <div className="relative max-w-sm min-w-[12rem] flex-1">
+          <div className="relative max-w-sm min-w-48 flex-1">
             <Search
               aria-hidden
               className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/40"
@@ -286,14 +277,16 @@ export const BoardToolbar = forwardRef<
               value={filters.query}
             />
             {filters.query ? (
-              <button
+              <Button
                 aria-label="Clear search"
-                className="absolute top-1/2 right-2 -translate-y-1/2 text-white/40 hover:text-white"
+                className="absolute top-1/2 right-1 -translate-y-1/2"
                 onClick={() => onChange({ ...filters, query: "" })}
+                size="icon-sm"
                 type="button"
+                variant="quiet"
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             ) : null}
           </div>
 
@@ -329,7 +322,7 @@ export const BoardToolbar = forwardRef<
             label="Labels"
           >
             {labels.length === 0 ? (
-              <div className="px-2 py-1.5 text-xs text-white/50">
+              <div className="px-2 py-1.5 text-xs text-white/40">
                 No labels yet
               </div>
             ) : (
@@ -346,11 +339,7 @@ export const BoardToolbar = forwardRef<
                       })
                     }
                   >
-                    <span
-                      aria-hidden
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ background: l.color }}
-                    />
+                    <Dot color={l.color} size="md" />
                     <span className="truncate">{l.name}</span>
                   </FilterItem>
                 );
@@ -372,14 +361,12 @@ export const BoardToolbar = forwardRef<
                 })
               }
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-[10px] text-white/60">
+              <span className="text-2xs flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white/70">
                 ?
               </span>
               <span>Unassigned</span>
             </FilterItem>
-            {members.length > 0 ? (
-              <div className="my-1 h-px bg-white/10" />
-            ) : null}
+            {members.length > 0 ? <DropdownMenuSeparator /> : null}
             {members.map((m) => {
               const checked = filters.assigneeIds.includes(m.userId);
               return (
@@ -418,23 +405,21 @@ export const BoardToolbar = forwardRef<
 
           {active ? (
             <Button
-              className="h-8 text-white/70 hover:text-white"
               onClick={() => {
                 onChange(EMPTY_FILTERS);
                 onExpandedChange(false);
               }}
               size="sm"
-              variant="ghost"
+              variant="property"
             >
               Clear
             </Button>
           ) : (
             <Button
               aria-label="Hide search and filters"
-              className="h-8 w-8 p-0 text-white/40 hover:text-white"
               onClick={() => onExpandedChange(false)}
-              size="sm"
-              variant="ghost"
+              size="icon"
+              variant="quiet"
             >
               <X className="h-3.5 w-3.5" />
             </Button>
@@ -462,24 +447,17 @@ function FilterChip({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          className={cn(
-            "h-8 gap-1.5 border border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.07]",
-            count > 0 && "border-sky-400/30 bg-sky-400/10 text-sky-200",
-          )}
+          className="gap-1.5"
           disabled={disabled}
           size="sm"
-          variant="ghost"
+          variant={count > 0 ? "selected" : "toolbar"}
         >
           {icon}
           <span>{label}</span>
-          {count > 0 ? (
-            <span className="rounded bg-sky-400/20 px-1 text-[10px]">
-              {count}
-            </span>
-          ) : null}
+          {count > 0 ? <CountBadge tone="info">{count}</CountBadge> : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[12rem]">
+      <DropdownMenuContent align="start" className="min-w-48">
         {children}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -496,26 +474,14 @@ function FilterItem({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-white/10 focus:bg-white/10"
-      onClick={(e) => {
+    <DropdownMenuItem
+      onSelect={(e) => {
         e.preventDefault();
         onSelect();
       }}
-      type="button"
     >
-      <span
-        aria-hidden
-        className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-          checked
-            ? "border-sky-400 bg-sky-400/20 text-sky-300"
-            : "border-white/20",
-        )}
-      >
-        {checked ? <Check className="h-3 w-3" /> : null}
-      </span>
+      <CheckboxBox checked={checked} tone="info" />
       {children}
-    </button>
+    </DropdownMenuItem>
   );
 }

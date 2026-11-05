@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { segmentVariants } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
 import { AiContextSection } from "./ai-context-section";
 import { DangerZoneSection } from "./danger-zone-section";
@@ -9,6 +11,7 @@ import { GeneralSection } from "./general-section";
 import { MembersSection } from "./members-section";
 import { NotificationsSection } from "./notifications-section";
 import { SharingSection } from "./sharing-section";
+import { PageTitle } from "@/components/ui/surface";
 
 const SECTIONS = [
   { id: "general", label: "General" },
@@ -29,19 +32,16 @@ export function SettingsView({ slug }: { slug: string }) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-8 lg:flex-row lg:gap-12">
       <aside className="lg:sticky lg:top-20 lg:h-fit lg:w-44 lg:shrink-0">
-        <div className="mb-3 flex items-center gap-2 text-xs text-white/50">
-          <Link
-            className="hover:text-white/80"
-            href={`/app/p/${slug}`}
-          >
+        <div className="mb-3 flex items-center gap-2 text-xs text-white/40">
+          <Link className="hover:text-white/70" href={`/app/p/${slug}`}>
             ← Board
           </Link>
         </div>
-        <h2 className="mb-4 text-sm font-medium text-white/80">Settings</h2>
+        <h2 className="mb-4 text-sm font-medium text-white">Settings</h2>
         <nav className="flex flex-row gap-1 overflow-x-auto lg:flex-col">
           {SECTIONS.map((s) => (
             <a
-              className="rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-white/60 transition hover:bg-white/5 hover:text-white"
+              className={cn(segmentVariants({ size: "sm" }), "justify-start")}
               href={`#${s.id}`}
               key={s.id}
             >
@@ -53,8 +53,8 @@ export function SettingsView({ slug }: { slug: string }) {
 
       <div className="flex min-w-0 flex-1 flex-col gap-10">
         <header>
-          <h1 className="text-2xl font-semibold">{project.name}</h1>
-          <p className="text-sm text-white/60">Project settings</p>
+          <PageTitle>{project.name}</PageTitle>
+          <p className="text-sm text-white/70">Project settings</p>
         </header>
 
         <GeneralSection
@@ -67,15 +67,8 @@ export function SettingsView({ slug }: { slug: string }) {
           projectId={project.id}
           slug={slug}
         />
-        <MembersSection
-          isOwner={isOwner}
-          projectId={project.id}
-          slug={slug}
-        />
-        <SharingSection
-          boardId={project.boardId}
-          isOwner={isOwner}
-        />
+        <MembersSection isOwner={isOwner} projectId={project.id} slug={slug} />
+        <SharingSection boardId={project.boardId} isOwner={isOwner} />
         <NotificationsSection projectId={project.id} />
         <DangerZoneSection
           isOwner={isOwner}
@@ -83,7 +76,7 @@ export function SettingsView({ slug }: { slug: string }) {
           projectName={project.name}
         />
 
-        <p className="border-t border-white/5 pt-6 text-xs text-white/40">
+        <p className="border-t border-white/10 pt-6 text-xs text-white/40">
           Beyond the browser:{" "}
           <Link
             className="underline underline-offset-2 transition hover:text-white/70"
