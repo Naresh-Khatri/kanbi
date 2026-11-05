@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
+import { Card, SectionLabel } from "@/components/ui/surface";
 import { MCP_RESOURCE_URL } from "@/server/mcp/config";
 
 import { CodeBlock } from "../_components/code-block";
@@ -35,11 +37,7 @@ const TOOLS = [
 ] as const;
 
 function ScopeTag({ scope }: { scope: "read" | "write" }) {
-  return (
-    <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono text-[11px] text-white/50">
-      {scope}
-    </span>
-  );
+  return <Badge className="font-mono">{scope}</Badge>;
 }
 
 export default function McpDocsPage() {
@@ -69,12 +67,10 @@ export default function McpDocsPage() {
         keys to copy.
       </p>
 
-      <div className="mt-6 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-        <p className="text-xs tracking-wide text-white/40 uppercase">
-          Endpoint
-        </p>
-        <p className="mt-1 font-mono text-sm text-white/90">{endpoint}</p>
-      </div>
+      <Card className="mt-6 py-3" tone="muted">
+        <SectionLabel>Endpoint</SectionLabel>
+        <p className="mt-1 font-mono text-sm text-white">{endpoint}</p>
+      </Card>
 
       <h2 className="mt-12 text-lg font-semibold tracking-tight">
         Claude Code
@@ -142,9 +138,9 @@ export default function McpDocsPage() {
             key={tool.name}
             className="flex items-center gap-3 px-4 py-2.5 text-sm"
           >
-            <code className="text-white/90">{tool.name}</code>
+            <code className="text-white">{tool.name}</code>
             <ScopeTag scope={tool.scope} />
-            <span className="ml-auto text-right text-white/50">
+            <span className="ml-auto text-right text-white/40">
               {tool.purpose}
             </span>
           </li>
@@ -161,13 +157,16 @@ export default function McpDocsPage() {
         assignee, and due date, then waits for your explicit approval before it
         creates anything.
       </p>
-      <div className="mt-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 font-mono text-xs leading-6 text-white/70">
+      <Card
+        className="mt-3 py-3 font-mono text-xs leading-6 text-white/70"
+        tone="muted"
+      >
         User and agent finish a feature decision
         <br />→ agent searches for duplicates
         <br />→ agent shows the proposed Kanbi task
         <br />→ user says “put this in Kanbi”
         <br />→ agent creates it and returns KAN-42 plus its link
-      </div>
+      </Card>
       <p className="mt-3 text-sm text-white/70">
         One useful task with a description and checklist is the default. Work is
         split only when each item can be delivered independently, and the full
@@ -189,7 +188,7 @@ export default function McpDocsPage() {
       <p className="mt-2 text-sm text-white/70">
         Every agent you authorize is listed under{" "}
         <Link
-          className="text-white underline underline-offset-4 transition hover:text-white/80"
+          className="text-white underline underline-offset-4 transition hover:text-white"
           href="/app/profile"
         >
           Profile → Connected apps

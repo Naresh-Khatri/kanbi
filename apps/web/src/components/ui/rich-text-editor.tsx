@@ -138,7 +138,7 @@ export function RichTextEditor({
   return (
     <>
       {toolbar === "document" ? (
-        <div className="sticky top-0 z-10 mb-5 flex flex-wrap items-center gap-0.5 border-b border-white/10 bg-[#0b0b0f]/95 py-2 backdrop-blur">
+        <div className="bg-canvas/70 sticky top-0 z-10 mb-5 flex flex-wrap items-center gap-0.5 border-b border-white/10 py-2 backdrop-blur">
           <ToolbarButton
             active={editor.isActive("heading", { level: 1 })}
             label="Heading 1"
@@ -163,7 +163,7 @@ export function RichTextEditor({
       ) : null}
       {toolbar === "bubble" ? (
         <BubbleMenu
-          className="z-[100] flex items-center gap-0.5 rounded-lg border border-white/10 bg-neutral-900 p-1 shadow-xl"
+          className="bg-raised z-[100] flex items-center gap-0.5 rounded-lg border border-white/10 p-1 shadow-xl"
           editor={editor}
           options={{ placement: "top", strategy: "fixed", offset: 8 }}
           updateDelay={150}
@@ -282,7 +282,7 @@ function ToolbarButton({
     <button
       aria-label={label}
       className={cn(
-        "flex h-7 w-7 items-center justify-center rounded text-white/80 transition-colors hover:bg-white/10 hover:text-white",
+        "flex h-7 w-7 items-center justify-center rounded-md text-white/70 transition-colors hover:bg-white/10 hover:text-white",
         active && "bg-white/15 text-white",
       )}
       onClick={onClick}

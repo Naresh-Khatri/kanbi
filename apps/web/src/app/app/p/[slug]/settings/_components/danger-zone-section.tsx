@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/surface";
 import { api } from "@/trpc/react";
 import { DeleteProjectDialog } from "./delete-project-dialog";
 import { Section } from "./section";
@@ -46,7 +47,9 @@ export function DangerZoneSection({
                 disabled={leave.isPending}
                 onClick={() => {
                   if (
-                    confirm(`Leave ${projectName}? You'll lose access to this project.`)
+                    confirm(
+                      `Leave ${projectName}? You'll lose access to this project.`,
+                    )
                   ) {
                     leave.mutate({ projectId });
                   }
@@ -100,12 +103,12 @@ function Row({
   action: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-start justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center">
+    <Card className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
       <div>
         <div className="text-sm font-medium text-white">{title}</div>
-        <div className="text-xs text-white/60">{description}</div>
+        <div className="text-xs text-white/70">{description}</div>
       </div>
       {action}
-    </div>
+    </Card>
   );
 }

@@ -8,6 +8,8 @@ import {
   type Priority,
   PriorityIcon,
 } from "@/app/app/p/[slug]/_components/priority";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 
@@ -57,7 +59,7 @@ export function TodayQueue() {
   if (data.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <Card as="section" className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-medium">Today</h2>
         {doneCount > 0 ? (
@@ -71,13 +73,15 @@ export function TodayQueue() {
           </span>
         ) : null}
         {doneCount > 0 ? (
-          <button
-            className="ml-auto text-xs text-white/50 transition hover:text-white/80"
+          <Button
+            className="ml-auto"
             onClick={() => clearDone.mutate()}
+            size="inline"
             type="button"
+            variant="link"
           >
             Clear done
-          </button>
+          </Button>
         ) : null}
       </div>
       <ul className="flex flex-col">
@@ -89,7 +93,7 @@ export function TodayQueue() {
           />
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }
 
@@ -119,18 +123,20 @@ function TodayRow({ item, onRemove }: { item: Item; onRemove: () => void }) {
             {item.estimatePomodoros}
           </span>
         ) : null}
-        <span className="max-w-[7rem] shrink-0 truncate text-xs text-white/40">
+        <span className="max-w-28 shrink-0 truncate text-xs text-white/40">
           {item.projectName}
         </span>
       </Link>
-      <button
+      <Button
         aria-label="Remove from today"
-        className="shrink-0 rounded p-1 text-white/40 opacity-0 transition group-hover:opacity-100 hover:bg-white/10 hover:text-white"
+        className="shrink-0 opacity-0 group-hover:opacity-100"
         onClick={onRemove}
+        size="icon-xs"
         type="button"
+        variant="quiet"
       >
         <X className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </li>
   );
 }

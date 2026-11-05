@@ -4,7 +4,6 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Archive,
-  Check,
   GitBranch,
   Link2,
   MoreHorizontal,
@@ -13,7 +12,9 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { Dot } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,9 +28,12 @@ import { api } from "@/trpc/react";
 import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
 import { copyBranchCommand, defaultBranchType } from "../copy-branch-command";
 import { copyTaskLink } from "../copy-task-link";
-import { PRIORITY_META, type Priority, PriorityIcon } from "../priority";
+import { type Priority, PriorityInline } from "../priority";
 import { useArchiveTask } from "../use-archive-task";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
+
+const REVEAL =
+  "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100";
 
 const SORTABLE_TRANSITION = {
   duration: 150,
@@ -49,10 +53,12 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   projectKey,
   selected,
   onToggleSelection,
+  completed,
 }: {
   boardId: string;
   task: TaskRow;
   columnId: string;
+  completed?: boolean;
   canWrite: boolean;
   onOpenTask: (taskId: string) => void;
   assignee: MemberInfo | null;
@@ -82,7 +88,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   return (
     <div className="relative flex flex-col gap-2">
       {showDropIndicatorBefore ? (
-        <DropIndicator className="inset-x-0 -top-[5px]" />
+        <DropIndicator className="inset-x-0 -top-1" />
       ) : null}
       <div
         className="touch-none select-none"
@@ -95,6 +101,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
           assignee={assignee}
           boardId={boardId}
           canWrite={canWrite}
+          completed={completed}
           focused={focused}
           labels={labels}
           onOpen={onOpen}
@@ -117,7 +124,7 @@ export function DropIndicator({ className }: { className?: string }) {
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute z-10 h-0.5 rounded-full bg-sky-400/80",
+        "bg-info/70 pointer-events-none absolute z-10 h-0.5 rounded-full",
         className,
       )}
     />
@@ -135,72 +142,71 @@ export function TaskCardPreview({
   labels: LabelInfo[];
   projectKey: string;
 }) {
-  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
-  const overflowCount = labels.length - visibleLabels.length;
-
   return (
-    <div className="w-72 rounded-lg border border-white/20 bg-[#14151c] p-3 shadow-lg will-change-transform">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm leading-snug">{task.title}</p>
-        <div className="h-9 w-9 shrink-0" />
-      </div>
-      {labels.length > 0 ? (
-        <div className="mt-2 flex flex-wrap items-center gap-1">
-          {visibleLabels.map((label) => (
-            <span
-              className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              key={label.id}
-              style={{
-                borderColor: `${label.color}55`,
-                color: label.color,
-              }}
-            >
-              {label.name}
-            </span>
-          ))}
-          {overflowCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] tracking-wide text-white/60">
-              +{overflowCount}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="font-mono text-[10px] tracking-wide text-white/40">
-            {projectKey}-{task.number}
-          </span>
-          {task.priority !== "none" ? (
-            <div
-              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              style={{
-                borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
-                color: PRIORITY_META[task.priority as Priority].color,
-              }}
-            >
-              <PriorityIcon
-                className="h-3 w-3"
-                priority={task.priority as Priority}
-              />
-              {PRIORITY_META[task.priority as Priority].label}
-            </div>
-          ) : null}
-          {task.estimatePomodoros != null ? (
-            <span className="inline-flex items-center gap-1 text-xs text-white/40">
-              <Timer className="h-3 w-3" />
-              {task.estimatePomodoros}
-            </span>
-          ) : null}
-        </div>
-        {assignee ? (
-          <UserAvatar image={assignee.image} name={assignee.name} size={20} />
-        ) : null}
-      </div>
+    <div className="bg-raised w-72 rounded-lg border border-white/20 p-3 will-change-transform">
+      <p className="line-clamp-2 text-sm leading-snug">{task.title}</p>
+      <CardBody
+        assignee={assignee}
+        labels={labels}
+        projectKey={projectKey}
+        task={task}
+      />
     </div>
   );
 }
 
 const MAX_VISIBLE_LABELS = 2;
+
+function CardBody({
+  task,
+  assignee,
+  labels,
+  projectKey,
+}: {
+  task: TaskRow;
+  assignee: MemberInfo | null;
+  labels: LabelInfo[];
+  projectKey: string;
+}) {
+  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
+  const overflowCount = labels.length - visibleLabels.length;
+  const priority = task.priority as Priority;
+
+  return (
+    <div className="text-2xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="font-mono tracking-wide text-white/40">
+        {projectKey}-{task.number}
+      </span>
+      {priority !== "none" ? <PriorityInline priority={priority} /> : null}
+      {visibleLabels.map((l) => (
+        <span
+          className="inline-flex min-w-0 items-center gap-1 text-white/70"
+          key={l.id}
+        >
+          <Dot color={l.color} size="xs" />
+          <span className="max-w-24 truncate">{l.name}</span>
+        </span>
+      ))}
+      {overflowCount > 0 ? (
+        <span className="text-white/40">+{overflowCount}</span>
+      ) : null}
+      {task.estimatePomodoros != null ? (
+        <span className="inline-flex items-center gap-1 text-white/40">
+          <Timer className="h-3 w-3" />
+          {task.estimatePomodoros}
+        </span>
+      ) : null}
+      {assignee ? (
+        <UserAvatar
+          className="ml-auto"
+          image={assignee.image}
+          name={assignee.name}
+          size={20}
+        />
+      ) : null}
+    </div>
+  );
+}
 
 export const TaskCard = memo(function TaskCard({
   boardId,
@@ -213,6 +219,7 @@ export const TaskCard = memo(function TaskCard({
   selected = false,
   onToggleSelection,
   canWrite,
+  completed = false,
 }: {
   boardId: string;
   task: TaskRow;
@@ -224,13 +231,12 @@ export const TaskCard = memo(function TaskCard({
   selected?: boolean;
   onToggleSelection?: (extend: boolean) => void;
   canWrite: boolean;
+  completed?: boolean;
 }) {
   const remove = useUndoableBoardDelete(boardId);
   const archiveTask = useArchiveTask(boardId);
   const toggleToday = useToggleToday(task.id);
   const ref = useRef<HTMLDivElement>(null);
-  const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
-  const overflowCount = labels.length - visibleLabels.length;
 
   useEffect(() => {
     if (focused) ref.current?.scrollIntoView({ block: "nearest" });
@@ -239,9 +245,9 @@ export const TaskCard = memo(function TaskCard({
   return (
     <div
       className={cn(
-        "group w-full cursor-pointer rounded-lg border border-white/10 bg-[#14151c] p-3 transition hover:border-white/20",
-        focused && "border-sky-400/60 ring-2 ring-sky-400/50",
-        selected && "border-sky-300/60 bg-sky-400/[0.08]",
+        "group bg-raised relative w-full cursor-pointer rounded-lg border border-white/10 p-3 transition hover:border-white/20",
+        focused && "border-info/70 ring-info/40 ring-2",
+        selected && "border-info/70 bg-info/10",
       )}
       onClick={(event) => {
         if (event.shiftKey && onToggleSelection) {
@@ -253,135 +259,97 @@ export const TaskCard = memo(function TaskCard({
       }}
       ref={ref}
     >
-      <div className="flex items-start justify-between gap-2">
-        {onToggleSelection ? (
-          <button
-            aria-label={selected ? "Deselect task" : "Select task"}
-            aria-pressed={selected}
-            className={cn(
-              "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-white/20 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100",
-              selected && "border-sky-300/60 bg-sky-400/20 opacity-100",
-            )}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleSelection(event.shiftKey);
-            }}
-            onPointerDown={(event) => event.stopPropagation()}
-            type="button"
-          >
-            {selected ? <Check className="h-3 w-3" /> : null}
-          </button>
-        ) : null}
-        <p className="min-w-0 flex-1 text-sm leading-snug">{task.title}</p>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              aria-label={`More actions for ${task.title}`}
-              className="opacity-0 group-hover:opacity-100"
-              onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              size="icon"
-              title={`More actions for ${task.title}`}
-              variant="ghost"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem onSelect={() => copyTaskLink(task.id)}>
-              <Link2 className="h-3.5 w-3.5" /> Copy link
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() =>
-                copyBranchCommand({
-                  number: task.number,
-                  title: task.title,
-                  type: defaultBranchType(labels.map((l) => l.name)),
-                })
-              }
-            >
-              <GitBranch className="h-3.5 w-3.5" /> Copy git branch
-            </DropdownMenuItem>
-            {canWrite ? (
-              <>
-                <DropdownMenuItem onSelect={toggleToday.onSelect}>
-                  <Sun className="h-3.5 w-3.5" />
-                  {toggleToday.onToday ? "Remove from Today" : "Add to Today"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    archiveTask({ id: task.id, title: task.title })
-                  }
-                >
-                  <Archive className="h-3.5 w-3.5" /> Archive
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  destructive
-                  onSelect={() =>
-                    void remove({
-                      kind: "task",
-                      id: task.id,
-                      name: task.title,
-                    })
-                  }
-                >
-                  Delete
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      {labels.length > 0 ? (
-        <div className="mt-2 flex flex-wrap items-center gap-1">
-          {visibleLabels.map((l) => (
-            <span
-              className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              key={l.id}
-              style={{ borderColor: `${l.color}55`, color: l.color }}
-            >
-              {l.name}
-            </span>
-          ))}
-          {overflowCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] tracking-wide text-white/60">
-              +{overflowCount}
-            </span>
-          ) : null}
-        </div>
+      {onToggleSelection ? (
+        <Checkbox
+          aria-label={selected ? "Deselect task" : "Select task"}
+          checked={selected}
+          className={cn(
+            "absolute -top-1.5 -left-1.5 z-10",
+            REVEAL,
+            selected && "opacity-100",
+          )}
+          onCheckedChange={() => {}}
+          onClick={(event) => {
+            event.stopPropagation();
+            event.preventDefault(); // skip onCheckedChange; shiftKey needed
+            onToggleSelection(event.shiftKey);
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          lifted
+          tone="info"
+        />
       ) : null}
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="font-mono text-[10px] tracking-wide text-white/40">
-            {projectKey}-{task.number}
-          </span>
-          {task.priority !== "none" ? (
-            <div
-              className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide"
-              style={{
-                borderColor: `${PRIORITY_META[task.priority as Priority].color}55`,
-                color: PRIORITY_META[task.priority as Priority].color,
-              }}
-            >
-              <PriorityIcon
-                className="h-3 w-3"
-                priority={task.priority as Priority}
-              />
-              {PRIORITY_META[task.priority as Priority].label}
-            </div>
+      <p
+        className={cn(
+          "line-clamp-2 text-sm leading-snug",
+          completed && "text-white/70",
+        )}
+      >
+        {task.title}
+      </p>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label={`More actions for ${task.title}`}
+            className={cn("bg-raised absolute top-1.5 right-1.5", REVEAL)}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            size="icon-xs"
+            title={`More actions for ${task.title}`}
+            variant="ghost"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onSelect={() => copyTaskLink(task.id)}>
+            <Link2 className="h-3.5 w-3.5" /> Copy link
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() =>
+              copyBranchCommand({
+                number: task.number,
+                title: task.title,
+                type: defaultBranchType(labels.map((l) => l.name)),
+              })
+            }
+          >
+            <GitBranch className="h-3.5 w-3.5" /> Copy git branch
+          </DropdownMenuItem>
+          {canWrite ? (
+            <>
+              <DropdownMenuItem onSelect={toggleToday.onSelect}>
+                <Sun className="h-3.5 w-3.5" />
+                {toggleToday.onToday ? "Remove from Today" : "Add to Today"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => archiveTask({ id: task.id, title: task.title })}
+              >
+                <Archive className="h-3.5 w-3.5" /> Archive
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                destructive
+                onSelect={() =>
+                  void remove({
+                    kind: "task",
+                    id: task.id,
+                    name: task.title,
+                  })
+                }
+              >
+                Delete
+              </DropdownMenuItem>
+            </>
           ) : null}
-          {task.estimatePomodoros != null ? (
-            <span className="inline-flex items-center gap-1 text-xs text-white/40">
-              <Timer className="h-3 w-3" />
-              {task.estimatePomodoros}
-            </span>
-          ) : null}
-        </div>
-        {assignee ? (
-          <UserAvatar image={assignee.image} name={assignee.name} size={20} />
-        ) : null}
-      </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <CardBody
+        assignee={assignee}
+        labels={labels}
+        projectKey={projectKey}
+        task={task}
+      />
     </div>
   );
 });

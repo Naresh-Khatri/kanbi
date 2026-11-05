@@ -4,7 +4,9 @@ import { ArchiveRestore } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
+import { Dot } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
 import { api } from "@/trpc/react";
 import { invalidateProjectLifecycle } from "./invalidate-project-lifecycle";
 
@@ -24,20 +26,17 @@ export function ArchivedProjects() {
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-white/5 overflow-hidden rounded-lg border border-white/10">
+    <ul className="flex flex-col divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10">
       {projects.map((project) => (
-        <li
-          className="flex items-center gap-3 bg-white/[0.01] px-4 py-3"
-          key={project.id}
-        >
-          <span
-            aria-hidden
-            className="h-2.5 w-2.5 shrink-0 rounded-full opacity-60"
-            style={{ background: project.color ?? "#6366f1" }}
+        <li className="flex items-center gap-3 px-4 py-3" key={project.id}>
+          <Dot
+            className="opacity-70"
+            color={project.color ?? DEFAULT_PROJECT_COLOR}
+            size="md"
           />
           <div className="min-w-0 flex-1">
             <Link
-              className="truncate text-sm font-medium text-white/80 transition hover:text-white"
+              className="truncate text-sm font-medium text-white transition hover:text-white"
               href={`/app/p/${project.slug}`}
             >
               {project.name}

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { InviteHeader } from "@/components/invite/invite-header";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
+import { Wordmark } from "@/components/ui/logo";
+import { Card } from "@/components/ui/surface";
 import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
 import {
@@ -130,15 +131,14 @@ export default async function InvitePage({
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 py-12 text-white">
+    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center px-6 py-12 text-white">
       <div className="flex w-full max-w-md flex-col gap-8">
-        <Link className="flex items-center justify-center gap-2.5" href="/">
-          <Logo className="h-7 w-7" />
-          <span className="text-lg font-extrabold tracking-tight">Kanbi</span>
+        <Link className="flex justify-center" href="/">
+          <Wordmark />
         </Link>
-        <div className="flex flex-col gap-6 rounded-xl border border-white/10 bg-white/[0.03] p-6 sm:p-8">
+        <Card className="flex flex-col gap-6 sm:p-8" padding="lg" tone="muted">
           {children}
-        </div>
+        </Card>
       </div>
     </main>
   );
@@ -157,7 +157,7 @@ function Notice({
     <div className="flex flex-col gap-4 text-center">
       <div className="flex flex-col gap-1.5">
         <h1 className="text-base font-semibold">{title}</h1>
-        <p className="text-sm text-white/60">{body}</p>
+        <p className="text-sm text-white/70">{body}</p>
       </div>
       {action ?? (
         <Button asChild variant="outline">

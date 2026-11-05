@@ -1,6 +1,7 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
+import { CountBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,12 +23,10 @@ export function HiddenColumns({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className="h-10 shrink-0 gap-2" variant="outline">
+        <Button className="shrink-0" size="sm" variant="quiet">
           <EyeOff className="h-4 w-4" />
           Hidden columns
-          <span className="rounded bg-white/10 px-1 text-[10px]">
-            {columns.length}
-          </span>
+          <CountBadge>{columns.length}</CountBadge>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

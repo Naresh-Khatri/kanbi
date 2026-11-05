@@ -16,6 +16,8 @@ import {
 } from "@/app/app/p/[slug]/_components/priority";
 import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
 
+import { Button } from "@/components/ui/button";
+import { Card, EmptyState, SectionTitle } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { TodayQueue } from "./today-queue";
@@ -61,13 +63,11 @@ export function MyWork() {
     data.mentions.length === 0;
 
   return (
-    <section className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-semibold">My work</h1>
-      </div>
+    <section className="flex flex-col gap-4 border-t border-white/10 pt-10">
+      <SectionTitle>My work</SectionTitle>
       <TodayQueue />
       {empty ? (
-        <p className="text-sm text-white/40">Nothing needs your attention.</p>
+        <EmptyState size="sm">Nothing needs your attention.</EmptyState>
       ) : (
         <div className="flex flex-col gap-4">
           <Section
@@ -127,9 +127,9 @@ function Section<T>({
   const multiColumn = visible.length > 5;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <Card className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span className={cn("text-white/60", danger && "text-red-400/80")}>
+        <span className={cn("text-white/70", danger && "text-danger")}>
           {icon}
         </span>
         <h2 className="text-sm font-medium">{title}</h2>
@@ -144,10 +144,12 @@ function Section<T>({
         {visible.map((item) => renderItem(item))}
       </ul>
       {overflow > 0 ? (
-        <button
-          className="mt-1 flex items-center gap-1 self-start text-xs text-white/50 transition hover:text-white/80"
+        <Button
+          className="mt-1 gap-1 self-start"
           onClick={() => setShowAll((v) => !v)}
+          size="inline"
           type="button"
+          variant="link"
         >
           <ChevronDown
             className={cn(
@@ -156,9 +158,9 @@ function Section<T>({
             )}
           />
           {showAll ? "Show less" : `Show ${overflow} more`}
-        </button>
+        </Button>
       ) : null}
-    </div>
+    </Card>
   );
 }
 
@@ -178,13 +180,13 @@ function TaskRow({ task: t, danger }: { task: Assigned; danger?: boolean }) {
           <span
             className={cn(
               "shrink-0 text-xs text-white/40",
-              danger && "text-red-400/80",
+              danger && "text-danger",
             )}
           >
             {formatDate(t.dueAt)}
           </span>
         ) : null}
-        <span className="max-w-[7rem] shrink-0 truncate text-xs text-white/40">
+        <span className="max-w-28 shrink-0 truncate text-xs text-white/40">
           {t.projectName}
         </span>
       </Link>
@@ -196,10 +198,10 @@ function MentionRow({ mention: m }: { mention: Mention }) {
   const body = (
     <>
       <span className="min-w-0 flex-1 truncate text-sm">
-        <span className="text-white/80">{m.actorName ?? "Someone"}</span>
-        <span className="text-white/50"> mentioned you</span>
+        <span className="text-white">{m.actorName ?? "Someone"}</span>
+        <span className="text-white/70"> mentioned you</span>
         {m.taskTitle ? (
-          <span className="text-white/80"> in “{m.taskTitle}”</span>
+          <span className="text-white"> in “{m.taskTitle}”</span>
         ) : null}
       </span>
       <span

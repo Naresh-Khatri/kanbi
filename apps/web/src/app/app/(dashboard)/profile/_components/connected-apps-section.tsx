@@ -1,11 +1,14 @@
 "use client";
 
+import { IconTile } from "@/components/ui/surface";
 import { Plug, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { formatRelative } from "@kanbi/shared";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/server/better-auth/client";
 import { api } from "@/trpc/react";
 
@@ -88,13 +91,13 @@ export function ConnectedAppsSection() {
     <section className="mt-12 border-t border-white/10 pt-8">
       <header className="mb-4">
         <h2 className="text-sm font-medium text-white">Connected apps</h2>
-        <p className="mt-1 text-xs text-white/50">
+        <p className="mt-1 text-xs text-white/70">
           Agents and tools you&apos;ve authorized to reach your Kanbi account
           over MCP. Revoke any you no longer use.
         </p>
       </header>
 
-      <ul className="divide-y divide-white/5 rounded-lg border border-white/10">
+      <ul className="divide-y divide-white/10 rounded-lg border border-white/10">
         {consents === null ? (
           <li className="px-4 py-3 text-xs text-white/40">Loading…</li>
         ) : consents.length === 0 ? (
@@ -108,9 +111,9 @@ export function ConnectedAppsSection() {
               className="flex items-center justify-between gap-3 px-4 py-3"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]">
-                  <Plug className="h-4 w-4 text-white/60" />
-                </span>
+                <IconTile size="sm">
+                  <Plug className="h-4 w-4" />
+                </IconTile>
                 <div className="min-w-0">
                   <p className="truncate text-sm text-white">
                     {names[c.clientId] ?? c.clientId}
@@ -119,30 +122,26 @@ export function ConnectedAppsSection() {
                     {c.scopes
                       .filter((s: string) => SCOPE_LABEL[s])
                       .map((s: string) => (
-                        <span
-                          key={s}
-                          className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[10px] text-white/50"
-                        >
-                          {SCOPE_LABEL[s]}
-                        </span>
+                        <Badge key={s}>{SCOPE_LABEL[s]}</Badge>
                       ))}
                     {c.createdAt ? (
-                      <span className="text-[11px] text-white/35">
+                      <span className="text-2xs text-white/40">
                         · granted {formatRelative(c.createdAt)}
                       </span>
                     ) : null}
                   </div>
                 </div>
               </div>
-              <button
+              <Button
                 aria-label="Revoke access"
-                className="rounded-md p-1.5 text-white/40 hover:bg-white/5 hover:text-red-400"
                 disabled={revoking === c.id}
                 onClick={() => revoke(c)}
+                size="icon-sm"
                 type="button"
+                variant="quiet-danger"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </li>
           ))
         )}

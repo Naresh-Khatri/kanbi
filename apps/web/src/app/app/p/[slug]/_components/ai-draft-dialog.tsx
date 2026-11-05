@@ -1,23 +1,19 @@
 "use client";
 
 import {
-  CalendarDays,
-  Check,
   ChevronDown,
   ChevronUp,
   Minus,
   Plus,
   Sparkles,
-  Tag,
   Timer,
-  User as UserIcon,
   X,
 } from "lucide-react";
-import { formatDate } from "@kanbi/shared";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { Badge, Dot } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,23 +23,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
+import { SectionLabel } from "@/components/ui/surface";
+import { segmentGroup, segmentVariants } from "@/components/ui/tabs";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
-import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { ColumnPicker } from "./column-picker";
+import type { Priority } from "./priority";
 import {
-  PRIORITIES,
-  PRIORITY_META,
-  type Priority,
-  PriorityIcon,
-} from "./priority";
+  AssigneePicker,
+  DueDatePicker,
+  LabelsChip,
+  PriorityPicker,
+} from "./task-properties";
 
 type BoardData = RouterOutputs["board"]["get"];
 type ColumnRow = BoardData["columns"][number];
@@ -73,9 +66,9 @@ const CONFIDENCE_META: Record<
   EditableIssue["confidence"],
   { label: string; dot: string }
 > = {
-  high: { label: "High confidence", dot: "bg-emerald-400/80" },
-  med: { label: "Medium confidence", dot: "bg-amber-400/70" },
-  low: { label: "Low confidence", dot: "bg-white/25" },
+  high: { label: "High confidence", dot: "bg-success/70" },
+  med: { label: "Medium confidence", dot: "bg-warning/70" },
+  low: { label: "Low confidence", dot: "bg-white/20" },
 };
 
 // variant depth labels, keyed on explicit `kind` tag (not array position)
@@ -84,13 +77,6 @@ const VARIANT_LABELS: Record<Variant["kind"], string> = {
   medium: "Medium",
   verbose: "Verbose",
 };
-
-function formatDueLabel(value: string) {
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) return value;
-  // build from parts so YYYY-MM-DD isn't shifted by timezone
-  return formatDate(new Date(y, m - 1, d));
-}
 
 // animates height to fit content so swapping variants glides vs snaps.
 // overflow clipped only mid-animation -> idle editor popovers aren't cut off
@@ -304,7 +290,7 @@ export function AiDraftDialog({
   return (
     <Dialog onOpenChange={requestOpenChange} open={open}>
       <DialogContent
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col gap-0 p-0"
+        className="max-h-dialog flex w-full max-w-3xl flex-col gap-0 p-0"
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
@@ -313,9 +299,9 @@ export function AiDraftDialog({
           }
         }}
       >
-        <DialogHeader className="border-b border-white/[0.06] px-5 py-3.5">
-          <DialogTitle className="flex items-center gap-2 text-[13px] font-medium text-white/90">
-            <Sparkles className="h-3.5 w-3.5 text-white/35" />
+        <DialogHeader className="border-b border-white/10 px-5 py-3.5">
+          <DialogTitle className="flex items-center gap-2 text-sm font-medium text-white">
+            <Sparkles className="text-ai h-3.5 w-3.5" />
             Draft tasks from a message
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -328,7 +314,7 @@ export function AiDraftDialog({
             <div className="flex flex-col gap-3 px-5 py-4">
               <Textarea
                 autoFocus
-                className="min-h-[200px] resize-y border-white/[0.08] bg-white/[0.02] text-[13px] leading-relaxed focus-visible:ring-white/20"
+                className="min-h-48 resize-y text-sm leading-relaxed"
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Paste the client message, bug report, or spec here…"
                 ref={messageRef}
@@ -365,10 +351,10 @@ export function AiDraftDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3">
+        <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
           {view === "input" ? (
             <>
-              <span className="max-w-[60%] text-[11px] leading-relaxed text-white/35">
+              <span className="text-2xs max-w-3/5 leading-relaxed text-white/40">
                 Each issue comes with a priority, assignee, due date, labels, a
                 pomodoro estimate, and a checklist.
               </span>
@@ -383,7 +369,7 @@ export function AiDraftDialog({
                     Review drafts →
                   </Button>
                 ) : null}
-                <span className="hidden text-[11px] text-white/40 sm:block">
+                <span className="text-2xs hidden text-white/40 sm:block">
                   ⌘+↵ to draft
                 </span>
                 <Button
@@ -418,7 +404,7 @@ export function AiDraftDialog({
                 >
                   Back
                 </Button>
-                <span className="hidden text-[11px] text-white/40 sm:block">
+                <span className="text-2xs hidden text-white/40 sm:block">
                   ⌘+↵
                 </span>
                 <Button
@@ -475,12 +461,12 @@ function SkeletonCards() {
     <div className="flex flex-col gap-3">
       {["a", "b"].map((k) => (
         <div
-          className="animate-pulse rounded-xl border border-white/[0.07] bg-white/[0.015] p-4"
+          className="animate-pulse rounded-lg border border-white/10 bg-white/5 p-4"
           key={k}
         >
-          <div className="mb-3 h-3 w-2/3 rounded bg-white/10" />
-          <div className="mb-2 h-3 w-1/2 rounded bg-white/10" />
-          <div className="h-3 w-3/4 rounded bg-white/10" />
+          <div className="mb-3 h-3 w-2/3 rounded-md bg-white/10" />
+          <div className="mb-2 h-3 w-1/2 rounded-md bg-white/10" />
+          <div className="h-3 w-3/4 rounded-md bg-white/10" />
         </div>
       ))}
     </div>
@@ -498,7 +484,7 @@ function RawPreview({
 }) {
   return (
     <button
-      className="flex items-start gap-2 border-b border-white/[0.06] px-5 py-2.5 text-left text-xs text-white/40 transition hover:text-white/60"
+      className="flex items-start gap-2 border-b border-white/10 px-5 py-2.5 text-left text-xs text-white/40 transition hover:text-white/70"
       onClick={onToggle}
       type="button"
     >
@@ -544,46 +530,42 @@ function IssueCard({
   return (
     <div
       className={cn(
-        "rounded-xl border transition-opacity",
-        issue.skip
-          ? "border-white/[0.05] opacity-45"
-          : "border-white/[0.07] bg-white/[0.015]",
+        "rounded-lg border border-white/10 transition-opacity",
+        issue.skip ? "opacity-40" : "bg-white/5",
       )}
     >
       <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            aria-hidden
-            className={cn("h-1.5 w-1.5 shrink-0 rounded-full", meta.dot)}
-            title={meta.label}
-          />
-          <span className="truncate text-[13px] font-medium text-white/85">
+          <Dot className={meta.dot} title={meta.label} />
+          <span className="truncate text-sm font-medium text-white">
             {issue.summary}
           </span>
         </div>
-        <button
-          className="shrink-0 text-[11px] text-white/40 transition hover:text-white/75"
+        <Button
+          className="text-2xs shrink-0"
           onClick={() => onSkip(!issue.skip)}
+          size="inline"
           type="button"
+          variant="link"
         >
           {issue.skip ? "Include" : "Skip"}
-        </button>
+        </Button>
       </div>
 
       {issue.skip || !variant ? null : (
         <>
           {/* issue-wide attrs, shared across variants */}
           <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2.5">
-            <PriorityChip
+            <PriorityPicker
               onChange={(priority) => onIssueEdit({ priority })}
               value={issue.priority}
             />
-            <AssigneeChip
+            <AssigneePicker
               members={members}
               onChange={(assigneeId) => onIssueEdit({ assigneeId })}
               value={issue.assigneeId}
             />
-            <DueDateChip
+            <DueDatePicker
               onChange={(dueAt) => onIssueEdit({ dueAt })}
               value={issue.dueAt}
             />
@@ -594,6 +576,7 @@ function IssueCard({
               value={issue.estimatePomodoros}
             />
             <LabelsChip
+              emptyText="No labels on this board"
               labels={labels}
               onToggle={(id, on) => {
                 const next = new Set(issue.labelIds);
@@ -608,33 +591,27 @@ function IssueCard({
                 {labels
                   .filter((l) => selectedLabels.has(l.id))
                   .map((l) => (
-                    <span
-                      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] text-black"
-                      key={l.id}
-                      style={{ background: l.color }}
-                    >
+                    <Badge color={l.color} fill="solid" key={l.id}>
                       {l.name}
-                    </span>
+                    </Badge>
                   ))}
               </div>
             ) : null}
           </div>
 
           {/* divider = boundary: attrs above are issue-wide, content below is per-variant */}
-          <div className="mx-4 border-t border-white/[0.05]" />
+          <div className="mx-4 border-t border-white/10" />
 
           {multiVariant ? (
             <div className="px-4 pt-3">
-              <div className="inline-flex w-fit items-center gap-0.5 rounded-lg bg-white/[0.03] p-0.5">
+              <div className={segmentGroup}>
                 {issue.variants.map((v, i) => (
                   <button
                     aria-pressed={i === issue.variantIndex}
-                    className={cn(
-                      "rounded-md px-3 py-1 text-[11px] font-medium transition",
-                      i === issue.variantIndex
-                        ? "bg-white/10 text-white/90"
-                        : "text-white/40 hover:text-white/70",
-                    )}
+                    className={segmentVariants({
+                      size: "xs",
+                      active: i === issue.variantIndex,
+                    })}
                     key={v.id}
                     onClick={() => onVariantChange(i)}
                     type="button"
@@ -649,13 +626,14 @@ function IssueCard({
           <AnimateHeight>
             <div className="flex flex-col gap-1 px-4 pt-3 pb-4">
               <Input
-                className="h-auto border-0 bg-transparent px-0 py-0 text-[15px] font-medium text-white/90 focus-visible:ring-0"
+                className="h-auto text-base font-medium"
                 onChange={(e) => onVariantEdit({ title: e.target.value })}
                 placeholder="Task title"
                 value={variant.title}
+                variant="bare"
               />
               <RichTextEditor
-                className="text-white/60"
+                className="text-white/70"
                 minHeight="52px"
                 onChange={(html) => onVariantEdit({ description: html })}
                 placeholder="Add context and acceptance criteria…"
@@ -673,37 +651,6 @@ function IssueCard({
   );
 }
 
-function PriorityChip({
-  value,
-  onChange,
-}: {
-  value: Priority;
-  onChange: (p: Priority) => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-white/55 capitalize transition hover:bg-white/[0.07] hover:text-white/85"
-          type="button"
-        >
-          <PriorityIcon className="h-3 w-3" priority={value} />
-          {value === "none" ? "Priority" : PRIORITY_META[value].label}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {PRIORITIES.map((p) => (
-          <DropdownMenuItem key={p} onSelect={() => onChange(p)}>
-            <PriorityIcon className="mr-2 h-3.5 w-3.5" priority={p} />
-            {PRIORITY_META[p].label}
-            {p === value ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 function EstimateChip({
   value,
   onChange,
@@ -712,175 +659,29 @@ function EstimateChip({
   onChange: (n: number) => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-white/[0.04] px-1 py-1 text-[11px] text-white/55">
-      <button
+    <span className="inline-flex h-7 items-center gap-1 px-1 text-xs text-white/70">
+      <Button
         aria-label="Decrease estimate"
-        className="rounded p-0.5 transition hover:bg-white/[0.07] hover:text-white/85 disabled:pointer-events-none disabled:opacity-30"
         disabled={value <= 1}
         onClick={() => onChange(Math.max(1, value - 1))}
+        size="icon-xs"
         type="button"
+        variant="quiet"
       >
         <Minus className="h-3 w-3" />
-      </button>
-      <Timer className="h-3 w-3" />
+      </Button>
+      <Timer className="h-3.5 w-3.5" />
       {value}
-      <button
+      <Button
         aria-label="Increase estimate"
-        className="rounded p-0.5 transition hover:bg-white/[0.07] hover:text-white/85 disabled:pointer-events-none disabled:opacity-30"
         disabled={value >= 8}
         onClick={() => onChange(Math.min(8, value + 1))}
+        size="icon-xs"
         type="button"
+        variant="quiet"
       >
         <Plus className="h-3 w-3" />
-      </button>
-    </span>
-  );
-}
-
-function LabelsChip({
-  labels,
-  selected,
-  onToggle,
-}: {
-  labels: LabelRow[];
-  selected: Set<string>;
-  onToggle: (id: string, on: boolean) => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-white/55 transition hover:bg-white/[0.07] hover:text-white/85"
-          type="button"
-        >
-          <Tag className="h-3 w-3" />
-          Labels
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {labels.length === 0 ? (
-          <DropdownMenuItem disabled>No labels on this board</DropdownMenuItem>
-        ) : (
-          labels.map((l) => {
-            const on = selected.has(l.id);
-            return (
-              <DropdownMenuItem
-                key={l.id}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  onToggle(l.id, !on);
-                }}
-              >
-                <span
-                  className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ background: l.color }}
-                />
-                {l.name}
-                {on ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
-              </DropdownMenuItem>
-            );
-          })
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function AssigneeChip({
-  value,
-  members,
-  onChange,
-}: {
-  value: string | null;
-  members: MemberRow[];
-  onChange: (id: string | null) => void;
-}) {
-  const current = members.find((m) => m.userId === value);
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-white/55 transition hover:bg-white/[0.07] hover:text-white/85"
-          type="button"
-        >
-          {current ? (
-            <UserAvatar image={current.image} name={current.name} size={14} />
-          ) : (
-            <UserIcon className="h-3 w-3" />
-          )}
-          {current ? current.name : "Assignee"}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem onSelect={() => onChange(null)}>
-          <span className="flex h-5 w-5 items-center justify-center">
-            <UserIcon className="h-3.5 w-3.5 text-white/50" />
-          </span>
-          Unassigned
-          {value === null ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
-        </DropdownMenuItem>
-        {members.map((m) => (
-          <DropdownMenuItem key={m.userId} onSelect={() => onChange(m.userId)}>
-            <UserAvatar image={m.image} name={m.name} size={20} />
-            {m.name}
-            {value === m.userId ? (
-              <Check className="ml-auto h-3.5 w-3.5" />
-            ) : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function DueDateChip({
-  value,
-  onChange,
-}: {
-  value: string | null;
-  onChange: (value: string | null) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  function openPicker() {
-    const el = inputRef.current;
-    if (!el) return;
-    try {
-      el.showPicker();
-    } catch {
-      el.focus();
-    }
-  }
-
-  return (
-    <span className="relative inline-flex items-center rounded-md bg-white/[0.04] transition hover:bg-white/[0.07]">
-      <button
-        className="inline-flex items-center gap-1.5 rounded-md py-1 pr-1.5 pl-2 text-[11px] text-white/55 transition hover:text-white/85"
-        onClick={openPicker}
-        type="button"
-      >
-        <CalendarDays className="h-3 w-3" />
-        {value ? formatDueLabel(value) : "Due date"}
-      </button>
-      {value ? (
-        <button
-          aria-label="Clear due date"
-          className="mr-1.5 rounded-full text-white/40 transition hover:text-white"
-          onClick={() => onChange(null)}
-          type="button"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      ) : null}
-      <input
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 left-3 h-0 w-0 opacity-0"
-        onChange={(e) => onChange(e.target.value || null)}
-        ref={inputRef}
-        tabIndex={-1}
-        type="date"
-        value={value ?? ""}
-      />
+      </Button>
     </span>
   );
 }
@@ -904,41 +705,39 @@ function ChecklistField({
   if (items.length === 0 && text.length === 0) {
     return (
       <Input
-        className="h-7 border-0 bg-transparent px-0 text-xs text-white/40 focus-visible:ring-0"
+        className="h-7 text-xs"
         onChange={(e) => setText(e.target.value)}
         placeholder="+ Add a checklist…"
         value={text}
+        variant="bare"
       />
     );
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-1.5 border-t border-white/[0.05] pt-3">
-      <div className="mb-0.5 text-[10px] font-medium tracking-wide text-white/30 uppercase">
-        Checklist
-      </div>
+    <div className="mt-2 flex flex-col gap-1.5 border-t border-white/10 pt-3">
+      <SectionLabel className="mb-0.5">Checklist</SectionLabel>
       {items.map((item, idx) => (
         <div className="group flex items-center gap-2.5" key={`${idx}-${item}`}>
-          <span
-            aria-hidden
-            className="ml-1 h-1 w-1 shrink-0 rounded-full bg-white/25"
-          />
-          <span className="flex-1 text-[13px] text-white/70">{item}</span>
-          <button
+          <Dot className="ml-1 h-1 w-1 bg-white/20" />
+          <span className="flex-1 text-sm text-white/70">{item}</span>
+          <Button
             aria-label="Remove item"
-            className="text-white/20 opacity-0 transition group-hover:opacity-100 hover:text-white/70"
+            className="opacity-0 group-hover:opacity-100"
             onClick={() => onChange(items.filter((_, i) => i !== idx))}
+            size="icon-xs"
             type="button"
+            variant="quiet"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       ))}
       <div className="flex items-center gap-2">
-        <Plus className="h-3 w-3 shrink-0 text-white/25" />
+        <Plus className="h-3 w-3 shrink-0 text-white/40" />
         <Input
           autoFocus
-          className="h-7 border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0"
+          className="h-7"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -948,41 +747,9 @@ function ChecklistField({
           }}
           placeholder="Add a step, press Enter"
           value={text}
+          variant="bare"
         />
       </div>
     </div>
-  );
-}
-
-function ColumnPicker({
-  columns,
-  value,
-  onChange,
-}: {
-  columns: ColumnRow[];
-  value: string | null;
-  onChange: (id: string) => void;
-}) {
-  const current = columns.find((c) => c.id === value);
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium text-white transition hover:bg-white/5"
-          type="button"
-        >
-          {current?.name ?? "column"}
-          <ChevronDown className="h-3 w-3 text-white/40" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {columns.map((c) => (
-          <DropdownMenuItem key={c.id} onSelect={() => onChange(c.id)}>
-            {c.name}
-            {c.id === value ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

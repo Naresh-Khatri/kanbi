@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { api } from "@/trpc/react";
 import { Section } from "./section";
 
@@ -52,7 +53,8 @@ export function SharingSection({
     const parsed = Number.parseInt(maxUses, 10);
     create.mutate({
       boardId,
-      expiresAt: expiryDays != null ? new Date(Date.now() + expiryDays * DAY_MS) : null,
+      expiresAt:
+        expiryDays != null ? new Date(Date.now() + expiryDays * DAY_MS) : null,
       maxUses: Number.isFinite(parsed) && parsed > 0 ? parsed : null,
     });
   }
@@ -64,15 +66,15 @@ export function SharingSection({
       title="Sharing"
     >
       {!isOwner ? (
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-white/70">
           Only owners can manage public share links.
         </p>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <Select
               aria-label="Link expiry"
-              className="h-8 rounded-md border border-white/10 bg-white/[0.03] px-2 text-sm text-white/80 outline-none focus:border-white/20"
+              size="sm"
               onChange={(e) =>
                 setExpiryDays(
                   e.target.value === "" ? null : Number(e.target.value),
@@ -81,11 +83,11 @@ export function SharingSection({
               value={expiryDays ?? ""}
             >
               {EXPIRY_OPTIONS.map((o) => (
-                <option className="bg-[#0f1016]" key={o.label} value={o.days ?? ""}>
+                <option key={o.label} value={o.days ?? ""}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </Select>
             <Input
               aria-label="Max views"
               className="h-8 w-28"
@@ -105,55 +107,56 @@ export function SharingSection({
             </Button>
           </div>
           {shares.length === 0 ? (
-            <p className="text-xs text-white/50">No active share links.</p>
+            <p className="text-xs text-white/40">No active share links.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-white/5 rounded-md border border-white/10">
+            <ul className="flex flex-col divide-y divide-white/10 rounded-md border border-white/10">
               {shares.map((s) => {
                 const expired = s.expiresAt
                   ? new Date(s.expiresAt).getTime() <= Date.now()
                   : false;
-                const exhausted =
-                  s.maxUses != null && s.usesCount >= s.maxUses;
+                const exhausted = s.maxUses != null && s.usesCount >= s.maxUses;
                 return (
                   <li className="flex flex-col gap-1 px-3 py-2" key={s.id}>
                     <div className="flex items-center gap-2">
-                      <input
-                        className="flex-1 rounded bg-white/5 px-2 py-1 text-xs text-white/80"
+                      <Input
+                        className="h-7 flex-1 text-xs"
                         readOnly
                         value={shareUrl(s.token)}
                       />
-                      <button
+                      <Button
                         aria-label="Copy link"
-                        className="text-white/70 hover:text-white"
                         onClick={() => {
                           navigator.clipboard.writeText(shareUrl(s.token));
                           toast.success("Link copied");
                         }}
+                        size="icon-xs"
                         type="button"
+                        variant="quiet"
                       >
                         <Copy className="h-3.5 w-3.5" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         aria-label="Revoke link"
-                        className="text-white/40 hover:text-red-400"
                         onClick={() =>
                           revoke.mutate({ boardId, shareId: s.id })
                         }
+                        size="icon-xs"
                         type="button"
+                        variant="quiet-danger"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </div>
-                    <p className="text-[11px] text-white/40">
+                    <p className="text-2xs text-white/40">
                       {s.usesCount}
                       {s.maxUses != null ? ` / ${s.maxUses}` : ""} views
                       {s.expiresAt
                         ? ` · expires ${formatDate(s.expiresAt)}`
                         : " · no expiry"}
                       {expired ? (
-                        <span className="text-red-400/80"> · expired</span>
+                        <span className="text-danger"> · expired</span>
                       ) : exhausted ? (
-                        <span className="text-red-400/80"> · limit reached</span>
+                        <span className="text-danger"> · limit reached</span>
                       ) : null}
                     </p>
                   </li>

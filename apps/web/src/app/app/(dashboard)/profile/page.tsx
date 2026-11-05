@@ -1,6 +1,7 @@
 import { ConnectedAppsSection } from "@/app/app/(dashboard)/profile/_components/connected-apps-section";
 import { DevicesSection } from "@/app/app/(dashboard)/profile/_components/devices-section";
 import { ProfileEditor } from "@/app/app/(dashboard)/profile/profile-editor";
+import { PageContainer } from "@/components/ui/surface";
 import { api, HydrateClient } from "@/trpc/server";
 
 export default function ProfilePage() {
@@ -8,11 +9,13 @@ export default function ProfilePage() {
   void api.device.list.prefetch();
   return (
     <HydrateClient>
-      <main className="mx-auto w-full max-w-xl px-6 py-10">
-        <ProfileEditor />
-        <DevicesSection />
-        <ConnectedAppsSection />
-      </main>
+      <PageContainer>
+        <div className="max-w-xl">
+          <ProfileEditor />
+          <DevicesSection />
+          <ConnectedAppsSection />
+        </div>
+      </PageContainer>
     </HydrateClient>
   );
 }

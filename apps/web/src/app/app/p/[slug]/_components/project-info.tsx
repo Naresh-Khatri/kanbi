@@ -12,6 +12,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Dot } from "@/components/ui/badge";
+import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
 import { api } from "@/trpc/react";
 
 const PROJECT_SWITCHER_LIMIT = 9;
@@ -32,24 +35,22 @@ export function ProjectInfo() {
     <div className="flex min-w-0 items-center gap-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
             aria-label="Switch project"
-            className="group flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/20"
+            className="group min-w-0 gap-2 px-2"
+            size="md"
             type="button"
+            variant="property"
           >
-            <span
-              aria-hidden
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ background: project.color ?? "#6366f1" }}
-            />
+            <Dot color={project.color ?? DEFAULT_PROJECT_COLOR} size="md" />
             <h1 className="truncate text-sm font-medium text-white">
               {project.name}
             </h1>
-            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-white/40 group-hover:text-white/70" />
-          </button>
+            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0" />
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
-          <div className="px-2 py-1 text-xs text-white/50">Switch project</div>
+          <div className="px-2 py-1 text-xs text-white/40">Switch project</div>
           {switchableProjects.map((p) => {
             const active = p.slug === slug;
             return (
@@ -58,11 +59,7 @@ export function ProjectInfo() {
                   className="flex items-center gap-2"
                   href={`/app/p/${p.slug}`}
                 >
-                  <span
-                    aria-hidden
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: p.color ?? "#6366f1" }}
-                  />
+                  <Dot color={p.color ?? DEFAULT_PROJECT_COLOR} />
                   <span className="flex-1 truncate">{p.name}</span>
                   {active ? (
                     <Check className="h-3.5 w-3.5 text-white/70" />

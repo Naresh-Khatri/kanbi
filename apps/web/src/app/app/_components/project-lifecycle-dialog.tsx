@@ -4,6 +4,7 @@ import { Archive, PauseCircle } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -68,16 +69,16 @@ export function ProjectLifecycleDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isArchiving ? (
-              <Archive className="size-4 text-white/50" aria-hidden />
+              <Archive className="size-4 text-white/40" aria-hidden />
             ) : (
-              <PauseCircle className="size-4 text-white/50" aria-hidden />
+              <PauseCircle className="size-4 text-white/40" aria-hidden />
             )}
             {isArchiving ? "Archive project?" : "Move project to On hold?"}
           </DialogTitle>
           <DialogDescription className="text-pretty">
             {isArchiving ? (
               <>
-                <strong className="font-medium text-white/80">
+                <strong className="font-medium text-white">
                   {projectName}
                 </strong>{" "}
                 will leave your Home view, project picker, task search, and
@@ -85,18 +86,18 @@ export function ProjectLifecycleDialog({
               </>
             ) : (
               <>
-                <strong className="font-medium text-white/80">
+                <strong className="font-medium text-white">
                   {projectName}
                 </strong>{" "}
                 will move into the collapsed{" "}
-                <strong className="font-medium text-white/80">On hold</strong>{" "}
+                <strong className="font-medium text-white">On hold</strong>{" "}
                 section on Home. It stays available in the project picker.
               </>
             )}
           </DialogDescription>
         </DialogHeader>
 
-        <p className="text-sm leading-relaxed text-white/50">
+        <p className="text-sm leading-relaxed text-white/70">
           {isArchiving ? (
             <>
               To access it again, open your user menu and choose{" "}
@@ -114,12 +115,10 @@ export function ProjectLifecycleDialog({
           )}
         </p>
 
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-white/60">
-          <input
-            type="checkbox"
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-white/70">
+          <Checkbox
             checked={dontShowAgain}
-            onChange={(event) => setDontShowAgain(event.target.checked)}
-            className="size-4 accent-white"
+            onCheckedChange={setDontShowAgain}
           />
           Don&apos;t show this again
         </label>

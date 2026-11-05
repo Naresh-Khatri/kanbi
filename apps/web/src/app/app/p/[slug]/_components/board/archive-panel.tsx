@@ -69,10 +69,10 @@ export function ArchivePanel({
           </DialogDescription>
         </DialogHeader>
         {tasks.length > 0 ? (
-          <ul className="-mr-2 flex max-h-[60vh] flex-col gap-1 overflow-y-auto pr-2">
+          <ul className="-mr-2 flex max-h-96 flex-col gap-1 overflow-y-auto pr-2">
             {tasks.map((t) => (
               <li
-                className="flex items-center gap-3 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2"
+                className="flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2"
                 key={t.id}
               >
                 <PriorityIcon
@@ -80,9 +80,7 @@ export function ArchivePanel({
                   priority={t.priority as Priority}
                 />
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm text-white/90">
-                    {t.title}
-                  </span>
+                  <span className="truncate text-sm text-white">{t.title}</span>
                   <span className="truncate text-xs text-white/40">
                     {columnNameById.get(t.columnId) ?? "—"}
                     {t.archivedAt
@@ -105,9 +103,8 @@ export function ArchivePanel({
                     >
                       <ArchiveRestore className="h-3.5 w-3.5" /> Restore
                     </Button>
-                    <button
+                    <Button
                       aria-label="Delete permanently"
-                      className="rounded p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white"
                       onClick={() =>
                         void removeTask({
                           kind: "task",
@@ -115,10 +112,12 @@ export function ArchivePanel({
                           name: t.title,
                         })
                       }
+                      size="icon-sm"
                       type="button"
+                      variant="quiet"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
               </li>

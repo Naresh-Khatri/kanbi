@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
+import { Button } from "@/components/ui/button";
+import { CountBadge, Dot } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -186,34 +188,43 @@ export function NotificationBell() {
         }
       }}
     >
-      <DropdownMenuTrigger
-        aria-label="Notifications"
-        className="relative flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
-      >
-        <Bell className="h-4 w-4" />
-        {unreadCount > 0 ? (
-          <span className="absolute top-1 right-1 flex min-w-[1rem] items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-medium text-white">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        ) : null}
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label="Notifications"
+          className="relative"
+          size="icon-md"
+          variant="quiet"
+        >
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 ? (
+            <CountBadge
+              className="absolute top-0 right-0 text-center"
+              tone="info"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </CountBadge>
+          ) : null}
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
           <span className="text-sm font-medium">Notifications</span>
           {hasUnread ? (
-            <button
-              className="inline-flex items-center gap-1 text-xs text-white/60 hover:text-white"
+            <Button
+              className="gap-1"
               onClick={() => markAllRead.mutate()}
+              size="inline"
               type="button"
+              variant="link"
             >
               <Check className="h-3 w-3" /> Mark all read
-            </button>
+            </Button>
           ) : null}
         </div>
         <div className="max-h-96 overflow-y-auto">
           {items.length === 0 ? (
-            <div className="px-3 py-6 text-center text-sm text-white/50">
-              You're all caught up.
+            <div className="px-3 py-6 text-center text-sm text-white/40">
+              You&apos;re all caught up.
             </div>
           ) : (
             items.map((n) => {
@@ -223,8 +234,8 @@ export function NotificationBell() {
                 n.createdAt instanceof Date
                   ? n.createdAt
                   : new Date(n.createdAt);
-              const rowClass = `border-white/5 border-b px-3 py-2.5 transition hover:bg-white/[0.04] ${
-                unread ? "bg-white/[0.02]" : ""
+              const rowClass = `border-white/10 border-b px-3 py-2.5 transition ${
+                unread ? "bg-white/5 hover:bg-white/10" : "hover:bg-white/5"
               }`;
               const handleClick = () => {
                 if (unread) markRead.mutate({ ids: [n.id] });
@@ -238,33 +249,30 @@ export function NotificationBell() {
                       size={28}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate-2 text-sm leading-snug text-white/90">
+                      <p className="truncate-2 text-sm leading-snug text-white">
                         {text}
                       </p>
                       <p
-                        className="mt-0.5 text-[11px] text-white/40"
+                        className="text-2xs mt-0.5 text-white/40"
                         title={formatDateTime(createdAt)}
                       >
                         {formatRelative(createdAt)}
                       </p>
                     </div>
-                    {unread ? (
-                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-sky-400" />
-                    ) : null}
+                    {unread ? <Dot className="bg-info mt-1" /> : null}
                   </div>
                   {actions && actions.length > 0 ? (
                     <div className="mt-2 ml-9 flex items-center gap-2">
                       {actions.map((a) => (
-                        <button
-                          className={
-                            a.variant === "primary"
-                              ? "rounded-md bg-sky-500 px-2 py-1 text-[11px] font-medium text-white transition hover:bg-sky-400"
-                              : "rounded-md px-2 py-1 text-[11px] text-white/60 transition hover:bg-white/10 hover:text-white"
-                          }
+                        <Button
                           disabled={
                             acceptInvite.isPending || declineInvite.isPending
                           }
                           key={a.kind}
+                          size="xs"
+                          variant={
+                            a.variant === "primary" ? "default" : "ghost"
+                          }
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -273,7 +281,7 @@ export function NotificationBell() {
                           type="button"
                         >
                           {a.label}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   ) : null}

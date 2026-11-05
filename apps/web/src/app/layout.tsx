@@ -22,7 +22,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html className={`${geist.variable} dark`} lang="en">
-      <body className="bg-[#0b0b0f] text-white antialiased">
+      <body className="bg-canvas text-white antialiased">
         <TRPCReactProvider>{children}</TRPCReactProvider>
         <Toaster position="bottom-right" theme="dark" />
       </body>

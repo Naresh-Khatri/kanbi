@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Swatch } from "@/components/ui/swatch";
+import { Ban, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -8,8 +9,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
+import { PageTitle } from "@/components/ui/surface";
 
 const DICEBEAR_BASE = "https://api.dicebear.com/9.x/lorelei/svg";
 
@@ -87,14 +88,14 @@ export function ProfileEditor() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="text-sm text-white/60">
+        <PageTitle>Profile</PageTitle>
+        <p className="text-sm text-white/70">
           Pick a name and avatar. Avatars use Lorelei from DiceBear.
         </p>
       </div>
 
       <form className="flex flex-col gap-5" onSubmit={onSubmit}>
-        <div className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+        <div className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/5 p-4">
           <img
             alt="Avatar preview"
             className="h-20 w-20 rounded-full border border-white/10"
@@ -102,7 +103,7 @@ export function ProfileEditor() {
           />
           <div className="flex min-w-0 flex-col gap-0.5">
             <div className="truncate font-medium">{name || "Your name"}</div>
-            <div className="truncate text-xs text-white/60">{me?.email}</div>
+            <div className="truncate text-xs text-white/70">{me?.email}</div>
           </div>
         </div>
 
@@ -120,48 +121,46 @@ export function ProfileEditor() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <Label>Pick an avatar</Label>
-            <div className="flex items-center gap-1 text-xs text-white/60">
-              <button
+            <div className="flex items-center gap-1 text-xs text-white/70">
+              <Button
                 aria-label="Previous page"
-                className="rounded p-1 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent"
                 disabled={page === 0}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
+                size="icon-xs"
                 type="button"
+                variant="quiet"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
+              </Button>
               <span className="tabular-nums">Page {page + 1}</span>
-              <button
+              <Button
                 aria-label="Next page"
-                className="rounded p-1 hover:bg-white/10"
                 onClick={() => setPage((p) => p + 1)}
+                size="icon-xs"
                 type="button"
+                variant="quiet"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             </div>
           </div>
           <div className="grid grid-cols-5 gap-2">
             {options.map((s) => {
               const active = s === seed;
               return (
-                <button
-                  className={cn(
-                    "flex aspect-square items-center justify-center rounded-lg border transition",
-                    active
-                      ? "border-white ring-2 ring-white/40"
-                      : "border-white/10 hover:border-white/40",
-                  )}
+                <Swatch
+                  className="aspect-square"
                   key={s}
                   onClick={() => setSeed(s)}
-                  type="button"
+                  selected={active}
+                  shape="square"
                 >
                   <img
                     alt=""
-                    className="h-full w-full rounded-lg"
+                    className="h-full w-full"
                     src={buildAvatarUrl(s, bg)}
                   />
-                </button>
+                </Swatch>
               );
             })}
           </div>
@@ -174,28 +173,19 @@ export function ProfileEditor() {
               const active = c === bg;
               const isTransparent = c === "transparent";
               return (
-                <button
+                <Swatch
                   aria-label={isTransparent ? "No background" : `#${c}`}
-                  className={cn(
-                    "h-10 w-14 rounded-md border transition",
-                    active
-                      ? "border-white ring-2 ring-white/40"
-                      : "border-white/15 hover:border-white/40",
-                  )}
+                  className="h-10 w-14"
+                  color={isTransparent ? undefined : `#${c}`}
                   key={c}
                   onClick={() => setBg(c)}
-                  style={{
-                    backgroundColor: isTransparent ? undefined : `#${c}`,
-                    backgroundImage: isTransparent
-                      ? "linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.15) 75%), linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.15) 75%)"
-                      : undefined,
-                    backgroundSize: isTransparent ? "8px 8px" : undefined,
-                    backgroundPosition: isTransparent
-                      ? "0 0, 4px 4px"
-                      : undefined,
-                  }}
-                  type="button"
-                />
+                  selected={active}
+                  shape="square"
+                >
+                  {isTransparent ? (
+                    <Ban className="h-4 w-4 text-white/40" />
+                  ) : null}
+                </Swatch>
               );
             })}
           </div>

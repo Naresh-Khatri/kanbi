@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Card } from "@/components/ui/surface";
+
 export function Section({
   id,
   title,
@@ -14,27 +16,26 @@ export function Section({
   tone?: "default" | "danger";
 }) {
   return (
-    <section
-      className={`scroll-mt-20 rounded-xl border ${
-        tone === "danger"
-          ? "border-red-500/30 bg-red-500/[0.03]"
-          : "border-white/10 bg-white/[0.02]"
-      } p-6`}
+    <Card
+      as="section"
+      className="scroll-mt-20"
       id={id}
+      padding="lg"
+      tone={tone === "danger" ? "danger" : "flat"}
     >
       <div className="mb-4">
         <h2
           className={`text-base font-semibold ${
-            tone === "danger" ? "text-red-300" : "text-white"
+            tone === "danger" ? "text-danger" : "text-white"
           }`}
         >
           {title}
         </h2>
         {description ? (
-          <p className="mt-1 text-sm text-white/60">{description}</p>
+          <p className="mt-1 text-sm text-white/70">{description}</p>
         ) : null}
       </div>
       {children}
-    </section>
+    </Card>
   );
 }

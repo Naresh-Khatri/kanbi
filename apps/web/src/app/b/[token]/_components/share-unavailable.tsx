@@ -1,5 +1,8 @@
 import { Ban, Clock, EyeOff, SearchX } from "lucide-react";
+import { IconTile } from "@/components/ui/surface";
 import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
 
 export type ShareStatus = "revoked" | "expired" | "exhausted" | "not_found";
 
@@ -32,22 +35,19 @@ const COPY: Record<
 export function ShareUnavailable({ status }: { status: ShareStatus }) {
   const { Icon, title, body } = COPY[status];
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-center text-white">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/5">
-        <Icon className="h-6 w-6 text-white/70" />
-      </div>
+    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center text-white">
+      <IconTile shape="round" size="lg">
+        <Icon className="h-6 w-6" />
+      </IconTile>
       <div className="flex max-w-md flex-col gap-2">
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
           {title}
         </h1>
-        <p className="text-white/60">{body}</p>
+        <p className="text-white/70">{body}</p>
       </div>
-      <Link
-        className="rounded-full bg-white px-6 py-2.5 font-medium text-black transition hover:bg-white/90"
-        href="/"
-      >
-        Go to Kanbi
-      </Link>
+      <Button asChild shape="pill" size="lg">
+        <Link href="/">Go to Kanbi</Link>
+      </Button>
     </main>
   );
 }

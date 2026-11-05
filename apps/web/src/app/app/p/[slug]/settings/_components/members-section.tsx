@@ -4,6 +4,7 @@ import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,10 +34,8 @@ export function MembersSection({
   const utils = api.useUtils();
   const members = api.project.members.useQuery({ projectId }).data ?? [];
   const invites =
-    api.project.listInvites.useQuery(
-      { projectId },
-      { enabled: isOwner },
-    ).data ?? [];
+    api.project.listInvites.useQuery({ projectId }, { enabled: isOwner })
+      .data ?? [];
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"editor" | "viewer">("editor");
@@ -119,7 +118,7 @@ export function MembersSection({
           <Label>
             {members.length} member{members.length === 1 ? "" : "s"}
           </Label>
-          <ul className="flex flex-col divide-y divide-white/5 rounded-md border border-white/10">
+          <ul className="flex flex-col divide-y divide-white/10 rounded-md border border-white/10">
             {sorted.map((m) => {
               const editable = isOwner && m.role !== "owner";
               const busy =
@@ -135,7 +134,7 @@ export function MembersSection({
                   <UserAvatar image={m.image} name={m.name} size={28} />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate">{m.name}</span>
-                    <span className="truncate text-xs text-white/50">
+                    <span className="truncate text-xs text-white/40">
                       {m.email}
                     </span>
                   </div>
@@ -154,22 +153,23 @@ export function MembersSection({
                       value={m.role as "editor" | "viewer"}
                     />
                   ) : (
-                    <span className="text-xs text-white/60 capitalize">
+                    <span className="text-xs text-white/70 capitalize">
                       {m.role}
                     </span>
                   )}
                   {editable ? (
-                    <button
+                    <Button
                       aria-label={`Remove ${m.name}`}
-                      className="text-white/40 hover:text-red-400 disabled:opacity-50"
                       disabled={busy}
                       onClick={() =>
                         removeMember.mutate({ projectId, userId: m.userId })
                       }
+                      size="icon-xs"
                       type="button"
+                      variant="quiet-danger"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   ) : null}
                 </li>
               );
@@ -180,7 +180,7 @@ export function MembersSection({
         {isOwner && invites.filter((i) => !i.acceptedAt).length > 0 ? (
           <div className="flex flex-col gap-2">
             <Label>Pending invites</Label>
-            <ul className="flex flex-col divide-y divide-white/5 rounded-md border border-white/10">
+            <ul className="flex flex-col divide-y divide-white/10 rounded-md border border-white/10">
               {invites
                 .filter((i) => !i.acceptedAt)
                 .map((i) => (
@@ -189,29 +189,29 @@ export function MembersSection({
                     key={i.id}
                   >
                     <span className="min-w-0 flex-1 truncate">{i.email}</span>
-                    <span className="rounded bg-white/5 px-1.5 py-0.5 text-xs text-white/70 capitalize">
-                      {i.role}
-                    </span>
-                    <button
-                      className="text-xs text-white/60 hover:text-white"
+                    <Badge className="capitalize">{i.role}</Badge>
+                    <Button
                       onClick={() => {
                         navigator.clipboard.writeText(inviteUrl(i.token));
                         toast.success("Invite link copied");
                       }}
+                      size="inline"
                       type="button"
+                      variant="link"
                     >
                       copy link
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       aria-label="Revoke invite"
-                      className="text-white/40 hover:text-red-400"
                       onClick={() =>
                         revoke.mutate({ projectId, inviteId: i.id })
                       }
+                      size="icon-xs"
                       type="button"
+                      variant="quiet-danger"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </li>
                 ))}
             </ul>
@@ -241,20 +241,22 @@ function RoleDropdown({
   ariaLabel?: string;
 }) {
   const current = ROLE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-  const sizeCls =
-    size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm";
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={ariaLabel}
-        className={`inline-flex items-center justify-between gap-2 rounded-md border border-white/15 bg-white/5 text-white outline-none hover:bg-white/10 focus:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 ${sizeCls}`}
-        disabled={disabled}
-        type="button"
-      >
-        <span>{current}</span>
-        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={ariaLabel}
+          className="justify-between"
+          disabled={disabled}
+          size={size === "sm" ? "xs" : "default"}
+          type="button"
+          variant="outline"
+        >
+          <span>{current}</span>
+          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[7rem]">
+      <DropdownMenuContent align="end" className="min-w-28">
         {ROLE_OPTIONS.map((opt) => (
           <DropdownMenuItem
             key={opt.value}

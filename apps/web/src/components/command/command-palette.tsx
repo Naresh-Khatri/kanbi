@@ -14,6 +14,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { useRecentProjects } from "@/components/keybinds/recents-store";
+import { dialogSurface, scrimVariants } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { api } from "@/trpc/react";
 
@@ -73,13 +75,16 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 p-4 pt-[18vh] backdrop-blur-sm"
+      className={cn(
+        scrimVariants({ tone: "blur" }),
+        "z-60 flex items-start justify-center p-4 pt-32",
+      )}
       onClick={(e) => {
         if (e.target === e.currentTarget) setPaletteOpen(false);
       }}
     >
       <Command
-        className="w-full max-w-xl overflow-hidden rounded-xl border border-white/10 bg-[#0f1016] text-white shadow-2xl"
+        className={cn(dialogSurface, "w-full max-w-xl overflow-hidden")}
         label="Command palette"
       >
         <Command.Input
@@ -89,8 +94,8 @@ export function CommandPalette() {
           placeholder="Type a command or search projects, tasks, and docs…"
           value={query}
         />
-        <Command.List className="max-h-[50vh] overflow-y-auto border-t border-white/5 py-1">
-          <Command.Empty className="px-4 py-6 text-center text-sm text-white/50">
+        <Command.List className="max-h-96 overflow-y-auto border-t border-white/10 py-1">
+          <Command.Empty className="px-4 py-6 text-center text-sm text-white/40">
             No results.
           </Command.Empty>
           <Command.Group
@@ -149,7 +154,7 @@ export function CommandPalette() {
                 >
                   <span
                     className={
-                      p.status === "on_hold" ? "text-white/50" : undefined
+                      p.status === "on_hold" ? "text-white/40" : undefined
                     }
                   >
                     {p.name}
@@ -242,7 +247,7 @@ function PaletteItem({
       onSelect={onSelect}
       value={value}
     >
-      <span className="text-white/60">{icon}</span>
+      <span className="text-white/70">{icon}</span>
       {children}
       {hint ? (
         <span className="ml-auto shrink-0 text-xs text-white/40">{hint}</span>

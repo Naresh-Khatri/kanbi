@@ -1,10 +1,15 @@
 "use client";
 
+import { Card } from "@/components/ui/surface";
 import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Smartphone, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { formatDateTime, formatRelative, type PairPayload } from "@kanbi/shared";
+import {
+  formatDateTime,
+  formatRelative,
+  type PairPayload,
+} from "@kanbi/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,29 +82,33 @@ export function DevicesSection() {
     <section className="mt-12 border-t border-white/10 pt-8">
       <header className="mb-4">
         <h2 className="text-sm font-medium text-white">Focus devices</h2>
-        <p className="mt-1 text-xs text-white/50">
+        <p className="mt-1 text-xs text-white/70">
           Pair the Kanbi Focus phone app. Each device gets its own token so you
           can revoke individually.
         </p>
       </header>
 
       {payload ? (
-        <div className="mb-6 rounded-lg border border-white/10 bg-white/5 p-4">
+        <Card className="mb-6" tone="muted">
           <div className="flex flex-col items-center gap-3">
             <div className="rounded-lg bg-white p-3">
               <QRCodeSVG level="M" size={208} value={encoded} />
             </div>
-            <p className="text-center text-xs text-white/60">
+            <p className="text-center text-xs text-white/70">
               Open Kanbi Focus on your phone, tap “Pair via QR”, and scan.
             </p>
-            <p className="text-center text-[11px] text-white/40">
-              {baseUrl}
-            </p>
+            <p className="text-2xs text-center text-white/40">{baseUrl}</p>
             {wasRewritten ? (
-              <p className="rounded-md border border-white/10 bg-black/40 px-2 py-1 text-[11px] text-white/50">
+              <Card
+                as="p"
+                className="text-2xs px-2 py-1 text-white/40"
+                padding="none"
+                radius="md"
+                tone="muted"
+              >
                 Rewrote {new URL(origin).hostname} → {LAN_HOST}. Override with
                 NEXT_PUBLIC_LAN_HOST.
-              </p>
+              </Card>
             ) : null}
             <div className="flex gap-2">
               <Button
@@ -120,16 +129,16 @@ export function DevicesSection() {
                 Done
               </Button>
             </div>
-            <p className="text-center text-[11px] text-amber-400/80">
+            <p className="text-2xs text-warning text-center">
               The token is shown once — leave this open until your phone has
               paired.
             </p>
           </div>
-        </div>
+        </Card>
       ) : (
         <div className="mb-6 flex items-end gap-2">
           <div className="flex-1">
-            <Label className="text-xs text-white/50" htmlFor="device-name">
+            <Label className="text-xs text-white/70" htmlFor="device-name">
               New device name
             </Label>
             <Input
@@ -147,11 +156,13 @@ export function DevicesSection() {
         </div>
       )}
 
-      <ul className="divide-y divide-white/5 rounded-lg border border-white/10">
+      <ul className="divide-y divide-white/10 rounded-lg border border-white/10">
         {list.isLoading ? (
           <li className="px-4 py-3 text-xs text-white/40">Loading…</li>
         ) : !list.data || list.data.length === 0 ? (
-          <li className="px-4 py-3 text-xs text-white/40">No paired devices.</li>
+          <li className="px-4 py-3 text-xs text-white/40">
+            No paired devices.
+          </li>
         ) : (
           list.data.map((d) => (
             <li
@@ -160,7 +171,7 @@ export function DevicesSection() {
             >
               <div className="min-w-0">
                 <p className="truncate text-sm text-white">{d.name}</p>
-                <p className="text-[11px] text-white/40">
+                <p className="text-2xs text-white/40">
                   <span className="font-mono">{d.tokenPrefix}…</span>
                   {" · "}
                   {d.lastSeenAt ? (
@@ -172,9 +183,8 @@ export function DevicesSection() {
                   )}
                 </p>
               </div>
-              <button
+              <Button
                 aria-label="Revoke"
-                className="rounded-md p-1.5 text-white/40 hover:bg-white/5 hover:text-red-400"
                 disabled={revoke.isPending}
                 onClick={() => {
                   if (
@@ -183,9 +193,12 @@ export function DevicesSection() {
                     revoke.mutate({ id: d.id });
                   }
                 }}
+                size="icon-sm"
+                type="button"
+                variant="quiet-danger"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </li>
           ))
         )}

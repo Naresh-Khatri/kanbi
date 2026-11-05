@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CalendarDays,
   Check,
   Copy,
   FileText,
@@ -18,14 +17,15 @@ import {
   Tag,
   Timer,
   Trash2,
-  User as UserIcon,
   X,
 } from "lucide-react";
 import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Dot } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -40,8 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input, Textarea } from "@/components/ui/input";
 import {
   isRichTextEmpty,
   RichTextContent,
@@ -58,7 +57,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Swatch } from "@/components/ui/swatch";
+import { SectionLabel } from "@/components/ui/surface";
+import { segmentVariants } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { LABEL_COLORS } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import {
@@ -70,12 +73,12 @@ import {
   defaultBranchType,
 } from "./copy-branch-command";
 import { copyTaskLink } from "./copy-task-link";
+import type { Priority } from "./priority";
 import {
-  PRIORITIES,
-  PRIORITY_META,
-  type Priority,
-  PriorityIcon,
-} from "./priority";
+  AssigneePicker,
+  DueDatePicker,
+  PriorityPicker,
+} from "./task-properties";
 import { useUndoableBoardDelete } from "./use-undoable-board-delete";
 
 type BoardData = RouterOutputs["board"]["get"];
@@ -238,62 +241,84 @@ function TaskDetail({
         </SheetDescription>
       </SheetHeader>
 
-      <div className="flex flex-wrap items-center gap-x-1 gap-y-1 border-y border-white/[0.06] py-2.5">
-        <StatusMenu
-          canWrite={canWrite}
-          columns={columns}
-          onChange={changeColumn}
-          value={task.columnId}
-        />
-        <PriorityMenu
-          canWrite={canWrite}
-          onChange={(p) =>
-            update.mutate({ boardId, taskId: task.id, priority: p })
-          }
-          value={task.priority as Priority}
-        />
-        <AssigneeMenu
-          canWrite={canWrite}
-          currentUserId={me.data?.id ?? null}
-          members={members.data ?? []}
-          onChange={(id) =>
-            update.mutate({ boardId, taskId: task.id, assigneeId: id })
-          }
-          value={task.assigneeId}
-        />
-        <EstimateControl
-          canWrite={canWrite}
-          onChange={(n) =>
-            update.mutate({ boardId, taskId: task.id, estimatePomodoros: n })
-          }
-          value={task.estimatePomodoros}
-        />
-        <DueControl
-          canWrite={canWrite}
-          onChange={(d) =>
-            update.mutate({ boardId, taskId: task.id, dueAt: d })
-          }
-          value={task.dueAt}
-        />
-        <LabelsPicker
-          activeLabelIds={activeLabelIds}
-          boardId={boardId}
-          canWrite={canWrite}
-          labels={labels}
-          taskId={task.id}
-        />
-        <BranchMenu
-          labelNames={labels
-            .filter((l) => activeLabelIds.has(l.id))
-            .map((l) => l.name)}
-          task={task}
-        />
-        <TodayToggle taskId={task.id} />
-      </div>
+      <dl className="flex flex-col gap-y-0.5">
+        <PropertyRow label="Status">
+          <StatusMenu
+            canWrite={canWrite}
+            columns={columns}
+            onChange={changeColumn}
+            value={task.columnId}
+          />
+        </PropertyRow>
+        <PropertyRow label="Priority">
+          <PriorityPicker
+            disabled={!canWrite}
+            onChange={(p) =>
+              update.mutate({ boardId, taskId: task.id, priority: p })
+            }
+            size="row"
+            value={task.priority as Priority}
+          />
+        </PropertyRow>
+        <PropertyRow label="Assignee">
+          <AssigneePicker
+            disabled={!canWrite}
+            members={members.data ?? []}
+            onChange={(id) =>
+              update.mutate({ boardId, taskId: task.id, assigneeId: id })
+            }
+            selfId={me.data?.id ?? null}
+            size="row"
+            value={task.assigneeId}
+          />
+        </PropertyRow>
+        <PropertyRow label="Estimate">
+          <EstimateControl
+            canWrite={canWrite}
+            onChange={(n) =>
+              update.mutate({
+                boardId,
+                taskId: task.id,
+                estimatePomodoros: n,
+              })
+            }
+            value={task.estimatePomodoros}
+          />
+        </PropertyRow>
+        <PropertyRow label="Due">
+          <DueControl
+            canWrite={canWrite}
+            onChange={(d) =>
+              update.mutate({ boardId, taskId: task.id, dueAt: d })
+            }
+            value={task.dueAt}
+          />
+        </PropertyRow>
+        <PropertyRow label="Labels">
+          <LabelsPicker
+            activeLabelIds={activeLabelIds}
+            boardId={boardId}
+            canWrite={canWrite}
+            labels={labels}
+            taskId={task.id}
+          />
+        </PropertyRow>
+        <PropertyRow label="Branch">
+          <BranchMenu
+            labelNames={labels
+              .filter((l) => activeLabelIds.has(l.id))
+              .map((l) => l.name)}
+            task={task}
+          />
+        </PropertyRow>
+        <PropertyRow label="Today">
+          <TodayToggle taskId={task.id} />
+        </PropertyRow>
+      </dl>
 
-      <div className="flex flex-col gap-2">
-        <Label>Description</Label>
-        <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
+      <SheetSection>
+        <SectionLabel as="h3">Description</SectionLabel>
+        <div className="-mx-3 rounded-md border border-transparent px-3 py-2 transition-colors focus-within:border-white/20 focus-within:bg-white/5 hover:bg-white/5">
           <RichTextEditor
             disabled={!canWrite}
             mentions={mentionItems}
@@ -313,7 +338,7 @@ function TaskDetail({
             value={description}
           />
         </div>
-      </div>
+      </SheetSection>
 
       <LinkedDocsPanel boardId={boardId} taskId={task.id} />
 
@@ -333,7 +358,7 @@ function TaskDetail({
       <ActivityPanel boardId={boardId} taskId={task.id} />
 
       {canWrite ? (
-        <div className="mt-4 flex justify-end">
+        <div className="flex justify-start border-t border-white/10 pt-5">
           <Button
             onClick={() =>
               void remove(
@@ -341,7 +366,8 @@ function TaskDetail({
                 onClose,
               )
             }
-            variant="destructive"
+            size="sm"
+            variant="quiet-danger"
           >
             <Trash2 className="h-4 w-4" /> Delete task
           </Button>
@@ -362,32 +388,30 @@ function LinkedDocsPanel({
   if (!linked.data || linked.data.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-2">
-      <Label>Docs</Label>
-      <div className="divide-y divide-white/[0.06] rounded-md border border-white/10 bg-white/[0.025] px-2">
+    <SheetSection as="section">
+      <SectionLabel as="h3">Docs</SectionLabel>
+      <div className="divide-y divide-white/10 rounded-md border border-white/10 bg-white/5 px-2">
         {linked.data.map((document) => (
           <Link
-            className="group flex items-center gap-2 rounded-sm px-1 py-2 text-sm text-white/65 transition hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none"
+            className="group flex items-center gap-2 rounded-md px-1 py-2 text-sm text-white/70 transition hover:text-white focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:outline-none"
             href={`/app/p/${document.projectSlug}/docs/${document.id}`}
             key={document.id}
           >
-            <FileText className="h-3.5 w-3.5 shrink-0 text-white/35 group-hover:text-white/55" />
+            <FileText className="h-3.5 w-3.5 shrink-0 text-white/40 group-hover:text-white/70" />
             <span className="truncate">{document.title}</span>
-            <span className="ml-auto shrink-0 text-[11px] text-white/30">
+            <span className="text-2xs ml-auto shrink-0 text-white/40">
               {formatRelative(document.updatedAt ?? document.createdAt)}
             </span>
           </Link>
         ))}
       </div>
-    </section>
+    </SheetSection>
   );
 }
 
-// Shared Linear-style "property" trigger: borderless, icon-led, quiet until hover.
-const PROP_BTN =
-  "inline-flex h-8 max-w-full items-center gap-1.5 rounded-md px-2 text-sm whitespace-nowrap text-white/85 transition hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none disabled:pointer-events-none data-[state=open]:bg-white/[0.06]";
-const PROP_ICON = "h-4 w-4 shrink-0 text-white/45";
-const PROP_PLACEHOLDER = "text-white/45";
+const PROP_CLS = "max-w-full";
+const PROP_ICON = "h-4 w-4 shrink-0 text-white/40";
+const PROP_PLACEHOLDER = "text-white/40";
 
 function DueControl({
   value,
@@ -398,53 +422,15 @@ function DueControl({
   onChange: (d: Date | null) => void;
   canWrite: boolean;
 }) {
-  const dateRef = useRef<HTMLInputElement>(null);
   const has = value != null;
-  const openPicker = () => {
-    const el = dateRef.current;
-    if (!el) return;
-    try {
-      el.showPicker();
-    } catch {
-      el.focus();
-    }
-  };
   return (
-    <div className="relative inline-flex items-center">
-      <button
-        className={PROP_BTN}
-        disabled={!canWrite}
-        onClick={openPicker}
-        type="button"
-      >
-        <CalendarDays className={PROP_ICON} />
-        <span className={cn("truncate", !has && PROP_PLACEHOLDER)}>
-          {has ? formatDate(value) : "Due date"}
-        </span>
-      </button>
-      {has && canWrite ? (
-        <button
-          aria-label="Clear due date"
-          className="-ml-1 rounded p-1 text-white/40 transition hover:bg-white/10 hover:text-white"
-          onClick={() => onChange(null)}
-          type="button"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      ) : null}
-      <input
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0"
-        disabled={!canWrite}
-        onChange={(e) =>
-          onChange(e.target.value ? new Date(e.target.value) : null)
-        }
-        ref={dateRef}
-        tabIndex={-1}
-        type="date"
-        value={has ? new Date(value).toISOString().slice(0, 10) : ""}
-      />
-    </div>
+    <DueDatePicker
+      disabled={!canWrite}
+      label={has ? formatDate(value) : undefined}
+      onChange={(v) => onChange(v ? new Date(v) : null)}
+      size="row"
+      value={has ? new Date(value).toISOString().slice(0, 10) : null}
+    />
   );
 }
 
@@ -467,44 +453,50 @@ function EstimateControl({
   return (
     <div className="inline-flex items-center">
       {has && canWrite ? (
-        <button
+        <Button
           aria-label="Decrease estimate"
-          className="rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white"
           onClick={dec}
+          size="icon-xs"
           type="button"
+          variant="quiet"
         >
           <Minus className="h-3 w-3" />
-        </button>
+        </Button>
       ) : null}
-      <button
-        className={PROP_BTN}
+      <Button
+        className={PROP_CLS}
+        size="md"
+        variant="property"
         disabled={!canWrite}
         onClick={inc}
         type="button"
       >
         <Timer className={PROP_ICON} />
         <span className={cn("truncate", !has && PROP_PLACEHOLDER)}>
-          {has ? `${value} pomodoro${value === 1 ? "" : "s"}` : "Estimate"}
+          {has ? `${value} pomodoro${value === 1 ? "" : "s"}` : "None"}
         </span>
-      </button>
+      </Button>
       {has && canWrite ? (
         <>
-          <button
+          <Button
             aria-label="Increase estimate"
-            className="rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white"
             onClick={inc}
+            size="icon-xs"
             type="button"
+            variant="quiet"
           >
             <Plus className="h-3 w-3" />
-          </button>
-          <button
+          </Button>
+          <Button
             aria-label="Clear estimate"
-            className="-ml-1 rounded p-1 text-white/40 transition hover:bg-white/10 hover:text-white"
+            className="-ml-1"
             onClick={() => onChange(null)}
+            size="icon-xs"
             type="button"
+            variant="quiet"
           >
             <X className="h-3 w-3" />
-          </button>
+          </Button>
         </>
       ) : null}
     </div>
@@ -532,8 +524,8 @@ function TitleField({
   // Re-fit whenever the value changes (typing, or switching tasks).
   useEffect(resize, [value]);
   return (
-    <textarea
-      className="w-full resize-none overflow-hidden border-0 bg-transparent px-0 text-xl leading-snug font-semibold text-white placeholder:text-white/40 focus-visible:outline-none disabled:cursor-default disabled:opacity-100"
+    <Textarea
+      className="resize-none overflow-hidden text-xl leading-snug font-semibold disabled:cursor-default disabled:opacity-100"
       disabled={disabled}
       onBlur={onCommit}
       onChange={(e) => onChange(e.target.value)}
@@ -546,6 +538,7 @@ function TitleField({
       ref={ref}
       rows={1}
       value={value}
+      variant="bare"
     />
   );
 }
@@ -560,24 +553,26 @@ function CopyLinkButton({ taskId }: { taskId: string }) {
     [],
   );
   return (
-    <button
+    <Button
       aria-label="Copy link to this task"
-      className="absolute top-[10px] right-[44px] z-10 inline-flex h-7 w-7 items-center justify-center rounded-md text-white/45 transition hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.06] focus-visible:outline-none"
+      className="absolute top-2.5 right-11 z-10"
       onClick={() => {
         copyTaskLink(taskId);
         setCopied(true);
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => setCopied(false), 1500);
       }}
+      size="icon-sm"
       title={copied ? "Copied" : "Copy link"}
       type="button"
+      variant="quiet"
     >
       {copied ? (
-        <Check className="h-4 w-4 text-emerald-400" />
+        <Check className="text-success h-4 w-4" />
       ) : (
         <Link2 className="h-4 w-4" />
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -596,17 +591,23 @@ function StatusMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className={PROP_BTN} disabled={!canWrite} type="button">
-          <SquareKanban className="h-4 w-4 shrink-0 text-white/60" />
+        <Button
+          className={PROP_CLS}
+          size="md"
+          variant="property"
+          disabled={!canWrite}
+          type="button"
+        >
+          <SquareKanban className="h-4 w-4 shrink-0 text-white/70" />
           <span className={cn("truncate", !current && PROP_PLACEHOLDER)}>
             {current ? current.name : "No status"}
           </span>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {columns.map((c) => (
           <DropdownMenuItem key={c.id} onSelect={() => onChange(c.id)}>
-            <SquareKanban className="h-3.5 w-3.5 text-white/50" />
+            <SquareKanban className="h-3.5 w-3.5 text-white/40" />
             {c.name}
             {value === c.id ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
           </DropdownMenuItem>
@@ -616,97 +617,25 @@ function StatusMenu({
   );
 }
 
-function PriorityMenu({
-  value,
-  onChange,
-  canWrite,
+// plain rows inside the label popover; must not close the menu on click
+function MenuRow({
+  muted,
+  onClick,
+  children,
 }: {
-  value: Priority;
-  onChange: (p: Priority) => void;
-  canWrite: boolean;
+  muted?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className={PROP_BTN} disabled={!canWrite} type="button">
-          <PriorityIcon className="h-4 w-4 shrink-0" priority={value} />
-          <span
-            className={cn("truncate", value === "none" && PROP_PLACEHOLDER)}
-          >
-            {value === "none" ? "Priority" : PRIORITY_META[value].label}
-          </span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {PRIORITIES.map((p) => (
-          <DropdownMenuItem key={p} onSelect={() => onChange(p)}>
-            <PriorityIcon className="mr-2 h-3.5 w-3.5" priority={p} />
-            {PRIORITY_META[p].label}
-            {p === value ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function AssigneeMenu({
-  value,
-  members,
-  currentUserId,
-  onChange,
-  canWrite,
-}: {
-  value: string | null;
-  members: RouterOutputs["project"]["members"];
-  currentUserId: string | null;
-  onChange: (id: string | null) => void;
-  canWrite: boolean;
-}) {
-  const current = members.find((m) => m.userId === value);
-  const canSelfAssign = !!currentUserId && value !== currentUserId;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className={PROP_BTN} disabled={!canWrite} type="button">
-          {current ? (
-            <>
-              <UserAvatar image={current.image} name={current.name} size={20} />
-              <span className="truncate">{current.name}</span>
-            </>
-          ) : (
-            <>
-              <UserIcon className={PROP_ICON} />
-              <span className={PROP_PLACEHOLDER}>Assignee</span>
-            </>
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {canSelfAssign ? (
-          <>
-            <DropdownMenuItem onSelect={() => onChange(currentUserId)}>
-              <UserIcon className="h-3.5 w-3.5" />
-              Assign to me
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        <DropdownMenuItem onSelect={() => onChange(null)}>
-          Unassigned
-          {value === null ? <Check className="ml-auto h-3.5 w-3.5" /> : null}
-        </DropdownMenuItem>
-        {members.map((m) => (
-          <DropdownMenuItem key={m.userId} onSelect={() => onChange(m.userId)}>
-            <UserAvatar image={m.image} name={m.name} size={18} />
-            {m.name}
-            {value === m.userId ? (
-              <Check className="ml-auto h-3.5 w-3.5" />
-            ) : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      className="w-full justify-start"
+      onClick={onClick}
+      size="md"
+      variant={muted ? "property" : "ghost"}
+    >
+      {children}
+    </Button>
   );
 }
 
@@ -768,32 +697,31 @@ function LabelsPicker({
     <>
       <DropdownMenu onOpenChange={setOpen} open={open}>
         <DropdownMenuTrigger asChild>
-          <button
-            className="inline-flex min-h-8 max-w-full flex-wrap items-center gap-x-2.5 gap-y-1 rounded-md px-2 py-1 text-sm text-white/85 transition hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none disabled:pointer-events-none data-[state=open]:bg-white/[0.06]"
+          <Button
+            className="h-auto min-h-8 max-w-full flex-wrap gap-x-2.5 gap-y-1 py-1"
             disabled={!canWrite}
+            size="md"
             type="button"
+            variant="property"
           >
             {active.length > 0 ? (
               active.map((l) => (
                 <span className="inline-flex items-center gap-1.5" key={l.id}>
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: l.color }}
-                  />
+                  <Dot color={l.color} />
                   {l.name}
                 </span>
               ))
             ) : (
               <>
                 <Tag className={PROP_ICON} />
-                <span className={PROP_PLACEHOLDER}>Label</span>
+                <span className={PROP_PLACEHOLDER}>None</span>
               </>
             )}
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
-          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-0"
+          className="w-(--radix-dropdown-menu-trigger-width) min-w-56 p-0"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <div className="border-b border-white/10 p-1.5">
@@ -816,32 +744,23 @@ function LabelsPicker({
             {filtered.map((l) => {
               const on = activeLabelIds.has(l.id);
               return (
-                <button
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition hover:bg-white/10"
+                <MenuRow
                   key={l.id}
                   onClick={() =>
                     toggle.mutate({ boardId, taskId, labelId: l.id, on: !on })
                   }
-                  type="button"
                 >
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ background: l.color }}
-                  />
+                  <Dot color={l.color} size="lg" />
                   <span className="flex-1 truncate">{l.name}</span>
                   {on ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
-                </button>
+                </MenuRow>
               );
             })}
             {canCreate ? (
-              <button
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-white/70 transition hover:bg-white/10"
-                onClick={createLabel}
-                type="button"
-              >
+              <MenuRow muted onClick={createLabel}>
                 <Plus className="h-3.5 w-3.5 shrink-0" />
                 Create “{query.trim()}”
-              </button>
+              </MenuRow>
             ) : null}
             {filtered.length === 0 && !canCreate ? (
               <p className="px-2 py-1.5 text-xs text-white/40">
@@ -850,16 +769,15 @@ function LabelsPicker({
             ) : null}
           </div>
           <div className="border-t border-white/10 p-1">
-            <button
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-white/60 transition hover:bg-white/10 hover:text-white"
+            <MenuRow
+              muted
               onClick={() => {
                 setOpen(false);
                 setManaging(true);
               }}
-              type="button"
             >
               <Settings2 className="h-3.5 w-3.5 shrink-0" /> Manage labels
-            </button>
+            </MenuRow>
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -894,27 +812,23 @@ function BranchMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className={PROP_BTN} type="button">
+        <Button className={PROP_CLS} size="md" variant="property" type="button">
           <GitBranch className={PROP_ICON} />
-          <span className="truncate">Branch</span>
-        </button>
+          <span className="truncate">Copy branch name</span>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72">
         <div className="px-2 pt-1.5 pb-2">
-          <p className="text-[10px] tracking-wide text-white/40 uppercase">
-            Branch name
-          </p>
-          <p className="mt-1 font-mono text-xs break-all text-white/80">
+          <SectionLabel as="p">Branch name</SectionLabel>
+          <p className="mt-1 font-mono text-xs break-all text-white">
             {branch}
           </p>
           <div className="mt-2 flex flex-wrap gap-1">
             {BRANCH_TYPES.map((t) => (
               <button
                 className={cn(
-                  "rounded px-1.5 py-0.5 font-mono text-[11px] transition",
-                  t === type
-                    ? "bg-white/15 text-white"
-                    : "bg-white/[0.04] text-white/50 hover:bg-white/10 hover:text-white/80",
+                  segmentVariants({ size: "2xs", active: t === type }),
+                  "font-mono",
                 )}
                 key={t}
                 onClick={() => setType(t)}
@@ -978,35 +892,28 @@ function TodayToggle({ taskId }: { taskId: string }) {
   });
 
   return (
-    <button
-      className={PROP_BTN}
+    <Button
+      className={PROP_CLS}
+      size="md"
+      variant="property"
       onClick={() =>
         onToday ? remove.mutate({ taskId }) : add.mutate({ taskId })
       }
       type="button"
     >
       <Sun
-        className={cn(PROP_ICON, onToday && "text-amber-400/80")}
+        className={cn(PROP_ICON, onToday && "text-warning")}
         fill={onToday ? "currentColor" : "none"}
       />
       <span className={cn(!onToday && PROP_PLACEHOLDER)}>
         {onToday ? "On today" : "Add to today"}
       </span>
-    </button>
+    </Button>
   );
 }
 
-const LABEL_PALETTE = [
-  "#f43f5e",
-  "#f59e0b",
-  "#10b981",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
-];
-
 function pickColor() {
-  return LABEL_PALETTE[Math.floor(Math.random() * LABEL_PALETTE.length)]!;
+  return LABEL_COLORS[Math.floor(Math.random() * LABEL_COLORS.length)]!;
 }
 
 function ManageLabelsDialog({
@@ -1073,17 +980,14 @@ function ManageLabelRow({
   return (
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-1">
-        {LABEL_PALETTE.map((c) => (
-          <button
+        {LABEL_COLORS.map((c) => (
+          <Swatch
             aria-label={`Set color ${c}`}
-            className={cn(
-              "h-4 w-4 rounded-full border transition",
-              l.color === c ? "border-white" : "border-white/10",
-            )}
+            className="size-4"
+            color={c}
             key={c}
             onClick={() => update.mutate({ boardId, labelId: l.id, color: c })}
-            style={{ background: c }}
-            type="button"
+            selected={l.color === c}
           />
         ))}
       </div>
@@ -1099,18 +1003,19 @@ function ManageLabelRow({
         }}
         value={name}
       />
-      <button
+      <Button
         aria-label="Delete label"
-        className="rounded p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white"
         onClick={() => {
           if (window.confirm(`Delete label "${l.name}"?`)) {
             remove.mutate({ boardId, labelId: l.id });
           }
         }}
+        size="icon-sm"
         type="button"
+        variant="quiet"
       >
         <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -1141,23 +1046,18 @@ function ChecklistPanel({
   });
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Checklist</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Checklist</SectionLabel>
       <ul className="flex flex-col gap-1">
         {(list.data ?? []).map((it) => (
           <li className="group flex items-center gap-2" key={it.id}>
-            <input
+            <Checkbox
+              aria-label={it.text}
               checked={it.done}
-              className="accent-white"
               disabled={!canWrite}
-              onChange={(e) =>
-                toggle.mutate({
-                  boardId,
-                  itemId: it.id,
-                  done: e.target.checked,
-                })
+              onCheckedChange={(done) =>
+                toggle.mutate({ boardId, itemId: it.id, done })
               }
-              type="checkbox"
             />
             <span
               className={cn(
@@ -1168,13 +1068,15 @@ function ChecklistPanel({
               {it.text}
             </span>
             {canWrite ? (
-              <button
-                className="text-white/40 opacity-0 transition group-hover:opacity-100 hover:text-white"
+              <Button
+                className="opacity-0 group-hover:opacity-100"
                 onClick={() => remove.mutate({ boardId, itemId: it.id })}
+                size="icon-xs"
                 type="button"
+                variant="quiet"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             ) : null}
           </li>
         ))}
@@ -1193,12 +1095,17 @@ function ChecklistPanel({
             placeholder="Add item"
             value={text}
           />
-          <Button size="sm" type="submit">
+          <Button
+            disabled={!text.trim()}
+            size="sm"
+            type="submit"
+            variant="secondary"
+          >
             Add
           </Button>
         </form>
       ) : null}
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1273,13 +1180,13 @@ function AttachmentsPanel({
   const busy = pending.length > 0;
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Attachments</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Attachments</SectionLabel>
       {images.length > 0 || pendingImages.length > 0 ? (
         <div className="grid grid-cols-3 gap-2">
           {images.map((a, i) => (
             <div
-              className="group relative overflow-hidden rounded-md border border-white/10 bg-white/[0.04]"
+              className="group relative overflow-hidden rounded-md border border-white/10 bg-white/5"
               key={a.id}
             >
               <button
@@ -1293,28 +1200,29 @@ function AttachmentsPanel({
                   src={a.url}
                 />
               </button>
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/80 to-transparent px-2 pt-6 pb-1.5 opacity-0 transition group-hover:opacity-100">
-                <span className="truncate text-[10px] text-white/80">
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/70 to-transparent px-2 pt-6 pb-1.5 opacity-0 transition group-hover:opacity-100">
+                <span className="text-2xs truncate text-white">
                   {a.filename}
                 </span>
                 {canWrite ? (
-                  <button
+                  <Button
                     aria-label="Remove attachment"
-                    className="text-white/70 hover:text-white"
                     onClick={() =>
                       remove.mutate({ boardId, attachmentId: a.id })
                     }
+                    size="icon-xs"
                     type="button"
+                    variant="quiet"
                   >
                     <Trash2 className="h-3 w-3" />
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </div>
           ))}
           {pendingImages.map((p) => (
             <div
-              className="relative overflow-hidden rounded-md border border-white/10 bg-white/[0.04]"
+              className="relative overflow-hidden rounded-md border border-white/10 bg-white/5"
               key={p.id}
             >
               {p.previewUrl ? (
@@ -1327,7 +1235,7 @@ function AttachmentsPanel({
                 <div className="aspect-square w-full" />
               )}
               <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-white/80" />
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
               </div>
             </div>
           ))}
@@ -1349,18 +1257,19 @@ function AttachmentsPanel({
               {formatBytes(a.sizeBytes)}
             </span>
             {canWrite ? (
-              <button
-                className="text-white/40 hover:text-white"
+              <Button
                 onClick={() => remove.mutate({ boardId, attachmentId: a.id })}
+                size="icon-xs"
                 type="button"
+                variant="quiet"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             ) : null}
           </li>
         ))}
         {pendingFiles.map((p) => (
-          <li className="flex items-center gap-2 text-white/60" key={p.id}>
+          <li className="flex items-center gap-2 text-white/70" key={p.id}>
             <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
             <span className="flex-1 truncate">{p.filename}</span>
             <span className="text-xs text-white/40">Uploading…</span>
@@ -1395,7 +1304,7 @@ function AttachmentsPanel({
         onChange={setViewerIndex}
         onClose={() => setViewerIndex(null)}
       />
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1424,7 +1333,7 @@ function ImageLightbox({
       }}
       open={current !== null && current !== undefined}
     >
-      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-black/95 p-0">
+      <DialogContent size="fullscreen">
         <DialogTitle className="sr-only">
           {current?.filename ?? "Image"}
         </DialogTitle>
@@ -1449,7 +1358,7 @@ function ImageLightbox({
                   "h-16 w-16 shrink-0 overflow-hidden rounded-md border transition",
                   i === index
                     ? "border-white"
-                    : "border-white/10 opacity-60 hover:opacity-100",
+                    : "border-white/10 opacity-70 hover:opacity-100",
                 )}
                 key={img.id}
                 onClick={() => onChange(i)}
@@ -1500,8 +1409,8 @@ function CommentsPanel({
   });
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Comments</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Comments</SectionLabel>
       <ul className="flex flex-col gap-3 text-sm">
         {(list.data ?? []).map((c) => (
           <CommentItem
@@ -1539,13 +1448,14 @@ function CommentsPanel({
               disabled={isRichTextEmpty(body) || create.isPending}
               size="sm"
               type="submit"
+              variant="secondary"
             >
               Comment
             </Button>
           </div>
         </form>
       ) : null}
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1585,36 +1495,38 @@ function CommentItem({
       <UserAvatar image={c.authorImage} name={c.authorName} size={24} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2 text-xs text-white/40">
-          <span className="font-medium text-white/80">{c.authorName}</span>
+          <span className="font-medium text-white">{c.authorName}</span>
           <span title={formatDateTime(c.createdAt)}>
             {formatRelative(c.createdAt)}
           </span>
-          {c.editedAt ? <span className="text-white/30">(edited)</span> : null}
+          {c.editedAt ? <span className="text-white/40">(edited)</span> : null}
           {canManage && !editing ? (
             <div className="ml-auto flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
-              <button
+              <Button
                 aria-label="Edit comment"
-                className="rounded p-1 text-white/40 transition hover:bg-white/5 hover:text-white"
                 onClick={() => {
                   setDraft(c.body);
                   setEditing(true);
                 }}
+                size="icon-xs"
                 type="button"
+                variant="quiet"
               >
                 <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button
+              </Button>
+              <Button
                 aria-label="Delete comment"
-                className="rounded p-1 text-white/40 transition hover:bg-white/5 hover:text-white"
                 onClick={() => {
                   if (window.confirm("Delete this comment?")) {
                     remove.mutate({ boardId, commentId: c.id });
                   }
                 }}
+                size="icon-xs"
                 type="button"
+                variant="quiet"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
@@ -1677,8 +1589,8 @@ function ActivityPanel({
   const list = api.activity.list.useQuery({ boardId, taskId, limit: 50 });
   if (!list.data || list.data.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Activity</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Activity</SectionLabel>
       <ul className="flex flex-col gap-1 text-sm">
         {list.data.map((a) => (
           <li
@@ -1686,7 +1598,7 @@ function ActivityPanel({
             key={a.id}
           >
             <UserAvatar image={a.actorImage} name={a.actorName} size={18} />
-            <span className="font-medium text-white/80">{a.actorName}</span>
+            <span className="font-medium text-white">{a.actorName}</span>
             <span>{formatVerb(a.verb)}</span>
             <span className="ml-auto" title={formatDateTime(a.createdAt)}>
               {formatRelative(a.createdAt)}
@@ -1694,7 +1606,7 @@ function ActivityPanel({
           </li>
         ))}
       </ul>
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1711,4 +1623,33 @@ function formatVerb(verb: string) {
     default:
       return verb;
   }
+}
+
+function SheetSection({
+  as: Comp = "div",
+  children,
+}: {
+  as?: "div" | "section";
+  children: React.ReactNode;
+}) {
+  return (
+    <Comp className="flex flex-col gap-3 border-t border-white/10 pt-5">
+      {children}
+    </Comp>
+  );
+}
+
+function PropertyRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-8 items-center">
+      <dt className="w-24 shrink-0 text-sm text-white/40">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
+  );
 }

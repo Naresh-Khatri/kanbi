@@ -48,10 +48,10 @@ const MENTION_CLASS =
   "rounded bg-blue-500/15 px-1 py-0.5 font-medium text-blue-300";
 /** Ticket-mention chip — visually distinct from user mentions, and clickable. */
 const TICKET_CLASS =
-  "cursor-pointer rounded bg-violet-500/15 px-1 py-0.5 font-medium text-violet-300 no-underline hover:bg-violet-500/25";
+  "cursor-pointer rounded bg-ai/15 text-ai px-1 py-0.5 font-medium no-underline hover:bg-ai/20";
 /** Shared dark hover-card surface. */
 const HOVER_CONTENT_CLASS =
-  "z-[200] w-64 rounded-lg border border-white/10 bg-[#14151c] p-3 text-white shadow-xl";
+  "z-[200] w-64 rounded-lg border border-white/10 bg-raised p-3 text-white shadow-xl";
 
 const PRIORITY_LABEL: Record<string, string> = {
   urgent: "Urgent",
@@ -114,7 +114,7 @@ function MentionChip({
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{item.label}</div>
                 {item.sublabel ? (
-                  <div className="truncate text-xs text-white/50">
+                  <div className="truncate text-xs text-white/40">
                     {item.sublabel}
                   </div>
                 ) : null}
@@ -202,17 +202,17 @@ function TicketChip({
                 {item.title}
               </span>
               {meta.length > 0 ? (
-                <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/50">
+                <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/40">
                   {meta.map((m, i) => (
                     <span className="flex items-center gap-1.5" key={i}>
-                      {i > 0 ? <span className="text-white/25">·</span> : null}
+                      {i > 0 ? <span className="text-white/40">·</span> : null}
                       {m}
                     </span>
                   ))}
                 </span>
               ) : null}
               <button
-                className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+                className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
                 onClick={openTask}
                 type="button"
               >
@@ -266,14 +266,14 @@ const MentionList = forwardRef<SuggestionHandle, MentionListProps>(
     if (items.length === 0) return null;
 
     return (
-      <div className="min-w-[180px] overflow-hidden rounded-md border border-white/10 bg-neutral-900 p-1 shadow-xl">
+      <div className="bg-raised min-w-44 overflow-hidden rounded-md border border-white/10 p-1 shadow-xl">
         {items.map((item, i) => (
           <button
             className={cn(
-              "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition",
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition",
               i === selected
                 ? "bg-white/10 text-white"
-                : "text-white/80 hover:bg-white/5",
+                : "text-white/70 hover:bg-white/5",
             )}
             key={item.id}
             onClick={() => select(i)}
@@ -329,14 +329,14 @@ const TicketList = forwardRef<SuggestionHandle, TicketListProps>(
     if (items.length === 0) return null;
 
     return (
-      <div className="max-h-64 min-w-[240px] overflow-y-auto rounded-md border border-white/10 bg-neutral-900 p-1 shadow-xl">
+      <div className="bg-raised max-h-64 min-w-60 overflow-y-auto rounded-md border border-white/10 p-1 shadow-xl">
         {items.map((item, i) => (
           <button
             className={cn(
-              "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition",
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition",
               i === selected
                 ? "bg-white/10 text-white"
-                : "text-white/80 hover:bg-white/5",
+                : "text-white/70 hover:bg-white/5",
             )}
             key={item.id}
             onClick={() => select(i)}
@@ -347,7 +347,7 @@ const TicketList = forwardRef<SuggestionHandle, TicketListProps>(
             <span className="shrink-0 font-medium text-violet-300">
               {item.label}
             </span>
-            <span className="truncate text-white/60">{item.title}</span>
+            <span className="truncate text-white/70">{item.title}</span>
           </button>
         ))}
       </div>

@@ -7,6 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
+import { SectionLabel } from "@/components/ui/surface";
 import { KEYBIND_GROUPS } from "@/lib/keybinds";
 
 export function KeybindCheatsheet() {
@@ -20,19 +22,15 @@ export function KeybindCheatsheet() {
         <div className="flex flex-col gap-4">
           {KEYBIND_GROUPS.map((g) => (
             <div className="flex flex-col gap-1.5" key={g.title}>
-              <div className="text-xs tracking-wide text-white/50 uppercase">
-                {g.title}
-              </div>
+              <SectionLabel as="div">{g.title}</SectionLabel>
               <ul className="flex flex-col gap-1 text-sm">
                 {g.entries.map((e) => (
                   <li
                     className="flex items-center justify-between"
                     key={e.keys}
                   >
-                    <span className="text-white/80">{e.description}</span>
-                    <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/80">
-                      {e.keys}
-                    </kbd>
+                    <span className="text-white">{e.description}</span>
+                    <Kbd variant="key">{e.keys}</Kbd>
                   </li>
                 ))}
               </ul>

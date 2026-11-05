@@ -10,6 +10,47 @@
   --font-sans:
     var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* surfaces: canvas = page, raised = cards/menus/popovers, overlay = dialogs/sheets */
+  --color-canvas: #0b0b0f;
+  --color-raised: #14151c;
+  --color-overlay: #0f1016;
+  --color-marketing-end: #15162c;
+  --color-project-default: #6366f1;
+  /* lightbox / media backdrop; dialogs use black/70 */
+  --color-scrim: rgb(0 0 0 / 0.9);
+
+  --spacing-header: 57px;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 0.875rem;
+}
+
+/* colour = meaning only (DESIGN.md) */
+@theme inline {
+  --color-info: var(--color-sky-400);
+  --color-success: var(--color-emerald-400);
+  --color-warning: var(--color-amber-400);
+  --color-danger: var(--color-red-400);
+  --color-ai: var(--color-violet-400);
+  /* solid fills under white text; -400 fails contrast */
+  --color-danger-solid: var(--color-red-500);
+}
+
+@utility bg-marketing {
+  @apply from-canvas to-marketing-end bg-gradient-to-b;
+}
+
+/* full-height views under the sticky app header */
+@utility h-below-header {
+  height: calc(100vh - var(--spacing-header));
+}
+@utility min-h-below-header {
+  min-height: calc(100vh - var(--spacing-header));
+}
+
+@utility max-h-dialog {
+  max-height: 85vh;
 }
 
 @theme inline {
@@ -89,11 +130,11 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: var(--color-canvas);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: var(--color-raised);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: var(--color-overlay);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
@@ -139,7 +180,7 @@
 .tiptap .is-editor-empty::before,
 .ProseMirror .is-editor-empty::before {
   content: attr(data-placeholder);
-  color: oklch(1 0 0 / 35%);
+  color: oklch(1 0 0 / 40%);
   float: left;
   height: 0;
   pointer-events: none;

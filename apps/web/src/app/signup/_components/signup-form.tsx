@@ -11,13 +11,15 @@ import {
   InvitedEmailHint,
   inviteReturnPath,
 } from "@/components/invite/auth-invite-banner";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/ui/logo";
+import { Wordmark } from "@/components/ui/logo";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
+import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export function SignupForm({
   providers,
@@ -84,24 +86,23 @@ export function SignupForm({
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0b0b0f] to-[#15162c] px-6 text-white">
+    <AuthShell>
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link className="flex items-center gap-2.5" href="/">
-          <Logo className="h-8 w-8" />
-          <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+        <Link href="/">
+          <Wordmark />
         </Link>
         {invite ? <AuthInviteBanner invite={invite} /> : null}
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">
+          <PageTitle>
             {invite ? "Create an account to join" : "Create your account"}
-          </h1>
-          <p className="text-sm text-white/60">
+          </PageTitle>
+          <PageSubtitle>
             {invite
               ? "Takes about 20 seconds. You'll confirm joining right after."
               : anySocial
                 ? `It takes about 20 seconds. Or continue with ${providerNames.join(" or ")}.`
                 : "It takes about 20 seconds."}
-          </p>
+          </PageSubtitle>
         </div>
         <form className="flex flex-col gap-3" onSubmit={onSubmit}>
           <div className="flex flex-col gap-1.5">
@@ -119,9 +120,6 @@ export function SignupForm({
             <Input
               autoComplete="email"
               id="email"
-              className={
-                invite ? "cursor-not-allowed text-white/60" : undefined
-              }
               onChange={(e) => setEmail(e.target.value)}
               readOnly={!!invite}
               required
@@ -188,7 +186,7 @@ export function SignupForm({
             </div>
           </>
         )}
-        <p className="text-center text-sm text-white/60">
+        <p className="text-center text-sm text-white/70">
           Already have an account?{" "}
           <Link
             className="text-white underline"
@@ -198,6 +196,6 @@ export function SignupForm({
           </Link>
         </p>
       </div>
-    </main>
+    </AuthShell>
   );
 }

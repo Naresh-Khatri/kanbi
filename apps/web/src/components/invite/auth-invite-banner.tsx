@@ -1,5 +1,6 @@
 import { Lock } from "lucide-react";
 
+import { Card } from "@/components/ui/surface";
 import { InviteHeader } from "@/components/invite/invite-header";
 import type { AuthInvite } from "@/server/invites";
 
@@ -8,15 +9,15 @@ export const inviteReturnPath = (invite: AuthInvite) =>
 
 export function AuthInviteBanner({ invite }: { invite: AuthInvite }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <Card tone="muted">
       <InviteHeader compact invite={invite} />
-    </div>
+    </Card>
   );
 }
 
 export function InvitedEmailHint({ providers }: { providers: string[] }) {
   return (
-    <p className="flex items-start gap-1.5 text-xs text-white/50">
+    <p className="flex items-start gap-1.5 text-xs text-white/40">
       <Lock className="mt-px h-3 w-3 shrink-0" />
       <span>
         Locked to the invited email.
