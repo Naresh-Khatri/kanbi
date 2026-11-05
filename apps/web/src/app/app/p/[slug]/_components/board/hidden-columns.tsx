@@ -23,7 +23,7 @@ export function HiddenColumns({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className="h-10 shrink-0 gap-2" variant="outline">
+        <Button className="shrink-0" size="sm" variant="quiet">
           <EyeOff className="h-4 w-4" />
           Hidden columns
           <CountBadge>{columns.length}</CountBadge>

@@ -19,6 +19,8 @@ const buttonVariants = cva(
         ghost: "text-white hover:bg-white/10",
         // icon/toolbar affordance: muted until hover
         quiet: "text-white/40 hover:bg-white/5 hover:text-white",
+        dashed:
+          "rounded-lg border border-dashed border-white/10 font-normal text-white/40 hover:border-white/20 hover:bg-white/5 hover:text-white",
         "quiet-danger": "hover:text-danger text-white/40 hover:bg-white/5",
         // linear-style property trigger (priority, assignee, due…)
         property:
@@ -43,6 +45,7 @@ const buttonVariants = cva(
         xs: "h-7 rounded-md px-2 text-xs",
         lg: "h-10 rounded-md px-6",
         icon: "h-9 w-9",
+        "icon-md": "h-8 w-8",
         "icon-sm": "h-7 w-7",
         "icon-xs": "h-6 w-6",
         inline: "h-auto p-0 text-xs",

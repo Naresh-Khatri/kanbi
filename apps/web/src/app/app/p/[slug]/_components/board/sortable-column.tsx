@@ -109,8 +109,8 @@ export const SortableColumn = memo(function SortableColumn({
     return (
       <div
         className={cn(
-          "flex h-full w-12 shrink-0 snap-center flex-col items-center rounded-lg bg-white/5 py-2 md:[scroll-snap-align:none]",
-          dropTarget && "bg-white/10 ring-1 ring-white/20",
+          "flex h-full w-12 shrink-0 snap-center flex-col items-center rounded-lg border border-white/10 py-2 md:[scroll-snap-align:none]",
+          dropTarget && "bg-white/5 ring-1 ring-white/20",
         )}
         ref={sortable.setNodeRef}
         style={style}
@@ -152,7 +152,7 @@ export const SortableColumn = memo(function SortableColumn({
   return (
     <div
       className={cn(
-        "flex h-full w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-3 rounded-lg bg-white/5 p-3 md:w-72 md:[scroll-snap-align:none]",
+        "group/column flex h-full w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-2 rounded-lg border border-white/10 p-2 md:w-72 md:[scroll-snap-align:none]",
         column.wipLimit != null &&
           totalTaskCount > column.wipLimit &&
           "ring-warning/40 ring-1",
@@ -201,6 +201,7 @@ export const SortableColumn = memo(function SortableColumn({
                 boardId={boardId}
                 canWrite={canWrite}
                 columnId={column.id}
+                completed={column.category === "completed"}
                 focused={focusedTaskId === t.id}
                 key={t.id}
                 labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
@@ -229,6 +230,16 @@ export const SortableColumn = memo(function SortableColumn({
               ) : null}
             </EmptyState>
           ) : null}
+          {canWrite && tasks.length > 0 ? (
+            <Button
+              className="justify-start"
+              onClick={() => onAddTask(column.id)}
+              size="sm"
+              variant="quiet"
+            >
+              <Plus className="h-4 w-4" /> Add task
+            </Button>
+          ) : null}
           {!sortBlocked &&
           dropTarget &&
           dropTarget.beforeTaskId === null &&
@@ -240,16 +251,6 @@ export const SortableColumn = memo(function SortableColumn({
           ) : null}
         </div>
       </ScrollArea>
-      {canWrite && tasks.length > 0 ? (
-        <Button
-          className="justify-start"
-          onClick={() => onAddTask(column.id)}
-          size="sm"
-          variant="property"
-        >
-          <Plus className="h-4 w-4" /> Add task
-        </Button>
-      ) : null}
     </div>
   );
 });

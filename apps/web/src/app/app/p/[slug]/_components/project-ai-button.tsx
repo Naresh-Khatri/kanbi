@@ -31,7 +31,7 @@ export function ProjectAiButton() {
     >
       <Sparkles className="h-3.5 w-3.5" />
       <span className="hidden sm:inline">Draft with AI</span>
-      <Kbd className="hidden sm:inline" variant="hint">
+      <Kbd className="hidden lg:inline" variant="hint">
         ⇧V
       </Kbd>
     </Button>

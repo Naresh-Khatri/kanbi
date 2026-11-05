@@ -59,6 +59,10 @@ const SORT_MODES = Object.keys(SORT_LABELS) as Array<
   Exclude<ColumnSortMode, "manual">
 >;
 
+// revealed on column hover/focus; stays in dom for keyboard
+const REVEAL =
+  "opacity-0 transition-opacity group-hover/column:opacity-100 group-focus-within/column:opacity-100 pointer-coarse:opacity-100 data-[state=open]:opacity-100";
+
 type ColumnCategory = ColumnRow["category"];
 
 const CATEGORY_META = {
@@ -264,7 +268,7 @@ export function ColumnHeader({
 
   return (
     <div
-      className="flex items-center gap-1 px-1"
+      className="flex h-8 items-center gap-1"
       onContextMenu={(event) => {
         event.preventDefault();
         setMenuOpen(true);
@@ -273,7 +277,7 @@ export function ColumnHeader({
       {canWrite ? (
         <Button
           aria-label={`Drag ${column.name} column`}
-          className="cursor-grab active:cursor-grabbing"
+          className={cn(REVEAL, "cursor-grab active:cursor-grabbing")}
           size="icon-sm"
           type="button"
           variant="quiet"
@@ -333,7 +337,7 @@ export function ColumnHeader({
             <span className="truncate">{column.name}</span>
             <span
               className={cn(
-                "ml-2 text-xs text-white/40",
+                "ml-1 text-xs text-white/40 tabular-nums",
                 overWipLimit && "text-warning",
               )}
               title={
@@ -352,8 +356,9 @@ export function ColumnHeader({
       {canWrite ? (
         <Button
           aria-label={`Add task to ${column.name}`}
+          className={REVEAL}
           onClick={() => onAddTask(column.id)}
-          size="icon"
+          size="icon-sm"
           title={`Add task to ${column.name}`}
           variant="ghost"
         >
@@ -368,7 +373,8 @@ export function ColumnHeader({
                 ? `Sort ${column.name}: ${SORT_LABELS[sortMode as Exclude<ColumnSortMode, "manual">]} ${sortDir === "asc" ? "ascending" : "descending"}`
                 : `Sort ${column.name}`
             }
-            size="icon"
+            className={cn(!sorted && REVEAL)}
+            size="icon-sm"
             title={
               sortBlocked
                 ? "This column is sorted. Clear sorting to reorder tasks manually."
@@ -434,7 +440,8 @@ export function ColumnHeader({
         <DropdownMenuTrigger asChild>
           <Button
             aria-label={`More actions for ${column.name}`}
-            size="icon"
+            className={REVEAL}
+            size="icon-sm"
             title={`More actions for ${column.name}`}
             variant="ghost"
           >

@@ -20,14 +20,18 @@ const fieldVariants = cva(
 
 type FieldProps = VariantProps<typeof fieldVariants>;
 
+// `size` is taken by the native input attr
+const inputSizes = { md: "h-9 px-3 py-1", sm: "h-7 px-2 text-xs" } as const;
+
 export const Input = React.forwardRef<
   HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement> & FieldProps
->(({ className, type, variant, ...props }, ref) => (
+  React.InputHTMLAttributes<HTMLInputElement> &
+    FieldProps & { inputSize?: keyof typeof inputSizes }
+>(({ className, type, variant, inputSize = "md", ...props }, ref) => (
   <input
     className={cn(
       fieldVariants({ variant }),
-      variant !== "bare" && "h-9 px-3 py-1",
+      variant !== "bare" && inputSizes[inputSize],
       className,
     )}
     ref={ref}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { APP_VERSION } from "@/changelog";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,9 +34,16 @@ export function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-white/10 px-2 py-1 text-sm transition hover:bg-white/10">
-        <UserAvatar image={image} name={name} size={24} />
-        <span className="pr-1">{name}</span>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={name}
+          shape="pill"
+          size="icon-md"
+          title={name}
+          variant="ghost"
+        >
+          <UserAvatar image={image} name={name} size={24} />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <div className="px-2 py-1.5 text-xs text-white/70">{email}</div>

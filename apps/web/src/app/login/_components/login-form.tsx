@@ -11,6 +11,7 @@ import {
   InvitedEmailHint,
   inviteReturnPath,
 } from "@/components/invite/auth-invite-banner";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +19,7 @@ import { Wordmark } from "@/components/ui/logo";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
-import { PageTitle } from "@/components/ui/surface";
+import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export function LoginForm({
   providers,
@@ -89,7 +90,7 @@ export function LoginForm({
   }
 
   return (
-    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
+    <AuthShell>
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Link href="/">
           <Wordmark />
@@ -99,13 +100,13 @@ export function LoginForm({
           <PageTitle>
             {invite ? "Sign in to accept" : "Sign in to Kanbi"}
           </PageTitle>
-          <p className="text-sm text-white/70">
+          <PageSubtitle>
             {invite
               ? "Sign in with the invited account, then confirm joining."
               : anySocial
                 ? `Welcome back. Use email, or continue with ${providerNames.join(" or ")}.`
                 : "Welcome back. Sign in with your email and password."}
-          </p>
+          </PageSubtitle>
         </div>
         <form className="flex flex-col gap-3" onSubmit={onSubmit}>
           <div className="flex flex-col gap-1.5">
@@ -193,6 +194,6 @@ export function LoginForm({
           </Link>
         </p>
       </div>
-    </main>
+    </AuthShell>
   );
 }

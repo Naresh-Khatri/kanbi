@@ -15,6 +15,10 @@ const segmentBase = cva(
         xs: "h-7 px-2 text-xs",
         sm: "h-8 px-2.5 text-xs",
       },
+      tone: {
+        quiet: "",
+        nav: "text-white/70 hover:text-white",
+      },
       active: {
         true: "bg-white/10 text-white hover:bg-white/10 hover:text-white",
       },

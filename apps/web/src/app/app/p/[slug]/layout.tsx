@@ -47,14 +47,12 @@ export default async function ProjectLayout({
             <Button
               aria-label="Project settings"
               asChild
-              className="gap-1.5"
-              size="sm"
+              size="icon-md"
               title="Project settings"
-              variant="toolbar"
+              variant="quiet"
             >
               <Link href={`/app/p/${slug}/settings`}>
-                <Settings className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline">Settings</span>
+                <Settings className="h-4 w-4" />
               </Link>
             </Button>
           </>

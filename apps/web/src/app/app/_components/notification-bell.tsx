@@ -191,9 +191,9 @@ export function NotificationBell() {
       <DropdownMenuTrigger asChild>
         <Button
           aria-label="Notifications"
-          className="relative h-8 w-8"
-          size="icon"
-          variant="property"
+          className="relative"
+          size="icon-md"
+          variant="quiet"
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 ? (

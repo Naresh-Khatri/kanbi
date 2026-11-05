@@ -17,7 +17,7 @@ import {
 import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
 
 import { Button } from "@/components/ui/button";
-import { Card, PageTitle } from "@/components/ui/surface";
+import { Card, EmptyState, SectionTitle } from "@/components/ui/surface";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { TodayQueue } from "./today-queue";
@@ -63,13 +63,11 @@ export function MyWork() {
     data.mentions.length === 0;
 
   return (
-    <section className="flex flex-col gap-5">
-      <div>
-        <PageTitle>My work</PageTitle>
-      </div>
+    <section className="flex flex-col gap-4 border-t border-white/10 pt-10">
+      <SectionTitle>My work</SectionTitle>
       <TodayQueue />
       {empty ? (
-        <p className="text-sm text-white/40">Nothing needs your attention.</p>
+        <EmptyState size="sm">Nothing needs your attention.</EmptyState>
       ) : (
         <div className="flex flex-col gap-4">
           <Section

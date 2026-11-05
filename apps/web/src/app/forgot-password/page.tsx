@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wordmark } from "@/components/ui/logo";
 import { authClient } from "@/server/better-auth/client";
-import { PageTitle } from "@/components/ui/surface";
+import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -32,16 +33,16 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
+    <AuthShell>
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Link href="/">
           <Wordmark />
         </Link>
         <div className="flex flex-col gap-1">
           <PageTitle>Forgot your password?</PageTitle>
-          <p className="text-sm text-white/70">
+          <PageSubtitle>
             Enter your email and we&apos;ll send you a reset link.
-          </p>
+          </PageSubtitle>
         </div>
         {sent ? (
           <p className="rounded-md border border-white/10 bg-white/5 p-3 text-sm text-white">
@@ -71,6 +72,6 @@ export default function ForgotPasswordPage() {
           </Link>
         </p>
       </div>
-    </main>
+    </AuthShell>
   );
 }

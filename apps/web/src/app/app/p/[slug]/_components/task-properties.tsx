@@ -113,7 +113,11 @@ export function PriorityPicker({
       <PropertyTrigger disabled={disabled} size={size}>
         <PriorityIcon className={SIZE[size].priorityIcon} priority={value} />
         <TriggerLabel placeholder={value === "none"} size={size}>
-          {value === "none" ? "Priority" : PRIORITY_META[value].label}
+          {value === "none"
+            ? size === "row"
+              ? "None"
+              : "Priority"
+            : PRIORITY_META[value].label}
         </TriggerLabel>
       </PropertyTrigger>
       <DropdownMenuContent align="start">
@@ -161,7 +165,7 @@ export function AssigneePicker({
           <UserIcon className={s.icon} />
         )}
         <TriggerLabel placeholder={!current} size={size}>
-          {current ? current.name : "Assignee"}
+          {current ? current.name : size === "row" ? "Unassigned" : "Assignee"}
         </TriggerLabel>
       </PropertyTrigger>
       <DropdownMenuContent align="start">
@@ -279,7 +283,11 @@ export function DueDatePicker({
       >
         <CalendarDays className={SIZE[size].icon} />
         <TriggerLabel placeholder={!value} size={size}>
-          {value ? (label ?? formatDueDate(value)) : "Due date"}
+          {value
+            ? (label ?? formatDueDate(value))
+            : row
+              ? "No date"
+              : "Due date"}
         </TriggerLabel>
       </Button>
       {value && !disabled ? (

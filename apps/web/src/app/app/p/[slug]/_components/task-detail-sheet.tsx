@@ -41,7 +41,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   isRichTextEmpty,
   RichTextContent,
@@ -242,64 +241,84 @@ function TaskDetail({
         </SheetDescription>
       </SheetHeader>
 
-      <div className="flex flex-wrap items-center gap-x-1 gap-y-1 border-y border-white/10 py-2.5">
-        <StatusMenu
-          canWrite={canWrite}
-          columns={columns}
-          onChange={changeColumn}
-          value={task.columnId}
-        />
-        <PriorityPicker
-          disabled={!canWrite}
-          onChange={(p) =>
-            update.mutate({ boardId, taskId: task.id, priority: p })
-          }
-          size="row"
-          value={task.priority as Priority}
-        />
-        <AssigneePicker
-          disabled={!canWrite}
-          members={members.data ?? []}
-          onChange={(id) =>
-            update.mutate({ boardId, taskId: task.id, assigneeId: id })
-          }
-          selfId={me.data?.id ?? null}
-          size="row"
-          value={task.assigneeId}
-        />
-        <EstimateControl
-          canWrite={canWrite}
-          onChange={(n) =>
-            update.mutate({ boardId, taskId: task.id, estimatePomodoros: n })
-          }
-          value={task.estimatePomodoros}
-        />
-        <DueControl
-          canWrite={canWrite}
-          onChange={(d) =>
-            update.mutate({ boardId, taskId: task.id, dueAt: d })
-          }
-          value={task.dueAt}
-        />
-        <LabelsPicker
-          activeLabelIds={activeLabelIds}
-          boardId={boardId}
-          canWrite={canWrite}
-          labels={labels}
-          taskId={task.id}
-        />
-        <BranchMenu
-          labelNames={labels
-            .filter((l) => activeLabelIds.has(l.id))
-            .map((l) => l.name)}
-          task={task}
-        />
-        <TodayToggle taskId={task.id} />
-      </div>
+      <dl className="flex flex-col gap-y-0.5">
+        <PropertyRow label="Status">
+          <StatusMenu
+            canWrite={canWrite}
+            columns={columns}
+            onChange={changeColumn}
+            value={task.columnId}
+          />
+        </PropertyRow>
+        <PropertyRow label="Priority">
+          <PriorityPicker
+            disabled={!canWrite}
+            onChange={(p) =>
+              update.mutate({ boardId, taskId: task.id, priority: p })
+            }
+            size="row"
+            value={task.priority as Priority}
+          />
+        </PropertyRow>
+        <PropertyRow label="Assignee">
+          <AssigneePicker
+            disabled={!canWrite}
+            members={members.data ?? []}
+            onChange={(id) =>
+              update.mutate({ boardId, taskId: task.id, assigneeId: id })
+            }
+            selfId={me.data?.id ?? null}
+            size="row"
+            value={task.assigneeId}
+          />
+        </PropertyRow>
+        <PropertyRow label="Estimate">
+          <EstimateControl
+            canWrite={canWrite}
+            onChange={(n) =>
+              update.mutate({
+                boardId,
+                taskId: task.id,
+                estimatePomodoros: n,
+              })
+            }
+            value={task.estimatePomodoros}
+          />
+        </PropertyRow>
+        <PropertyRow label="Due">
+          <DueControl
+            canWrite={canWrite}
+            onChange={(d) =>
+              update.mutate({ boardId, taskId: task.id, dueAt: d })
+            }
+            value={task.dueAt}
+          />
+        </PropertyRow>
+        <PropertyRow label="Labels">
+          <LabelsPicker
+            activeLabelIds={activeLabelIds}
+            boardId={boardId}
+            canWrite={canWrite}
+            labels={labels}
+            taskId={task.id}
+          />
+        </PropertyRow>
+        <PropertyRow label="Branch">
+          <BranchMenu
+            labelNames={labels
+              .filter((l) => activeLabelIds.has(l.id))
+              .map((l) => l.name)}
+            task={task}
+          />
+        </PropertyRow>
+        <PropertyRow label="Today">
+          <TodayToggle taskId={task.id} />
+        </PropertyRow>
+      </dl>
 
-      <div className="flex flex-col gap-2">
-        <Label>Description</Label>
-        <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
+      <SheetSection>
+        <SectionLabel as="h3">Description</SectionLabel>
+        <div className="-mx-3 rounded-md border border-transparent px-3 py-2 transition-colors focus-within:border-white/20 focus-within:bg-white/5 hover:bg-white/5">
           <RichTextEditor
             disabled={!canWrite}
             mentions={mentionItems}
@@ -319,7 +338,7 @@ function TaskDetail({
             value={description}
           />
         </div>
-      </div>
+      </SheetSection>
 
       <LinkedDocsPanel boardId={boardId} taskId={task.id} />
 
@@ -339,7 +358,7 @@ function TaskDetail({
       <ActivityPanel boardId={boardId} taskId={task.id} />
 
       {canWrite ? (
-        <div className="mt-4 flex justify-end">
+        <div className="flex justify-start border-t border-white/10 pt-5">
           <Button
             onClick={() =>
               void remove(
@@ -347,7 +366,8 @@ function TaskDetail({
                 onClose,
               )
             }
-            variant="destructive"
+            size="sm"
+            variant="quiet-danger"
           >
             <Trash2 className="h-4 w-4" /> Delete task
           </Button>
@@ -368,8 +388,8 @@ function LinkedDocsPanel({
   if (!linked.data || linked.data.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-2">
-      <Label>Docs</Label>
+    <SheetSection as="section">
+      <SectionLabel as="h3">Docs</SectionLabel>
       <div className="divide-y divide-white/10 rounded-md border border-white/10 bg-white/5 px-2">
         {linked.data.map((document) => (
           <Link
@@ -385,7 +405,7 @@ function LinkedDocsPanel({
           </Link>
         ))}
       </div>
-    </section>
+    </SheetSection>
   );
 }
 
@@ -453,7 +473,7 @@ function EstimateControl({
       >
         <Timer className={PROP_ICON} />
         <span className={cn("truncate", !has && PROP_PLACEHOLDER)}>
-          {has ? `${value} pomodoro${value === 1 ? "" : "s"}` : "Estimate"}
+          {has ? `${value} pomodoro${value === 1 ? "" : "s"}` : "None"}
         </span>
       </Button>
       {has && canWrite ? (
@@ -694,7 +714,7 @@ function LabelsPicker({
             ) : (
               <>
                 <Tag className={PROP_ICON} />
-                <span className={PROP_PLACEHOLDER}>Label</span>
+                <span className={PROP_PLACEHOLDER}>None</span>
               </>
             )}
           </Button>
@@ -794,7 +814,7 @@ function BranchMenu({
       <DropdownMenuTrigger asChild>
         <Button className={PROP_CLS} size="md" variant="property" type="button">
           <GitBranch className={PROP_ICON} />
-          <span className="truncate">Branch</span>
+          <span className="truncate">Copy branch name</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72">
@@ -1026,8 +1046,8 @@ function ChecklistPanel({
   });
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Checklist</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Checklist</SectionLabel>
       <ul className="flex flex-col gap-1">
         {(list.data ?? []).map((it) => (
           <li className="group flex items-center gap-2" key={it.id}>
@@ -1075,12 +1095,17 @@ function ChecklistPanel({
             placeholder="Add item"
             value={text}
           />
-          <Button size="sm" type="submit">
+          <Button
+            disabled={!text.trim()}
+            size="sm"
+            type="submit"
+            variant="secondary"
+          >
             Add
           </Button>
         </form>
       ) : null}
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1155,8 +1180,8 @@ function AttachmentsPanel({
   const busy = pending.length > 0;
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Attachments</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Attachments</SectionLabel>
       {images.length > 0 || pendingImages.length > 0 ? (
         <div className="grid grid-cols-3 gap-2">
           {images.map((a, i) => (
@@ -1279,7 +1304,7 @@ function AttachmentsPanel({
         onChange={setViewerIndex}
         onClose={() => setViewerIndex(null)}
       />
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1384,8 +1409,8 @@ function CommentsPanel({
   });
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Comments</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Comments</SectionLabel>
       <ul className="flex flex-col gap-3 text-sm">
         {(list.data ?? []).map((c) => (
           <CommentItem
@@ -1423,13 +1448,14 @@ function CommentsPanel({
               disabled={isRichTextEmpty(body) || create.isPending}
               size="sm"
               type="submit"
+              variant="secondary"
             >
               Comment
             </Button>
           </div>
         </form>
       ) : null}
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1563,8 +1589,8 @@ function ActivityPanel({
   const list = api.activity.list.useQuery({ boardId, taskId, limit: 50 });
   if (!list.data || list.data.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2">
-      <Label>Activity</Label>
+    <SheetSection>
+      <SectionLabel as="h3">Activity</SectionLabel>
       <ul className="flex flex-col gap-1 text-sm">
         {list.data.map((a) => (
           <li
@@ -1580,7 +1606,7 @@ function ActivityPanel({
           </li>
         ))}
       </ul>
-    </div>
+    </SheetSection>
   );
 }
 
@@ -1597,4 +1623,33 @@ function formatVerb(verb: string) {
     default:
       return verb;
   }
+}
+
+function SheetSection({
+  as: Comp = "div",
+  children,
+}: {
+  as?: "div" | "section";
+  children: React.ReactNode;
+}) {
+  return (
+    <Comp className="flex flex-col gap-3 border-t border-white/10 pt-5">
+      {children}
+    </Comp>
+  );
+}
+
+function PropertyRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-8 items-center">
+      <dt className="w-24 shrink-0 text-sm text-white/40">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
+  );
 }

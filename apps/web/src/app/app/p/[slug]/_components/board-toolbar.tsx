@@ -200,14 +200,14 @@ export const BoardToolbar = forwardRef<
 
   return (
     <div className="border-b border-white/10">
-      <div className="flex items-center gap-1 px-6 py-2">
+      <div className="flex h-11 items-center gap-1 px-4 sm:px-6">
         <Button
           aria-controls="board-search-filters"
           aria-expanded={showControls}
           className="gap-1.5"
           onClick={openSearch}
-          size="sm"
-          variant={filters.query ? "selected" : "toolbar"}
+          size="xs"
+          variant={filters.query ? "selected" : "property"}
         >
           <Search className="h-3.5 w-3.5" />
           <span>Search</span>
@@ -218,8 +218,8 @@ export const BoardToolbar = forwardRef<
           aria-expanded={showControls}
           className="gap-1.5"
           onClick={() => onExpandedChange(!expanded)}
-          size="sm"
-          variant={filterCount > 0 ? "selected" : "toolbar"}
+          size="xs"
+          variant={filterCount > 0 ? "selected" : "property"}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
           <span>Filters</span>
@@ -237,21 +237,21 @@ export const BoardToolbar = forwardRef<
           <Button
             className="gap-1.5"
             onClick={onOpenDigest}
-            size="sm"
+            size="xs"
             variant="property"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Digest</span>
+            <span className="sr-only sm:not-sr-only">Digest</span>
           </Button>
           {archivedCount > 0 ? (
             <Button
               className="gap-1.5"
               onClick={onOpenArchive}
-              size="sm"
+              size="xs"
               variant="property"
             >
               <Archive className="h-3.5 w-3.5" />
-              <span>Archive</span>
+              <span className="sr-only sm:not-sr-only">Archive</span>
               <CountBadge>{archivedCount}</CountBadge>
             </Button>
           ) : null}
@@ -260,7 +260,7 @@ export const BoardToolbar = forwardRef<
 
       {showControls ? (
         <div
-          className="flex flex-wrap items-center gap-2 border-t border-white/10 px-6 py-2"
+          className="flex flex-wrap items-center gap-1.5 border-t border-white/10 px-4 py-1.5 sm:px-6"
           id="board-search-filters"
         >
           <div className="relative max-w-sm min-w-48 flex-1">
@@ -270,7 +270,8 @@ export const BoardToolbar = forwardRef<
             />
             <Input
               aria-label="Search tasks"
-              className="h-8 pr-8 pl-8"
+              className="pr-8 pl-8"
+              inputSize="sm"
               onChange={(e) => onChange({ ...filters, query: e.target.value })}
               placeholder="Search tasks…"
               ref={searchRef}
@@ -409,7 +410,7 @@ export const BoardToolbar = forwardRef<
                 onChange(EMPTY_FILTERS);
                 onExpandedChange(false);
               }}
-              size="sm"
+              size="xs"
               variant="property"
             >
               Clear
@@ -418,7 +419,7 @@ export const BoardToolbar = forwardRef<
             <Button
               aria-label="Hide search and filters"
               onClick={() => onExpandedChange(false)}
-              size="icon"
+              size="icon-sm"
               variant="quiet"
             >
               <X className="h-3.5 w-3.5" />
@@ -449,8 +450,8 @@ function FilterChip({
         <Button
           className="gap-1.5"
           disabled={disabled}
-          size="sm"
-          variant={count > 0 ? "selected" : "toolbar"}
+          size="xs"
+          variant={count > 0 ? "selected" : "property"}
         >
           {icon}
           <span>{label}</span>

@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wordmark } from "@/components/ui/logo";
 import { authClient } from "@/server/better-auth/client";
-import { PageTitle } from "@/components/ui/surface";
+import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export default function ResetPasswordPage() {
   return (
@@ -51,25 +52,25 @@ function ResetPasswordForm() {
 
   if (!token || error) {
     return (
-      <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
+      <AuthShell>
         <div className="flex w-full max-w-sm flex-col gap-4">
           <Link href="/">
             <Wordmark />
           </Link>
           <PageTitle>Link expired</PageTitle>
-          <p className="text-sm text-white/70">
+          <PageSubtitle>
             This reset link is invalid or has expired. Request a new one.
-          </p>
+          </PageSubtitle>
           <Link className="text-white underline" href="/forgot-password">
             Send a new link
           </Link>
         </div>
-      </main>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
+    <AuthShell>
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Link href="/">
           <Wordmark />
@@ -107,6 +108,6 @@ function ResetPasswordForm() {
           </Button>
         </form>
       </div>
-    </main>
+    </AuthShell>
   );
 }

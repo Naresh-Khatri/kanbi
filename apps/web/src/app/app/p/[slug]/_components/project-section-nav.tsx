@@ -12,12 +12,14 @@ export function ProjectSectionNav({ slug }: { slug: string }) {
   const boardActive = pathname === `/app/p/${slug}`;
 
   return (
-    <nav aria-label="Project sections" className="flex items-center gap-0.5">
+    <nav aria-label="Project sections" className="flex shrink-0 items-center gap-0.5">
       <SectionLink active={boardActive} href={`/app/p/${slug}`}>
-        <SquareKanban className="h-3.5 w-3.5" /> Board
+        <SquareKanban className="h-3.5 w-3.5" />
+        <span className="sr-only sm:not-sr-only">Board</span>
       </SectionLink>
       <SectionLink active={docsActive} href={`/app/p/${slug}/docs`}>
-        <FileText className="h-3.5 w-3.5" /> Docs
+        <FileText className="h-3.5 w-3.5" />
+        <span className="sr-only sm:not-sr-only">Docs</span>
       </SectionLink>
     </nav>
   );
@@ -35,7 +37,11 @@ function SectionLink({
   return (
     <Link
       aria-current={active ? "page" : undefined}
-      className={segmentVariants({ size: "sm", active })}
+      className={segmentVariants({
+        size: "sm",
+        active,
+        tone: "nav",
+      })}
       href={href}
     >
       {children}

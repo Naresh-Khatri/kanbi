@@ -125,4 +125,45 @@ export function PageTitle({
   return <h1 className={cn("text-2xl font-semibold", className)} {...props} />;
 }
 
+export function PageSubtitle({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLParagraphElement>) {
+  return (
+    <p
+      className={cn("text-sm text-balance text-white/70", className)}
+      {...props}
+    />
+  );
+}
+
+export function SectionTitle({
+  className,
+  as: Comp = "h2",
+  ...props
+}: React.HTMLAttributes<HTMLHeadingElement> & { as?: "h2" | "h3" }) {
+  return (
+    <Comp
+      className={cn("text-base font-semibold tracking-tight", className)}
+      {...props}
+    />
+  );
+}
+
+export function PageContainer({
+  className,
+  as: Comp = "main",
+  ...props
+}: React.HTMLAttributes<HTMLElement> & { as?: "main" | "div" }) {
+  return (
+    <Comp
+      className={cn(
+        "mx-auto flex w-full max-w-5xl flex-col px-6 py-10",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 export { cardVariants, emptyVariants };

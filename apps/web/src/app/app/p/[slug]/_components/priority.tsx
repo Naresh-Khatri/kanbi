@@ -74,3 +74,13 @@ export function PriorityBadge({ priority }: { priority: Priority }) {
     </Badge>
   );
 }
+
+export function PriorityInline({ priority }: { priority: Priority }) {
+  const { Icon, text, label } = PRIORITY_META[priority];
+  return (
+    <span className={cn("inline-flex items-center gap-1", text)}>
+      <Icon aria-hidden className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}

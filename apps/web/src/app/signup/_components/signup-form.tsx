@@ -11,6 +11,7 @@ import {
   InvitedEmailHint,
   inviteReturnPath,
 } from "@/components/invite/auth-invite-banner";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +19,7 @@ import { Wordmark } from "@/components/ui/logo";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
-import { PageTitle } from "@/components/ui/surface";
+import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export function SignupForm({
   providers,
@@ -85,7 +86,7 @@ export function SignupForm({
   }
 
   return (
-    <main className="bg-marketing flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-white">
+    <AuthShell>
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Link href="/">
           <Wordmark />
@@ -95,13 +96,13 @@ export function SignupForm({
           <PageTitle>
             {invite ? "Create an account to join" : "Create your account"}
           </PageTitle>
-          <p className="text-sm text-white/70">
+          <PageSubtitle>
             {invite
               ? "Takes about 20 seconds. You'll confirm joining right after."
               : anySocial
                 ? `It takes about 20 seconds. Or continue with ${providerNames.join(" or ")}.`
                 : "It takes about 20 seconds."}
-          </p>
+          </PageSubtitle>
         </div>
         <form className="flex flex-col gap-3" onSubmit={onSubmit}>
           <div className="flex flex-col gap-1.5">
@@ -195,6 +196,6 @@ export function SignupForm({
           </Link>
         </p>
       </div>
-    </main>
+    </AuthShell>
   );
 }

@@ -87,10 +87,10 @@ export function ProjectTeamButton() {
       <DropdownMenuTrigger asChild>
         <Button
           aria-label="Team & presence"
-          className="gap-2 pr-2 pl-1.5"
+          className="gap-1.5 px-1.5"
           size="sm"
           type="button"
-          variant="toolbar"
+          variant="ghost"
         >
           <span className="flex -space-x-1.5">
             {shown.map((m) => (

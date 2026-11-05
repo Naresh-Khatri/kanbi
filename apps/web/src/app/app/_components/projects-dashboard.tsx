@@ -43,7 +43,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cardVariants, EmptyState, PageTitle } from "@/components/ui/surface";
+import {
+  cardVariants,
+  EmptyState,
+  PageSubtitle,
+  PageTitle,
+} from "@/components/ui/surface";
 import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
 import { api } from "@/trpc/react";
 
@@ -64,19 +69,20 @@ type ProjectCard = {
 export function ProjectsDashboard() {
   const [projects] = api.project.list.useSuspenseQuery();
   const [showOnHold, setShowOnHold] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
   const active = projects.filter((p) => p.status === "active");
   const onHold = projects.filter((p) => p.status === "on_hold");
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
           <PageTitle>Projects</PageTitle>
-          <p className="text-sm text-white/70">
+          <PageSubtitle>
             Create a project, get a board, start shipping.
-          </p>
+          </PageSubtitle>
         </div>
-        <NewProjectDialog />
+        <NewProjectDialog onOpenChange={setNewOpen} open={newOpen} />
       </div>
 
       {projects.length === 0 ? (
@@ -86,13 +92,24 @@ export function ProjectsDashboard() {
       ) : (
         <>
           {active.length > 0 ? (
-            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {active.map((p) => (
                 <ProjectCardItem key={p.id} project={p} />
               ))}
+              <li className="flex">
+                <Button
+                  className="min-h-32 w-full flex-col"
+                  onClick={() => setNewOpen(true)}
+                  type="button"
+                  variant="dashed"
+                >
+                  <Plus className="h-4 w-4" />
+                  New project
+                </Button>
+              </li>
             </ul>
           ) : (
-            <p className="text-sm text-white/40">No active projects.</p>
+            <EmptyState size="sm">No active projects.</EmptyState>
           )}
 
           {onHold.length > 0 ? (
@@ -137,21 +154,33 @@ function ProjectCardItem({ project }: { project: ProjectCard }) {
       <Link
         className={cn(
           cardVariants({ tone: "muted", padding: "none", interactive: true }),
-          "block p-5",
+          "flex h-full min-h-32 flex-col justify-between gap-4 p-4",
         )}
         href={`/app/p/${project.slug}`}
       >
-        <div className="flex items-center gap-2 pr-8">
-          <Dot color={project.color ?? DEFAULT_PROJECT_COLOR} size="lg" />
-          <span className="truncate font-medium">{project.name}</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 pr-8">
+            <Dot color={project.color ?? DEFAULT_PROJECT_COLOR} size="lg" />
+            <span className="truncate font-medium">{project.name}</span>
+          </div>
+          {project.description ? (
+            <p className="line-clamp-2 text-xs text-white/70">
+              {project.description}
+            </p>
+          ) : null}
         </div>
-        {project.inProgressTasks > 0 ? (
-          <p className="mt-2 text-xs text-white/40">
-            {project.inProgressTasks} in progress
-          </p>
-        ) : null}
+        <p className="flex items-center gap-3 text-xs text-white/40 tabular-nums">
+          {project.inProgressTasks > 0 ? (
+            <span>{project.inProgressTasks} in progress</span>
+          ) : null}
+          {project.totalTasks > 0 ? (
+            <span className="ml-auto">
+              {project.doneTasks}/{project.totalTasks} done
+            </span>
+          ) : null}
+        </p>
       </Link>
-      <div className="absolute top-3 right-3">
+      <div className="absolute top-3.5 right-3">
         <ProjectMenu
           onDeleteRequest={() => setDeleteOpen(true)}
           project={project}
@@ -315,9 +344,15 @@ function ProjectMenu({
   );
 }
 
-function NewProjectDialog() {
+function NewProjectDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const setOpen = onOpenChange;
   const utils = api.useUtils();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -326,7 +361,7 @@ function NewProjectDialog() {
 
   useEffect(() => {
     if (createProjectToken > 0) setOpen(true);
-  }, [createProjectToken]);
+  }, [createProjectToken, setOpen]);
 
   const create = api.project.create.useMutation({
     onSuccess: async () => {

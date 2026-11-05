@@ -23,9 +23,10 @@ export function AddColumn({ boardId }: { boardId: string }) {
   if (!open) {
     return (
       <Button
-        className="h-10 w-[calc(100vw-2rem)] shrink-0 snap-center justify-start md:w-72 md:[scroll-snap-align:none]"
+        className="shrink-0 snap-center md:[scroll-snap-align:none]"
         onClick={() => setOpen(true)}
-        variant="outline"
+        size="sm"
+        variant="quiet"
       >
         <Plus className="h-4 w-4" /> Add column
       </Button>
@@ -33,7 +34,7 @@ export function AddColumn({ boardId }: { boardId: string }) {
   }
   return (
     <form
-      className="flex w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-2 rounded-lg bg-white/5 p-3 md:w-72 md:[scroll-snap-align:none]"
+      className="flex w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-2 rounded-lg border border-white/10 p-3 md:w-72 md:[scroll-snap-align:none]"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;

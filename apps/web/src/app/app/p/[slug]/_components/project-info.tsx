@@ -37,7 +37,8 @@ export function ProjectInfo() {
         <DropdownMenuTrigger asChild>
           <Button
             aria-label="Switch project"
-            className="group h-auto min-w-0 gap-2 px-1.5 py-1"
+            className="group min-w-0 gap-2 px-2"
+            size="md"
             type="button"
             variant="property"
           >
