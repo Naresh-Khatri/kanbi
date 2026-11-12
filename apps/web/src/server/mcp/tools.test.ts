@@ -54,13 +54,28 @@ describe("registerTools", () => {
       "find_tasks",
       "get_work_queue",
       "get_task",
+      "list_docs",
+      "get_doc",
+      "search_docs",
     ]);
   });
 
   it("registers only mutations for a write-only grant", () => {
     expect(
       collect(authorization(["kanbi:write"])).map((tool) => tool.name),
-    ).toEqual(["create_tasks", "start_task", "finish_task"]);
+    ).toEqual([
+      "create_tasks",
+      "start_task",
+      "finish_task",
+      "comment_on_task",
+      "report_blocker",
+      "update_checklist",
+      "set_task_labels",
+      "add_attachment",
+      "confirm_attachment",
+      "edit_comment",
+      "delete_comment",
+    ]);
   });
 
   it("registers capture and work tools plus the work prompt for a complete grant", () => {
@@ -77,6 +92,17 @@ describe("registerTools", () => {
       "get_task",
       "start_task",
       "finish_task",
+      "comment_on_task",
+      "report_blocker",
+      "update_checklist",
+      "set_task_labels",
+      "add_attachment",
+      "confirm_attachment",
+      "edit_comment",
+      "delete_comment",
+      "list_docs",
+      "get_doc",
+      "search_docs",
     ]);
     expect(prompts).toEqual(["work"]);
   });
@@ -88,7 +114,19 @@ describe("registerTools", () => {
 
   it("advertises accurate annotations and structured output", () => {
     const tools = collect(authorization(["kanbi:read", "kanbi:write"]));
-    const writes = ["create_tasks", "start_task", "finish_task"];
+    const writes = [
+      "create_tasks",
+      "start_task",
+      "finish_task",
+      "comment_on_task",
+      "report_blocker",
+      "update_checklist",
+      "set_task_labels",
+      "add_attachment",
+      "confirm_attachment",
+      "edit_comment",
+      "delete_comment",
+    ];
     const hints = (name: string) =>
       tools.find((tool) => tool.name === name)?.config.annotations;
     expect(hints("create_tasks")?.idempotentHint).toBe(false);
@@ -97,7 +135,9 @@ describe("registerTools", () => {
       expect(tool.config.annotations?.readOnlyHint).toBe(
         !writes.includes(tool.name),
       );
-      expect(tool.config.annotations?.destructiveHint).toBe(false);
+      expect(tool.config.annotations?.destructiveHint).toBe(
+        tool.name === "delete_comment",
+      );
     }
     expect(tools.every((tool) => tool.config.outputSchema)).toBe(true);
   });

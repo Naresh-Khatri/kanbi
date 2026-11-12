@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -76,4 +77,24 @@ export async function getObjectBytes(key: string): Promise<Uint8Array> {
   );
   if (!res.Body) throw new Error(`R2 object ${key} has no body`);
   return res.Body.transformToByteArray();
+}
+
+/** Null when the object was never uploaded. */
+export async function headObject(
+  key: string,
+): Promise<{ sizeBytes: number; contentType: string | null } | null> {
+  try {
+    const res = await getR2().send(
+      new HeadObjectCommand({ Bucket: env.R2_BUCKET!, Key: key }),
+    );
+    return {
+      sizeBytes: res.ContentLength ?? 0,
+      contentType: res.ContentType ?? null,
+    };
+  } catch (err) {
+    const status = (err as { $metadata?: { httpStatusCode?: number } })
+      .$metadata?.httpStatusCode;
+    if (status === 404) return null;
+    throw err;
+  }
 }

@@ -19,10 +19,18 @@ import {
 
 import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
-import { MCP_ORIGIN, SCOPE_READ, SCOPE_WRITE } from "./config";
+import { registerCollaborationTools } from "./collaborate";
+import { SCOPE_READ, SCOPE_WRITE } from "./config";
+import { registerDocTools } from "./docs";
 import { registerFindTools } from "./find";
 import { ok, toFailure } from "./result";
 import { sanitizeRichText } from "./sanitize";
+import {
+  agentCommentBody,
+  postAgentComment,
+  resolveTask,
+  taskUrl,
+} from "./task-ref";
 import { registerWorkTools, WORK_INSTRUCTIONS } from "./work";
 
 const PRIORITIES = taskPriority.enumValues;
@@ -94,12 +102,6 @@ const createTasksOutput = {
     }),
   ),
 };
-
-function taskUrl(projectSlug: string, taskId: string): string {
-  const url = new URL(`/app/p/${projectSlug}`, MCP_ORIGIN);
-  url.searchParams.set("task", taskId);
-  return url.toString();
-}
 
 /** Guidance supplied to MCP hosts during initialization. */
 export const KANBI_MCP_INSTRUCTIONS = `
@@ -308,6 +310,15 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
           "Create records immediately after the user has approved the exact preview. This operation is not idempotent. Use get_project_context for canonical column, label, and member IDs before calling.",
         inputSchema: {
           projectId: z.string().min(1),
+          followUpOf: z
+            .string()
+            .trim()
+            .min(1)
+            .max(100)
+            .optional()
+            .describe(
+              'Ticket like "KAN-42" these tasks were split out of, e.g. out-of-scope work found while fixing it. Links back from each new task, and notes the new tickets on the parent when it is assigned to the user.',
+            ),
           tasks: z
             .array(
               z.object({
@@ -335,9 +346,15 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
           openWorldHint: false,
         },
       },
-      async ({ projectId, tasks }) =>
+      async ({ projectId, tasks, followUpOf }) =>
         run(async (caller) => {
           await resolveProjectAccess({ db, userId: auth.userId, projectId });
+          const parent = followUpOf
+            ? await resolveTask(caller, followUpOf)
+            : null;
+          const parentLink = parent
+            ? `<p>Follow-up from <a href="${taskUrl(parent.projectSlug, parent.id)}">${parent.identifier}</a>.</p>`
+            : "";
           const [projectBoard] = await db
             .select({ id: board.id })
             .from(board)
@@ -351,9 +368,11 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
               columnId: taskInput.columnId,
               title: taskInput.title,
               description:
-                taskInput.description === undefined
+                taskInput.description === undefined && !parentLink
                   ? undefined
-                  : sanitizeRichText(taskInput.description),
+                  : sanitizeRichText(
+                      `${parentLink}${taskInput.description ?? ""}`,
+                    ),
               priority: taskInput.priority,
               labelIds: taskInput.labelIds,
               assigneeId: taskInput.assigneeId ?? undefined,
@@ -361,15 +380,26 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
               checklist: taskInput.checklist,
             })),
           });
-          return {
-            count: result.count,
-            tasks: result.tasks.map((item) => ({
-              id: item.id,
-              identifier: `${item.projectKey}-${item.number}`,
-              title: item.title,
-              url: taskUrl(item.projectSlug, item.id),
-            })),
-          };
+          const created = result.tasks.map((item) => ({
+            id: item.id,
+            identifier: `${item.projectKey}-${item.number}`,
+            title: item.title,
+            url: taskUrl(item.projectSlug, item.id),
+          }));
+          if (parent && parent.assigneeId === auth.userId) {
+            // creation already succeeded; the backlink note is best-effort
+            await agentCommentBody(
+              `Follow-ups split out:\n${created.map((c) => `- [${c.identifier}](${c.url}) ${c.title}`).join("\n")}`,
+              auth.clientId,
+            )
+              .then((body) =>
+                postAgentComment(caller, parent, auth.userId, body),
+              )
+              .catch((err: unknown) =>
+                console.error("[mcp] follow-up note failed", err),
+              );
+          }
+          return { count: result.count, tasks: created };
         }),
     );
   }
@@ -380,4 +410,9 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
     read: auth.scopes.includes(SCOPE_READ),
     write: auth.scopes.includes(SCOPE_WRITE),
   });
+
+  if (auth.scopes.includes(SCOPE_WRITE)) {
+    registerCollaborationTools(server, auth);
+  }
+  if (auth.scopes.includes(SCOPE_READ)) registerDocTools(server, auth);
 }
