@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { AvatarPicker } from "@/components/avatar-picker";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LastUsedBadge, useLastUsedAuth } from "@/components/auth/last-used";
 import { SocialAuth, socialProviderNames } from "@/components/auth/social-auth";
@@ -29,6 +30,8 @@ import {
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toastManager } from "@/components/ui/toast";
+import { UserAvatar } from "@/components/user-avatar";
+import { buildAvatarUrl } from "@/lib/avatar";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
@@ -36,9 +39,12 @@ import type { AuthInvite } from "@/server/invites";
 export function SignupForm({
   providers,
   invite,
+  initialAvatar,
 }: {
   providers: { github: boolean; google: boolean };
   invite: AuthInvite | null;
+  // picked server-side -> no hydration mismatch
+  initialAvatar: { seed: string; bg: string };
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,6 +53,7 @@ export function SignupForm({
   const [email, setEmail] = useState(invite?.email ?? "");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const [avatar, setAvatar] = useState(initialAvatar);
   const { lastUsed, mark } = useLastUsedAuth();
 
   const providerNames = socialProviderNames(providers);
@@ -55,7 +62,12 @@ export function SignupForm({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
-    const res = await authClient.signUp.email({ name, email, password });
+    const res = await authClient.signUp.email({
+      name,
+      email,
+      password,
+      image: buildAvatarUrl(avatar.seed, avatar.bg),
+    });
     setPending(false);
     if (res.error) {
       toastManager.add({
@@ -105,15 +117,29 @@ export function SignupForm({
             <Form className="flex flex-col gap-4" onSubmit={onSubmit}>
               <Field name="name">
                 <FieldLabel>Name</FieldLabel>
-                <Input
-                  autoComplete="name"
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ada Lovelace"
-                  required
-                  size="lg"
-                  value={name}
-                />
+                <div className="flex w-full items-center gap-3">
+                  <UserAvatar
+                    className="border"
+                    image={buildAvatarUrl(avatar.seed, avatar.bg)}
+                    name={name || "?"}
+                    size={40}
+                  />
+                  <Input
+                    autoComplete="name"
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ada Lovelace"
+                    required
+                    size="lg"
+                    value={name}
+                  />
+                </div>
               </Field>
+              <AvatarPicker
+                bg={avatar.bg}
+                onBgChange={(bg) => setAvatar((a) => ({ ...a, bg }))}
+                onSeedChange={(seed) => setAvatar((a) => ({ ...a, seed }))}
+                seed={avatar.seed}
+              />
               <Field name="email">
                 <FieldLabel>Email</FieldLabel>
                 <Input
@@ -162,10 +188,10 @@ export function SignupForm({
             </Form>
           </CardPanel>
         </Card>
-        <p className="text-center text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-center text-sm">
           Already have an account?{" "}
           <Link
-            className="font-medium text-foreground underline-offset-4 hover:underline"
+            className="text-foreground font-medium underline-offset-4 hover:underline"
             href={preserveOAuthQuery("/login", currentQuery)}
           >
             Sign in

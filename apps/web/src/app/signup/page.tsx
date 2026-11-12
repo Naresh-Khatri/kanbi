@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { randomAvatar } from "@/lib/avatar";
 import { socialProvidersEnabled } from "@/server/better-auth/config";
 import { db } from "@/server/db";
 import { resolveAuthInvite } from "@/server/invites";
@@ -22,7 +23,11 @@ export default async function SignupPage({
   );
   return (
     <Suspense>
-      <SignupForm invite={invite} providers={socialProvidersEnabled} />
+      <SignupForm
+        initialAvatar={randomAvatar()}
+        invite={invite}
+        providers={socialProvidersEnabled}
+      />
     </Suspense>
   );
 }

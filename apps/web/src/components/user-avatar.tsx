@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { normalizeAvatarUrl } from "@/lib/avatar";
 
 function initialsOf(name: string | null | undefined) {
   if (!name) return "?";
@@ -25,12 +26,13 @@ export function UserAvatar({
   size?: number;
   className?: string;
 }) {
+  const src = normalizeAvatarUrl(image);
   return (
     <Avatar
       className={className}
       style={{ "--avatar-size": `${size}px` } as React.CSSProperties}
     >
-      {image ? <AvatarImage alt="" src={image} /> : null}
+      {src ? <AvatarImage alt="" src={src} /> : null}
       <AvatarFallback>{initialsOf(name)}</AvatarFallback>
     </Avatar>
   );
