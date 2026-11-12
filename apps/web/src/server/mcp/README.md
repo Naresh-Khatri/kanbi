@@ -120,10 +120,16 @@ work, `/loop 15m /mcp__kanbi__work`.
 ```text
 get_work_queue(repo)  -> project matched from the repo name; in-progress first,
                          then up to 5 ready tasks (priority, due date, age)
-get_task(KAN-42)      -> brief + inlined images
+get_task(KAN-42)      -> brief + inlined images + up to 3 linked docs
 start_task(KAN-42)    -> moves to the board's first in-progress column
-... agent fixes the problem and runs the repo's checks ...
-finish_task(KAN-42)   -> ticks completed checklist items, moves to first done column
+... agent fixes the problem, runs the repo's checks, maybe update_checklist /
+    add_attachment + confirm_attachment for a screenshot ...
+finish_task(KAN-42, summary, prUrl?)
+                      -> ticks completed checklist items, moves to first done
+                         column, posts the summary as an agent comment
+report_blocker(KAN-42, reason)
+                      -> instead of finishing: posts the blocker, moves the
+                         task back to ready
 ```
 
 - **Scope:** only tasks assigned to you, in `unstarted` or `started` columns.
@@ -133,9 +139,16 @@ finish_task(KAN-42)   -> ticks completed checklist items, moves to first done co
 - **Project inference:** the repo basename (or remote) is matched to project
   slug, name, or key. Exact matches win over partial ones. If a repo hint
   matches nothing, the agent gets candidates and asks; it never guesses.
-- **No trace:** every change goes through the normal tRPC procedures as you.
-  Activity, notifications, and realtime updates look like you moved the card.
-  Agents never comment or edit tasks.
+- **Acts as you, visibly:** every change goes through the normal tRPC
+  procedures as you, so activity, notifications, and realtime updates are the
+  same as in the app. Comments an agent posts end with a
+  `— via <client name> (agent)` footer (`agent-note.ts`); `get_task` labels
+  them as agent-posted. An agent can edit or delete only comments that carry
+  its own client's footer, never ones you typed. Identical comments retried
+  within 10 minutes are deduplicated.
+- **Write scope:** every write tool except `create_tasks` acts only on tasks
+  assigned to you. Agents never edit a task's title or description, archive,
+  delete, or reassign.
 - **Races:** `start_task` and `finish_task` move with a compare-and-swap on the
   current column (`task.move` `expectedColumnId`). If someone moved the card
   meanwhile, the call fails and the agent re-reads the queue.
@@ -147,6 +160,15 @@ finish_task(KAN-42)   -> ticks completed checklist items, moves to first done co
   (`server/tasks/columns.ts`).
 - **Images:** up to 4 png/jpeg/gif/webp attachments of up to about 3.75 MB each
   are inlined as image content. Other files are listed with short-lived links.
+- **Attachments from the agent:** `add_attachment` returns a presigned R2 PUT
+  URL (and a ready curl command) valid for 10 minutes; after uploading,
+  `confirm_attachment` checks the object exists and records it. Bytes never
+  pass through the model. Requires R2 to be configured.
+- **Docs:** read-only. `get_task` inlines up to 3 docs linked to the task
+  (4,000 chars each); `list_docs`, `get_doc`, and `search_docs` (keyword,
+  ranked) cover the rest. Docs are presented as possibly outdated reference
+  data. There is no doc writing and no `ask_docs` (that would be a second model
+  call).
 
 ## What an agent can do
 
@@ -164,23 +186,37 @@ the mutations. The `work` prompt needs both scopes.
 | `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
 | `get_task`            | read  | Trust-ordered markdown brief with images inlined.                                 |
 | `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
-| `finish_task`         | write | Tick completed checklist items and move to the first done column.                 |
+| `finish_task`         | write | Tick checklist items, move to done, post the summary (and PR link) as a comment.  |
+| `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.               |
+| `report_blocker`      | write | Post the blocker and move the task back to ready instead of leaving it started.   |
+| `update_checklist`    | write | Complete, reopen, or add checklist items on your task.                            |
+| `set_task_labels`     | write | Add/remove existing board labels by name; never creates labels.                   |
+| `add_attachment`      | write | Get a presigned upload URL for a file (max 25 MB).                                |
+| `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                    |
+| `edit_comment`        | write | Edit a comment this agent client posted.                                          |
+| `delete_comment`      | write | Delete a comment this agent client posted.                                        |
+| `list_docs`           | read  | A project's doc pages as a tree.                                                  |
+| `get_doc`             | read  | One doc page as markdown.                                                         |
+| `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                            |
 
 Use `get_project_context` to obtain canonical column, label, and member IDs.
 `search_tasks` is title-only and a duplicate match is a guardrail, not a
 blocker. After `create_tasks`, report every returned ticket identifier and link.
+`create_tasks` takes an optional `followUpOf` task: each new description links
+back to it, and if that task is yours, it gets a comment listing the follow-ups.
 
-Task edits, comments, other people's tasks, project administration, Docs
-access, and backend AI drafting are unavailable over MCP.
+Editing task titles or descriptions, writing to other people's tasks, archiving
+or deleting tasks, project administration, writing docs, and backend AI
+drafting are unavailable over MCP.
 
 ## Scopes
 
-| Scope            | Granted access                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`. |
-| `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`.                                          |
-| `openid`         | Standard identity claim (requested by default).                                       |
-| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser. |
+| Scope            | Granted access                                                                                                                                                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `list_docs`, `get_doc`, `search_docs`.                                                         |
+| `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`. |
+| `openid`         | Standard identity claim (requested by default).                                                                                                                                                    |
+| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                              |
 
 ## Managing access
 
@@ -225,6 +261,10 @@ but the discovery metadata and login cookie live on the configured origin.
 - `work.ts` - work-mode tools and the `work` prompt; `work-queue.ts` holds the
   pure repo matching, ordering, and brief building.
 - `find.ts` - `find_tasks`, read-only ad-hoc task lookup.
+- `collaborate.ts` - comments, blockers, checklist, labels, attachments on the
+  user's assigned tasks; `task-ref.ts` holds the shared task resolution, column
+  moves, and agent comment posting; `agent-note.ts` the comment footer.
+- `docs.ts` - read-only doc tools.
 - `result.ts` - shared tool results; `McpUserError` messages reach the agent
   verbatim, everything else is logged and genericized.
 - `caller.ts` - synthesizes a session from the OAuth subject so existing tRPC

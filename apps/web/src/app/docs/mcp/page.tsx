@@ -36,6 +36,86 @@ const TOOLS = [
     scope: "write",
     purpose: "Create only the exact task set the user approved.",
   },
+  {
+    name: "find_tasks",
+    scope: "read",
+    purpose: "Answer who added what, when, status, and assignee questions.",
+  },
+  {
+    name: "get_work_queue",
+    scope: "read",
+    purpose: "Your open assigned tasks for the current repo.",
+  },
+  {
+    name: "get_task",
+    scope: "read",
+    purpose: "Trust-ordered brief with images and linked docs.",
+  },
+  {
+    name: "start_task",
+    scope: "write",
+    purpose: "Move your task to in progress.",
+  },
+  {
+    name: "finish_task",
+    scope: "write",
+    purpose: "Move your task to done and post the summary.",
+  },
+  {
+    name: "comment_on_task",
+    scope: "write",
+    purpose: "Post an agent-marked comment on your task.",
+  },
+  {
+    name: "report_blocker",
+    scope: "write",
+    purpose: "Explain the blocker and move your task back to ready.",
+  },
+  {
+    name: "update_checklist",
+    scope: "write",
+    purpose: "Complete, reopen, or add checklist items.",
+  },
+  {
+    name: "set_task_labels",
+    scope: "write",
+    purpose: "Add or remove existing board labels.",
+  },
+  {
+    name: "add_attachment",
+    scope: "write",
+    purpose: "Get an upload URL for a file such as a screenshot.",
+  },
+  {
+    name: "confirm_attachment",
+    scope: "write",
+    purpose: "Record the uploaded file on the task.",
+  },
+  {
+    name: "edit_comment",
+    scope: "write",
+    purpose: "Edit a comment the same agent posted.",
+  },
+  {
+    name: "delete_comment",
+    scope: "write",
+    purpose: "Delete a comment the same agent posted.",
+  },
+  {
+    name: "list_docs",
+    scope: "read",
+    purpose: "A project's doc pages as a tree.",
+  },
+  {
+    name: "get_doc",
+    scope: "read",
+    purpose: "Read one doc page as markdown.",
+  },
+  {
+    name: "search_docs",
+    scope: "read",
+    purpose: "Keyword search across docs.",
+  },
 ] as const;
 
 const LINK =
@@ -74,10 +154,10 @@ export default function McpDocsPage() {
 
       <Card className="mt-8">
         <CardPanel className="flex flex-col gap-1 px-4 py-3">
-          <span className="font-medium text-muted-foreground text-xs">
+          <span className="text-muted-foreground text-xs font-medium">
             Endpoint
           </span>
-          <code className="break-all font-mono text-sm">{endpoint}</code>
+          <code className="font-mono text-sm break-all">{endpoint}</code>
         </CardPanel>
       </Card>
 
@@ -107,8 +187,8 @@ export default function McpDocsPage() {
         </p>
         <CodeBlock code={opencodeConfig} label="opencode.json" />
         <p>
-          Then trigger the login (it also starts automatically the first time
-          it hits the server):
+          Then trigger the login (it also starts automatically the first time it
+          hits the server):
         </p>
         <CodeBlock code="opencode mcp auth kanbi" />
       </DocsSection>
@@ -164,8 +244,8 @@ export default function McpDocsPage() {
       <DocsSection title="Capture approved work">
         <p>
           The connected agent writes the task content; Kanbi does not make a
-          second model call. The agent searches for likely duplicates, shows
-          the exact project, column, title, description, checklist, priority,
+          second model call. The agent searches for likely duplicates, shows the
+          exact project, column, title, description, checklist, priority,
           labels, assignee, and due date, then waits for your explicit approval
           before it creates anything.
         </p>
@@ -174,7 +254,7 @@ export default function McpDocsPage() {
             <ol className="flex flex-col gap-1.5 text-sm">
               {FLOW.map((step, i) => (
                 <li className="flex gap-3" key={step}>
-                  <span className="w-4 shrink-0 text-end text-muted-foreground tabular-nums">
+                  <span className="text-muted-foreground w-4 shrink-0 text-end tabular-nums">
                     {i + 1}
                   </span>
                   {step}
@@ -186,8 +266,8 @@ export default function McpDocsPage() {
         <p>
           One useful task with a description and checklist is the default. Work
           is split only when each item can be delivered independently, and the
-          full split is shown before approval. Task management after creation
-          is not available over MCP.
+          full split is shown before approval. Task management after creation is
+          not available over MCP.
         </p>
       </DocsSection>
 
@@ -214,18 +294,18 @@ export default function McpDocsPage() {
 
       <DocsSection title="Troubleshooting">
         <p>
-          <span className="font-medium text-foreground">
+          <span className="text-foreground font-medium">
             Tools 401, or an endless re-auth loop.
           </span>{" "}
-          The token came back opaque instead of a JWT. Re-authorize with a
-          clean token — for Claude Code, <code>claude mcp remove kanbi</code>{" "}
-          then add it again.
+          The token came back opaque instead of a JWT. Re-authorize with a clean
+          token — for Claude Code, <code>claude mcp remove kanbi</code> then add
+          it again.
         </p>
         <p>
-          <span className="font-medium text-foreground">Host mismatch.</span>{" "}
+          <span className="text-foreground font-medium">Host mismatch.</span>{" "}
           Point the agent at the same host this page is served from, so OAuth
-          discovery, the token audience, and your browser session all line up
-          on one origin.
+          discovery, the token audience, and your browser session all line up on
+          one origin.
         </p>
       </DocsSection>
     </article>
