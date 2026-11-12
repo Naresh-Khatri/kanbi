@@ -3,6 +3,19 @@ import "server-only";
 import nodemailer from "nodemailer";
 
 import { env } from "@/env";
+import {
+  button,
+  divider,
+  esc,
+  eyebrow,
+  frame,
+  heading,
+  layout,
+  linkFallback,
+  paragraph,
+  strong,
+  tokens,
+} from "@/server/mail/layout";
 
 // SMTP is optional; build the transport only when it's configured so the app
 // still runs without mail credentials (sends become no-ops below).
@@ -35,29 +48,23 @@ function appUrl() {
   return env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
 }
 
-const layout = (title: string, body: string) => `<!doctype html>
-<html>
-  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0b0b0c;color:#e7e7e7;padding:32px;">
-    <div style="max-width:520px;margin:0 auto;background:#141416;border:1px solid #222;border-radius:12px;padding:28px;">
-      <h1 style="font-size:18px;margin:0 0 12px;">${title}</h1>
-      ${body}
-      <p style="color:#777;font-size:12px;margin-top:24px;">Kanbi</p>
-    </div>
-  </body>
-</html>`;
-
-const button = (href: string, label: string) =>
-  `<a href="${href}" style="display:inline-block;background:#fff;color:#0b0b0c;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">${label}</a>`;
-
 export async function sendPasswordResetEmail(to: string, url: string) {
   const subject = "Reset your Kanbi password";
-  const text = `Reset your password by visiting: ${url}\n\nIf you didn't request this, you can ignore this email.`;
-  const html = layout(
-    "Reset your password",
-    `<p style="color:#bbb;">Click the button below to choose a new password. This link will expire soon.</p>
-     <p style="margin:20px 0;">${button(url, "Reset password")}</p>
-     <p style="color:#777;font-size:12px;">If you didn't request this, you can safely ignore this email.</p>`,
-  );
+  const text = `Reset your Kanbi password:\n${url}\n\nThis link expires soon. If you didn't request a reset, ignore this email.`;
+  const html = layout({
+    preview: "Use this link to choose a new password.",
+    body: [
+      heading("Reset your password"),
+      paragraph(
+        "Use the button below to choose a new password. The link expires soon.",
+      ),
+      button(url, "Reset password"),
+      divider(),
+      linkFallback(url),
+    ].join(""),
+    footer:
+      "Didn't request this? Ignore this email and your password stays the same.",
+  });
   await sendMail({ to, subject, text, html });
 }
 
@@ -74,6 +81,20 @@ function highlightToText(h: DigestHighlightLine) {
     .join(" ");
 }
 
+function highlightToHtml(h: DigestHighlightLine, boardUrl: string) {
+  const task = h.task
+    ? h.taskId
+      ? `<a href="${esc(`${boardUrl}?task=${encodeURIComponent(h.taskId)}`)}" class="k-fg k-link" style="color:${tokens.fg};font-weight:500;text-decoration:underline;text-decoration-color:${tokens.muted};text-underline-offset:3px;">${esc(h.task)}</a>`
+      : `<span class="k-fg" style="color:${tokens.fg};font-weight:500;">${esc(h.task)}</span>`
+    : null;
+  const parts = [
+    h.actor ? strong(h.actor) : null,
+    `<span class="k-muted" style="color:${tokens.muted};">${esc(h.action)}</span>`,
+    task,
+  ];
+  return parts.filter(Boolean).join(" ");
+}
+
 export async function sendDigestEmail(
   to: string,
   opts: {
@@ -85,32 +106,26 @@ export async function sendDigestEmail(
   },
 ) {
   const url = `${appUrl()}/app/p/${opts.slug}`;
-  const subject = `Weekly digest — ${opts.boardName}`;
+  const subject = `Weekly digest: ${opts.boardName}`;
   const bullets = opts.highlights
-    .map((h) => `• ${highlightToText(h)}`)
+    .map((h) => `- ${highlightToText(h)}`)
     .join("\n");
   const text = `${opts.headline}\n\n${opts.summary}${
     bullets ? `\n\n${bullets}` : ""
   }\n\nOpen the board: ${url}`;
-  const highlightsHtml =
-    opts.highlights.length > 0
-      ? `<ul style="color:#bbb;padding-left:18px;margin:16px 0;">${opts.highlights
-          .map((h) => {
-            const line = highlightToText(h);
-            const body = h.taskId
-              ? `<a href="${url}?task=${h.taskId}" style="color:#cbd5e1;text-decoration:none;">${line}</a>`
-              : line;
-            return `<li style="margin:4px 0;">${body}</li>`;
-          })
-          .join("")}</ul>`
-      : "";
-  const html = layout(
-    opts.headline,
-    `<p style="color:#bbb;">${opts.summary}</p>
-     ${highlightsHtml}
-     <p style="margin:20px 0;">${button(url, "Open board")}</p>
-     <p style="color:#777;font-size:12px;">You're getting this because weekly digests are on for ${opts.boardName}. Turn them off in the project's settings.</p>`,
-  );
+  const html = layout({
+    preview: opts.summary,
+    body: [
+      eyebrow(`Weekly digest · ${opts.boardName}`),
+      heading(opts.headline),
+      paragraph(esc(opts.summary)),
+      opts.highlights.length > 0
+        ? frame(opts.highlights.map((h) => highlightToHtml(h, url)))
+        : "",
+      button(url, "Open board"),
+    ].join(""),
+    footer: `You're getting this because weekly digests are on for ${strong(opts.boardName)}. Turn them off in the project settings.`,
+  });
   await sendMail({ to, subject, text, html });
 }
 
@@ -119,14 +134,22 @@ export async function sendProjectInviteEmail(
   opts: { token: string; projectName: string; inviterName?: string | null },
 ) {
   const url = `${appUrl()}/invite/${opts.token}`;
-  const who = opts.inviterName ? `${opts.inviterName} ` : "Someone ";
-  const subject = `${who}invited you to ${opts.projectName} on Kanbi`;
-  const text = `${who}invited you to collaborate on "${opts.projectName}".\n\nAccept: ${url}`;
-  const html = layout(
-    `You've been invited to ${opts.projectName}`,
-    `<p style="color:#bbb;">${who}invited you to collaborate on <strong>${opts.projectName}</strong> on Kanbi.</p>
-     <p style="margin:20px 0;">${button(url, "Accept invite")}</p>
-     <p style="color:#777;font-size:12px;">Or paste this link in your browser: ${url}</p>`,
-  );
+  const who = opts.inviterName ?? "Someone";
+  const subject = `${who} invited you to ${opts.projectName} on Kanbi`;
+  const text = `${who} invited you to collaborate on "${opts.projectName}" on Kanbi.\n\nAccept the invite: ${url}`;
+  const html = layout({
+    preview: `${who} invited you to collaborate on ${opts.projectName}.`,
+    body: [
+      eyebrow("Project invite"),
+      heading(`Join ${opts.projectName} on Kanbi`),
+      paragraph(
+        `${strong(who)} invited you to collaborate on ${strong(opts.projectName)}. Accept to see its board and docs.`,
+      ),
+      button(url, "Accept invite"),
+      divider(),
+      linkFallback(url),
+    ].join(""),
+    footer: `Sent to ${esc(to)}. Not expecting this? You can ignore it.`,
+  });
   await sendMail({ to, subject, text, html });
 }
