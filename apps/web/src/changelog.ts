@@ -13,6 +13,16 @@ export type Release = {
 
 export const releases: Release[] = [
   {
+    version: "0.2.0",
+    date: "2026-11-12",
+    entries: [
+      "Connect coding agents over MCP to work through your assigned tasks: they pick up the queue for the current repo, post progress, blockers, checklist updates and screenshots, and can read project docs",
+      "Public board links now open a full read-only board with progress, task details and image attachments",
+      "A refreshed interface with a slim top bar, and project settings split into General, Access and Notifications tabs",
+      "Invite links now confirm you're signed in with the invited account before you join",
+    ],
+  },
+  {
     version: "0.1.0",
     date: "2026-08-12",
     entries: [
