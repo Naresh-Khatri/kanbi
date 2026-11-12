@@ -1,94 +1,70 @@
 # Kanbi Design Principles
 
-A small, opinionated design language for Kanbi. The goal is a UI that feels quiet, fast, and out of the way — so the work on the board can be seen.
+Kanbi's UI is built entirely on **[coss ui](https://coss.com/ui)** (Base UI + Tailwind v4). The goal is unchanged: a UI that feels quiet, fast, and out of the way so the work on the board can be seen. coss supplies the primitives and the design system; this file says how Kanbi uses them.
 
-## Philosophy
+- Docs map: https://coss.com/ui/llms.txt (every page is markdown at `<url>.md`)
+- Agent skill: `npx skills add cosscom/ui` (source: `apps/ui/skills/coss` in github.com/cosscom/ui)
+- Particles (composition examples): https://coss.com/ui/particles
 
-- **Subtract until it breaks, then add one thing back.** A screen should have a single job and the minimum UI needed to do it.
-- **Monochrome with alpha, not a palette.** Reach for `white/70`, `white/10`, `white/5` before introducing a new color.
-- **Type and space carry the design.** No decorative shadows, no ornamental borders, no gradients inside components.
-- **Keyboard-first.** Every primary action has a shortcut, and shortcuts are discoverable.
-- **Color is meaning.** Priority, status, focus — that's where color goes. Never decoration.
-- **Motion is almost invisible.** Things snap into place; they don't swoop.
+## Rules
 
-## Two surfaces, two dialects
+1. **coss first, always.** If coss has a primitive for it, use it. Never hand-roll dialogs, menus, popovers, selects, tooltips, toasts, tabs, avatars, badges, cards, empty states, spinners or skeletons.
+2. **`src/components/ui/` is coss-only.** Files there come from `pnpm dlx shadcn@latest add @coss/<name>`. Update with the CLI; don't fork them for one screen. Customize at the call site with `className`, or compose a domain component elsewhere.
+3. **Domain components live with their route** (`_components/`) or in `src/components/<domain>/` when shared (`brand/logo`, `rich-text/*`, `user-avatar`, `command/*`). They compose coss parts. They never re-implement them.
+4. **Semantic tokens only.** Use `text-foreground`, `text-muted-foreground`, `bg-background`, `bg-card`, `bg-popover`, `bg-accent`, `bg-muted`, `border` (default color), `border-input`, `text-destructive-foreground`, `bg-destructive`, plus `info` / `success` / `warning` (`text-*-foreground` for text, `bg-*/8` or `/16` tints). No `white/xx`, no hex, no Tailwind palette colors in components. The one Kanbi addition is `ai` / `ai-foreground`, used only for AI-drafted content.
+5. **Color is meaning.** Priority, status, due-ness, AI, destructive. Data colors (labels, project color) come from the DB as inline `style`. Never decorate.
 
-Marketing pages and product pages do different jobs. They shouldn't look the same.
+## Primitive choices
 
-### Marketing / auth surfaces — landing, login, signup
+| Need | Use |
+| --- | --- |
+| Modal task / form | `Dialog` (`DialogPopup` › `DialogHeader` › `DialogPanel` › `DialogFooter`) |
+| Destructive confirm | `AlertDialog` |
+| Side panel (task detail, digest, archive) | `Drawer` (`position="right"`). `Sheet` is deprecated in coss, don't use it |
+| Actions on a thing | `Menu` (`MenuTrigger render={<Button …/>}`, `MenuItem onClick`) |
+| Right-click on cards/columns | `ContextMenu`, mirroring the `Menu` items |
+| Pick one from a short list | `Select` (items-first) |
+| Pick from a long or searchable list (assignee, labels, column) | `Combobox` (`multiple` for labels) |
+| Rich floating content | `Popover`; link previews → `PreviewCard` |
+| Icon-only button | `Button size="icon*" variant="ghost"` + `Tooltip` (with `Kbd` when there's a shortcut) + `aria-label` |
+| Notifications | `toastManager.add({ type, title, description, actionProps })`, not Sonner |
+| Undo | toast with `actionProps: { children: "Undo", onClick }` |
+| View switchers | `Tabs` (pages) / `ToggleGroup` (inline view or filter modes) |
+| Forms | `Form` + `Field` › `FieldLabel` / `Input` / `FieldDescription` / `FieldError` |
+| Inputs with icons/buttons | `InputGroup` |
+| Boxes / sections | `Card` (+ `CardHeader`/`CardPanel`/`CardFooter`) or `Frame` for list containers |
+| Empty states | `Empty` › `EmptyHeader` › `EmptyMedia variant="icon"` / `EmptyTitle` / `EmptyDescription` / `EmptyContent` |
+| Status / label chips, counts | `Badge` (`variant` = outline / secondary / info / success / warning / error) |
+| Loading | `Skeleton` for layout, `Spinner` or `Button loading` for actions |
+| Command palette | `Command` (coss Autocomplete-based) |
+| Lists of rows (members, devices, archive) | `Frame` / `Table` |
+| App navigation | One slim top bar (`AppHeader`): logo, project switcher + section tabs, search, inbox, avatar. No sidebar; ⌘K and project jumps cover navigation |
 
-These pages set tone and get out of the way.
+## Composition conventions (Base UI, not Radix)
 
-- Gradient background: `bg-gradient-to-b from-[#0b0b0f] to-[#15162c]`
-- Centered, full-height compositions with generous whitespace
-- Display typography: `font-extrabold text-5xl tracking-tight sm:text-6xl`
-- Pill CTAs (`rounded-full`) — one primary (solid white), one secondary (hairline outline)
-- No product chrome (no sidebars, no breadcrumbs)
+- `asChild` → `render`: `<DialogTrigger render={<Button variant="outline" />}>Open</DialogTrigger>`; links: `<Button render={<Link href="…" />}>`.
+- Menu items use `onClick`, not `onSelect`.
+- Footer cancel/close buttons in Dialog/AlertDialog/Drawer are `variant="ghost"`; `outline` is for buttons that open overlays.
+- Icons: `aria-hidden="true"` when decorative. No numeric `size` props: primitives size their SVGs, override with `size-*` only when needed.
+- Prefer parent `flex gap-*` over `space-y-*`; logical spacing (`ms-*`, `pe-*`); `size-*` for squares; `cn()` for conditionals; `in-[[data-slot=…]]` over `group`.
 
-### Product surfaces — everything under `/app`
+## Dialects
 
-These pages are lived in. They should feel like a tool, not a page.
+- **Product (`/app`, `/b`)**: dense, flat, hairline borders, one top bar and full-width content. Small type (`text-sm`/`text-xs`), `size="sm"` controls in toolbars.
+- **Marketing / auth (`/`, `/login`, `/signup`, `/docs`, `/invite`)**: same tokens and components at larger sizes (`Button size="lg"`, `font-heading` display type), centered compositions, generous space. No product chrome.
 
-- Flat near-black background, no gradients
-- Hairline borders (`border-white/10`) to separate regions, not shadows
-- Corners are `rounded-md` or `rounded-lg` — pill shapes are reserved for filter chips and status badges
-- Information density is a feature — prefer smaller type and tighter padding over sparse layouts
-- Every interactive element has a keyboard path; visible shortcut hints where space allows
+## Motion (Emil Kowalski's rules)
 
-## Typography
-
-- Display (marketing): `font-extrabold tracking-tight`, 5xl–6xl
-- Section headings (product): `font-semibold tracking-tight`, base–lg
-- Body: default weight, `text-white` for primary, `text-white/70` for secondary, `text-white/40` for meta/disabled
-- Line length for prose: cap at `max-w-md` on marketing, `max-w-prose` elsewhere
-- Never mix centered and left-aligned text in the same region
-
-## The alpha ladder (on dark)
-
-A small, disciplined set of tokens. Reach for these before introducing a new color.
-
-| Purpose         | Token                                         |
-| --------------- | --------------------------------------------- |
-| Primary text    | `text-white`                                  |
-| Muted text      | `text-white/70`                               |
-| Meta / disabled | `text-white/40`                               |
-| Hairline        | `border-white/10`                             |
-| Emphasis border | `border-white/20`                             |
-| Hover fill      | `bg-white/5` (dense) / `bg-white/10` (sparse) |
-| Pressed fill    | `bg-white/15`                                 |
-
-Color is reserved for **meaning**: priority, status, urgency, focus ring. Decorative color is not a thing here.
-
-## Buttons
-
-Always `transition`, never scale or shadow on hover.
-
-- **Primary (marketing)** — solid white, black text, pill:
-  `rounded-full bg-white px-6 py-2.5 font-medium text-black transition hover:bg-white/90`
-- **Secondary (marketing)** — hairline pill:
-  `rounded-full border border-white/20 px-6 py-2.5 font-medium transition hover:bg-white/10`
-- **Product button** — compact, rectangular, hairline:
-  `rounded-md border border-white/10 px-3 py-1.5 text-sm transition hover:bg-white/5`
-- **Ghost / icon button** — no border, just hover fill:
-  `rounded-md p-1.5 transition hover:bg-white/5`
-
-One primary per row. Icons inside product buttons are fine and expected; inside marketing CTAs, only if the label would otherwise be ambiguous.
-
-## Motion
-
-- Default transition duration. No bespoke easing curves unless there's a reason.
-- No entrance animations on static content.
-- Drag, open, and confirm get motion. Scroll, hover, and navigation don't.
-- If a motion feels "designed," it's probably too much.
+- Let coss primitives own overlay motion (origin-aware, `ease-out`, under 250ms).
+- No animation on keyboard-initiated or 100x/day actions (command palette, shortcuts, hover).
+- Drag, open and confirm get motion. Scroll, hover and navigation don't.
+- Animate only `transform`/`opacity`; respect `prefers-reduced-motion`.
 
 ## Keyboard-first
 
-Non-negotiable for a tool like this.
-
-- Every primary action has a shortcut, and the shortcut is discoverable (tooltip, command palette, or visible hint).
-- `Cmd+K` is the command palette. It should eventually do anything a mouse can.
-- Single-key shortcuts (`c` to create, `/` to search, `esc` to dismiss) are encouraged inside the product.
-- Focus rings stay visible — `ring-white/40` or the focus accent. Never removed.
+- Every primary action has a shortcut (`react-hotkeys-hook`), shown with `Kbd` in tooltips, menus (`MenuShortcut`) and the command palette.
+- `Cmd+K` palette, `c` create, `/` search, `g h` home, `Alt+1-9` jump to a project, `esc` dismisses.
+- Focus rings stay visible (coss defaults). Never remove them.
 
 ## The test
 

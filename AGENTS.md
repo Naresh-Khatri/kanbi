@@ -27,7 +27,7 @@ There is no test suite. Inside `apps/web` you can also run `pnpm lint:fix`. Env 
 
 ## Web app architecture (`apps/web/src`)
 
-Stack: Next.js 15 App Router, tRPC v11 + TanStack Query, Drizzle ORM on Postgres (`pg` pool), Better Auth, Tailwind v4 + shadcn/Radix, dnd-kit, Zustand, Tiptap, Sonner.
+Stack: Next.js 15 App Router, tRPC v11 + TanStack Query, Drizzle ORM on Postgres (`pg` pool), Better Auth, Tailwind v4 + coss ui (Base UI), dnd-kit, Zustand, Tiptap.
 
 ### Data flow
 
@@ -65,7 +65,7 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 
 - `board-view.tsx` orchestrates everything: dnd-kit DnD (sortable columns horizontally, tasks vertically; `closestCenter` for columns, `closestCorners` for tasks), filters, realtime subscription, open-task state. Types in `board-types.ts` derive from `RouterOutputs["board"]["get"]`.
 - **Mutations are optimistic**: `onMutate` cancels queries, snapshots, writes to the TanStack Query cache; `onError` rolls back; `onSettled` invalidates. Follow this pattern for new board mutations.
-- Deletes are undoable (`use-undoable-board-delete.ts`): remove from cache immediately, defer the server mutation 6s, Sonner toast with Undo restores the snapshot.
+- Deletes are undoable (`use-undoable-board-delete.ts`): remove from cache immediately, defer the server mutation 6s, a coss toast (`toastManager`) with an Undo action restores the snapshot.
 - Cross-component signals (create-task, AI import, command palette) go through the Zustand store `src/components/keybinds/shell-store.ts` (`useAppShell`).
 
 ### Docs feature (`src/app/app/p/[slug]/docs/`)
@@ -87,9 +87,9 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 
 ## Design language
 
-**Read `DESIGN.md` before any UI work.** Key rules: dark-only UI; monochrome alpha ladder (`text-white/70`, `border-white/10`, `bg-white/5`) instead of new colors — color is reserved for meaning (priority/status/focus); two dialects — marketing pages get gradients/pill buttons/display type, product pages under `/app` are flat near-black, hairline borders, dense, `rounded-md`; no hover scale/shadow, minimal motion; keyboard-first (shortcuts via `react-hotkeys-hook`).
+**Read `DESIGN.md` before any UI work.** All UI is built from [coss ui](https://coss.com/ui) primitives (Base UI + Tailwind v4, docs map at https://coss.com/ui/llms.txt). `src/components/ui/` holds only coss files added via `pnpm dlx shadcn@latest add @coss/<name>`. Don't hand-edit them for one screen, and don't add custom primitives there. Use semantic tokens (`text-muted-foreground`, `bg-card`, `border`…), not raw colors. Use Base UI composition (`render`, not `asChild`). Use `toastManager`, not Sonner, and `Drawer`, not Sheet. Keep the app keyboard-first (shortcuts via `react-hotkeys-hook`, shown with `Kbd`).
 
-Tailwind v4 is configured in `src/styles/globals.css` (`@theme` blocks, no `tailwind.config.ts`). Shared primitives live in `src/components/ui/`.
+Tailwind v4 is configured in `src/styles/globals.css` (coss neutral tokens, dark-only via `.dark` on `<html>`, no `tailwind.config.ts`). Shared domain components live in `src/components/<domain>/`.
 
 ## Other notes
 
