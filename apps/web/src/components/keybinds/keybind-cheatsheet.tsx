@@ -3,41 +3,45 @@
 import { useAppShell } from "@/components/keybinds/shell-store";
 import {
   Dialog,
-  DialogContent,
+  DialogDescription,
   DialogHeader,
+  DialogPanel,
+  DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
-import { SectionLabel } from "@/components/ui/surface";
 import { KEYBIND_GROUPS } from "@/lib/keybinds";
 
 export function KeybindCheatsheet() {
   const { cheatsheetOpen, setCheatsheetOpen } = useAppShell();
   return (
     <Dialog onOpenChange={setCheatsheetOpen} open={cheatsheetOpen}>
-      <DialogContent>
+      <DialogPopup>
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogDescription>Press ? anywhere to open this.</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4">
+        <DialogPanel className="flex flex-col gap-5">
           {KEYBIND_GROUPS.map((g) => (
-            <div className="flex flex-col gap-1.5" key={g.title}>
-              <SectionLabel as="div">{g.title}</SectionLabel>
-              <ul className="flex flex-col gap-1 text-sm">
+            <section className="flex flex-col gap-1" key={g.title}>
+              <h3 className="text-muted-foreground text-xs font-medium">
+                {g.title}
+              </h3>
+              <ul className="flex flex-col divide-y text-sm">
                 {g.entries.map((e) => (
                   <li
-                    className="flex items-center justify-between"
+                    className="flex items-center justify-between gap-4 py-1.5"
                     key={e.keys}
                   >
-                    <span className="text-white">{e.description}</span>
-                    <Kbd variant="key">{e.keys}</Kbd>
+                    <span>{e.description}</span>
+                    <Kbd>{e.keys}</Kbd>
                   </li>
                 ))}
               </ul>
-            </div>
+            </section>
           ))}
-        </div>
-      </DialogContent>
+        </DialogPanel>
+      </DialogPopup>
     </Dialog>
   );
 }

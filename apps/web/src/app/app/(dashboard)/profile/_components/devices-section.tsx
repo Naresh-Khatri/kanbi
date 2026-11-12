@@ -1,19 +1,62 @@
 "use client";
 
-import { Card } from "@/components/ui/surface";
-import { useEffect, useMemo, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
-import { Smartphone, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 import {
   formatDateTime,
   formatRelative,
   type PairPayload,
 } from "@kanbi/shared";
+import { SmartphoneIcon, Trash2Icon } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { useEffect, useMemo, useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toastManager } from "@/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { env } from "@/env.js";
 import { api } from "@/trpc/react";
 
@@ -39,7 +82,11 @@ export function DevicesSection() {
     onSuccess: () => utils.device.list.invalidate(),
   });
   const revoke = api.device.revoke.useMutation({
-    onSuccess: () => utils.device.list.invalidate(),
+    onSuccess: () => {
+      setRevoking(null);
+      return utils.device.list.invalidate();
+    },
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
 
   const [name, setName] = useState("");
@@ -48,6 +95,9 @@ export function DevicesSection() {
     deviceId: string;
     token: string;
   } | null>(null);
+  const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -74,135 +124,209 @@ export function DevicesSection() {
       setIssued({ deviceId: result.id, token: result.token });
       setName("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to pair device");
+      toastManager.add({
+        type: "error",
+        title: e instanceof Error ? e.message : "Failed to pair device",
+      });
     }
   };
 
-  return (
-    <section className="mt-12 border-t border-white/10 pt-8">
-      <header className="mb-4">
-        <h2 className="text-sm font-medium text-white">Focus devices</h2>
-        <p className="mt-1 text-xs text-white/70">
-          Pair the Kanbi Focus phone app. Each device gets its own token so you
-          can revoke individually.
-        </p>
-      </header>
+  const devices = list.data ?? [];
 
-      {payload ? (
-        <Card className="mb-6" tone="muted">
-          <div className="flex flex-col items-center gap-3">
-            <div className="rounded-lg bg-white p-3">
-              <QRCodeSVG level="M" size={208} value={encoded} />
-            </div>
-            <p className="text-center text-xs text-white/70">
-              Open Kanbi Focus on your phone, tap “Pair via QR”, and scan.
-            </p>
-            <p className="text-2xs text-center text-white/40">{baseUrl}</p>
-            {wasRewritten ? (
-              <Card
-                as="p"
-                className="text-2xs px-2 py-1 text-white/40"
-                padding="none"
-                radius="md"
-                tone="muted"
-              >
-                Rewrote {new URL(origin).hostname} → {LAN_HOST}. Override with
-                NEXT_PUBLIC_LAN_HOST.
-              </Card>
-            ) : null}
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  navigator.clipboard.writeText(encoded);
-                  toast.success("Pairing payload copied");
-                }}
-                size="sm"
-                variant="outline"
-              >
-                Copy payload
-              </Button>
-              <Button
-                onClick={() => setIssued(null)}
-                size="sm"
-                variant="outline"
-              >
-                Done
-              </Button>
-            </div>
-            <p className="text-2xs text-warning text-center">
-              The token is shown once — leave this open until your phone has
-              paired.
-            </p>
-          </div>
-        </Card>
-      ) : (
-        <div className="mb-6 flex items-end gap-2">
-          <div className="flex-1">
-            <Label className="text-xs text-white/70" htmlFor="device-name">
-              New device name
-            </Label>
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader>
+        <CardTitle className="text-base" render={<h2 />}>
+          Focus devices
+        </CardTitle>
+        <CardDescription>
+          Pair the Kanbi Focus phone app. Each device gets its own token so you
+          can revoke them one at a time.
+        </CardDescription>
+      </CardHeader>
+      <CardPanel>
+        <Form
+          className="flex flex-col gap-2 sm:flex-row sm:items-end"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleIssue();
+          }}
+        >
+          <Field className="flex-1" name="deviceName">
+            <FieldLabel>New device name</FieldLabel>
             <Input
-              className="mt-1"
-              id="device-name"
               onChange={(e) => setName(e.target.value)}
               placeholder="iPhone 15 / kitchen tablet / …"
               value={name}
             />
-          </div>
-          <Button disabled={issue.isPending} onClick={handleIssue}>
-            <Smartphone className="mr-2 h-4 w-4" />
+          </Field>
+          <Button loading={issue.isPending} type="submit">
+            <SmartphoneIcon aria-hidden="true" />
             Pair new device
           </Button>
-        </div>
-      )}
+        </Form>
+      </CardPanel>
 
-      <ul className="divide-y divide-white/10 rounded-lg border border-white/10">
-        {list.isLoading ? (
-          <li className="px-4 py-3 text-xs text-white/40">Loading…</li>
-        ) : !list.data || list.data.length === 0 ? (
-          <li className="px-4 py-3 text-xs text-white/40">
-            No paired devices.
-          </li>
-        ) : (
-          list.data.map((d) => (
-            <li
-              key={d.id}
-              className="flex items-center justify-between px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm text-white">{d.name}</p>
-                <p className="text-2xs text-white/40">
-                  <span className="font-mono">{d.tokenPrefix}…</span>
-                  {" · "}
+      {list.isLoading ? (
+        <div className="flex flex-col gap-2 border-t px-6 py-4">
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-5 w-1/3" />
+        </div>
+      ) : devices.length === 0 ? (
+        <Empty className="border-t py-8 md:py-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <SmartphoneIcon aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle className="text-base">No paired devices</EmptyTitle>
+            <EmptyDescription>
+              Name a device above and scan the QR code from Kanbi Focus.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <Table
+          className="[&_tr>*:first-child]:ps-6 [&_tr>*:last-child]:pe-6"
+          render={<div className="border-t" />}
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>Device</TableHead>
+              <TableHead>Token</TableHead>
+              <TableHead>Last seen</TableHead>
+              <TableHead className="w-12">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {devices.map((d) => (
+              <TableRow key={d.id}>
+                <TableCell className="max-w-0 truncate font-medium">
+                  {d.name}
+                </TableCell>
+                <TableCell className="text-muted-foreground font-mono text-xs">
+                  {d.tokenPrefix}…
+                </TableCell>
+                <TableCell className="text-muted-foreground text-xs">
                   {d.lastSeenAt ? (
                     <span title={formatDateTime(d.lastSeenAt)}>
-                      last seen {formatRelative(d.lastSeenAt)}
+                      {formatRelative(d.lastSeenAt)}
                     </span>
                   ) : (
-                    "never used"
+                    "Never used"
                   )}
-                </p>
-              </div>
-              <Button
-                aria-label="Revoke"
-                disabled={revoke.isPending}
-                onClick={() => {
-                  if (
-                    confirm(`Revoke "${d.name}"? The device will sign out.`)
-                  ) {
-                    revoke.mutate({ id: d.id });
-                  }
-                }}
-                size="icon-sm"
-                type="button"
-                variant="quiet-danger"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </li>
-          ))
-        )}
-      </ul>
-    </section>
+                </TableCell>
+                <TableCell className="text-end">
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          aria-label={`Revoke ${d.name}`}
+                          onClick={() =>
+                            setRevoking({ id: d.id, name: d.name })
+                          }
+                          size="icon-sm"
+                          variant="ghost"
+                        />
+                      }
+                    >
+                      <Trash2Icon aria-hidden="true" />
+                    </TooltipTrigger>
+                    <TooltipPopup>Revoke</TooltipPopup>
+                  </Tooltip>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) setIssued(null);
+        }}
+        open={payload !== null}
+      >
+        <DialogPopup className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Scan to pair</DialogTitle>
+            <DialogDescription>
+              Open Kanbi Focus on your phone, tap “Pair via QR”, and scan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="flex flex-col items-center gap-3">
+            {/* qr needs a light quiet zone to scan in dark mode */}
+            <div className="rounded-lg bg-white p-3">
+              <QRCodeSVG level="M" size={208} value={encoded} />
+            </div>
+            <p className="text-muted-foreground text-center font-mono text-xs">
+              {baseUrl}
+            </p>
+            {wasRewritten ? (
+              <p className="text-muted-foreground text-center text-xs">
+                Rewrote {origin ? new URL(origin).hostname : "localhost"} →{" "}
+                {LAN_HOST}. Override with NEXT_PUBLIC_LAN_HOST.
+              </p>
+            ) : null}
+            <Alert variant="warning">
+              <AlertDescription>
+                The token is shown once. Keep this open until your phone has
+                paired.
+              </AlertDescription>
+            </Alert>
+          </DialogPanel>
+          <DialogFooter>
+            <Button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(encoded);
+                  toastManager.add({
+                    type: "success",
+                    title: "Pairing payload copied",
+                  });
+                } catch {
+                  toastManager.add({ type: "error", title: "Couldn't copy" });
+                }
+              }}
+              variant="outline"
+            >
+              Copy payload
+            </Button>
+            <Button onClick={() => setIssued(null)}>Done</Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) setRevoking(null);
+        }}
+        open={revoking !== null}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke “{revoking?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The device will sign out and need to be paired again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="ghost" />}>
+              Cancel
+            </AlertDialogClose>
+            <Button
+              loading={revoke.isPending}
+              onClick={() => {
+                if (revoking) revoke.mutate({ id: revoking.id });
+              }}
+              variant="destructive"
+            >
+              Revoke device
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+    </Card>
   );
 }

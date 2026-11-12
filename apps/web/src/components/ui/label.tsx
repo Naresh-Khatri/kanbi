@@ -1,21 +1,26 @@
 "use client";
 
-import * as LabelPrimitive from "@radix-ui/react-label";
-import * as React from "react";
-
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
+import type React from "react";
 import { cn } from "@/lib/utils";
 
-export const Label = React.forwardRef<
-  React.ElementRef<typeof LabelPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
->(({ className, ...props }, ref) => (
-  <LabelPrimitive.Root
-    className={cn(
-      "text-sm leading-none font-medium text-white/80 peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+export function Label({
+  className,
+  render,
+  ...props
+}: useRender.ComponentProps<"label">): React.ReactElement {
+  const defaultProps = {
+    className: cn(
+      "inline-flex items-center gap-2 font-medium text-base/4.5 text-foreground sm:text-sm/4",
       className,
-    )}
-    ref={ref}
-    {...props}
-  />
-));
-Label.displayName = LabelPrimitive.Root.displayName;
+    ),
+    "data-slot": "label",
+  };
+
+  return useRender({
+    defaultTagName: "label",
+    props: mergeProps<"label">(defaultProps, props),
+    render,
+  });
+}

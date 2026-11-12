@@ -1,33 +1,31 @@
 import Link from "next/link";
 
+import { Wordmark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
 
-/**
- * Shell for the public getting-started pages. Marketing dialect (gradient
- * backdrop, no product chrome) but with a readable left-aligned column instead
- * of the centered hero composition.
- */
+/** public getting-started pages: marketing dialect, left-aligned reading column */
 export default function DocsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-marketing min-h-screen text-white">
-      <header className="mx-auto flex max-w-2xl items-center justify-between px-6 py-6">
-        <Link
-          className="flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
-          href="/"
-        >
-          <Logo className="h-5 w-5" />
-          Kanbi
+    <div className="relative isolate min-h-dvh">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-96 bg-radial-[ellipse_at_50%_0%] from-foreground/6 to-transparent to-70%"
+      />
+      <header className="mx-auto flex h-16 max-w-2xl items-center justify-between px-6">
+        <Link aria-label="Kanbi home" className="rounded-md" href="/">
+          <Wordmark size="sm" />
         </Link>
-        <Button asChild size="inline" variant="link">
-          <Link href="/login">Sign in</Link>
+        <Button render={<Link href="/login" />} variant="ghost">
+          Sign in
         </Button>
       </header>
-      <main className="mx-auto max-w-2xl px-6 pt-6 pb-24">{children}</main>
+      <main className="mx-auto max-w-2xl px-6 pt-10 pb-24 [&_p_code]:rounded-sm [&_p_code]:bg-muted [&_p_code]:px-1 [&_p_code]:py-0.5 [&_p_code]:font-mono [&_p_code]:text-[0.8125rem] [&_p_code]:text-foreground">
+        {children}
+      </main>
     </div>
   );
 }

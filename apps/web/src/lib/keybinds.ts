@@ -8,7 +8,7 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
     title: "Navigation",
     entries: [
       { keys: "⌘K / Ctrl+K", description: "Open command palette" },
-      { keys: "g then h", description: "Go to dashboard" },
+      { keys: "g then h", description: "Go to Home" },
       {
         keys: "g then 1-9 / Alt+1-9",
         description: "Jump to Nth active project",

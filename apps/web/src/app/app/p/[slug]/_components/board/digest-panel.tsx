@@ -1,35 +1,41 @@
 "use client";
 
 import {
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-  MessageSquare,
-  Plus,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react";
-import {
   formatDate,
   formatDateRange,
   formatRelative,
   formatWeekday,
 } from "@kanbi/shared";
+import {
+  ArrowRightIcon,
+  CheckCircle2Icon,
+  MessageSquareIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { useMemo } from "react";
-import { toast } from "sonner";
-
-import { Dot } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Card, EmptyState, SectionLabel } from "@/components/ui/surface";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { cn } from "@/lib/utils";
+  Drawer,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerPanel,
+  DrawerPopup,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Spinner } from "@/components/ui/spinner";
+import { toastManager } from "@/components/ui/toast";
+import { UserAvatar } from "@/components/user-avatar";
 import type { DigestCategory, DigestHighlight } from "@/server/db/schema";
 import { api } from "@/trpc/react";
 
@@ -38,10 +44,20 @@ type Member = { userId: string; name: string | null; image: string | null };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const STAT_DEFS = [
-  { key: "created", label: "created", Icon: Plus, accent: false },
-  { key: "moved", label: "moved", Icon: ArrowRight, accent: false },
-  { key: "completed", label: "completed", Icon: CheckCircle2, accent: true },
-  { key: "comments", label: "comments", Icon: MessageSquare, accent: false },
+  { key: "created", label: "created", Icon: PlusIcon, accent: false },
+  { key: "moved", label: "moved", Icon: ArrowRightIcon, accent: false },
+  {
+    key: "completed",
+    label: "completed",
+    Icon: CheckCircle2Icon,
+    accent: true,
+  },
+  {
+    key: "comments",
+    label: "comments",
+    Icon: MessageSquareIcon,
+    accent: false,
+  },
 ] as const;
 
 const GROUPS: { category: DigestCategory; label: string }[] = [
@@ -56,7 +72,6 @@ function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Tiny per-day activity bar chart for the window. */
 function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
   const max = Math.max(1, ...data);
   const startMs = new Date(start).getTime();
@@ -69,7 +84,7 @@ function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
         })}`;
         return (
           <div
-            className="flex-1 rounded-md bg-white/10 transition-colors hover:bg-white/15"
+            className="bg-info/24 dark:bg-info/32 flex-1 rounded-sm"
             key={i}
             style={{ height: `${Math.max(6, (v / max) * 100)}%` }}
             title={`${label}: ${v} update${v === 1 ? "" : "s"}`}
@@ -80,7 +95,6 @@ function Sparkline({ data, start }: { data: number[]; start: Date | string }) {
   );
 }
 
-/** Emphasize numbers and known people inline within the AI prose. */
 function FormattedSummary({ text, names }: { text: string; names: string[] }) {
   const nodes = useMemo(() => {
     const sorted = names
@@ -94,13 +108,13 @@ function FormattedSummary({ text, names }: { text: string; names: string[] }) {
       if (!part) return null;
       if (/^\d/.test(part))
         return (
-          <strong className="font-semibold text-white" key={i}>
+          <strong className="text-foreground font-semibold" key={i}>
             {part}
           </strong>
         );
       if (nameSet.has(part.toLowerCase()))
         return (
-          <span className="font-medium text-white" key={i}>
+          <span className="text-foreground font-medium" key={i}>
             {part}
           </span>
         );
@@ -108,7 +122,9 @@ function FormattedSummary({ text, names }: { text: string; names: string[] }) {
     });
   }, [text, names]);
 
-  return <p className="text-sm leading-relaxed text-white/70">{nodes}</p>;
+  return (
+    <p className="text-muted-foreground text-sm leading-relaxed">{nodes}</p>
+  );
 }
 
 function HighlightRow({
@@ -123,17 +139,20 @@ function HighlightRow({
   const inner = (
     <>
       {h.actor ? (
-        <UserAvatar className="mt-0.5" image={image} name={h.actor} size={22} />
+        <UserAvatar className="mt-0.5" image={image} name={h.actor} size={20} />
       ) : (
-        <Dot className="mt-2 h-1.5 w-1.5 bg-white/15" />
+        <span
+          aria-hidden="true"
+          className="bg-muted-foreground/40 mx-[7px] mt-2 size-1.5 shrink-0 rounded-full"
+        />
       )}
-      <p className="text-sm leading-relaxed text-white/70">
+      <p className="text-muted-foreground text-sm leading-relaxed">
         {h.actor ? (
-          <span className="font-medium text-white">{h.actor} </span>
+          <span className="text-foreground font-medium">{h.actor} </span>
         ) : null}
         {h.action}
         {h.task ? (
-          <span className="font-medium text-white"> “{h.task}”</span>
+          <span className="text-foreground font-medium"> “{h.task}”</span>
         ) : null}
       </p>
     </>
@@ -143,7 +162,7 @@ function HighlightRow({
     return (
       <li>
         <button
-          className="-mx-2 flex w-full items-start gap-2.5 rounded-md px-2 py-1 text-left transition hover:bg-white/5"
+          className="hover:bg-accent focus-visible:ring-ring -mx-2 flex w-[calc(100%+--spacing(4))] items-start gap-2.5 rounded-md px-2 py-1 text-start transition-colors outline-none focus-visible:ring-2"
           onClick={onOpen}
           type="button"
         >
@@ -174,7 +193,7 @@ export function DigestPanel({
   const latest = api.digest.latest.useQuery({ boardId }, { enabled: open });
   const generate = api.digest.generate.useMutation({
     onSuccess: () => utils.digest.latest.invalidate({ boardId }),
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
 
   const { nameToImage, memberNames } = useMemo(() => {
@@ -205,186 +224,160 @@ export function DigestPanel({
   const showLabels = groups.length > 1;
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle asChild>
-            <SectionLabel
-              as="h2"
-              className="flex flex-wrap items-center gap-x-2 gap-y-1"
-            >
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5" /> Weekly digest
-              </span>
-              {digest ? (
-                <span className="flex items-center gap-2 tracking-normal text-white/40 normal-case">
-                  <span className="text-white/40">·</span>
-                  {formatDateRange(digest.periodStart, digest.periodEnd)}
-                </span>
-              ) : null}
-            </SectionLabel>
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            An AI summary of the last 7 days of board activity.
-          </DialogDescription>
-        </DialogHeader>
-
-        {latest.isLoading ? (
-          <div className="flex items-center justify-center py-10 text-white/40">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : digest ? (
-          <div className="flex flex-col gap-4">
-            <h2 className="text-xl leading-snug font-semibold text-white">
-              {digest.content.headline}
-            </h2>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              {STAT_DEFS.map(({ key, label, Icon, accent }) => {
-                const value = digest.content.stats[key];
-                if (!value) return null;
-                return (
-                  <Card
-                    as="span"
-                    className={cn(
-                      "flex items-center gap-1 px-2 py-0.5 text-xs",
-                      accent ? "text-success" : "text-white/70",
-                    )}
-                    key={key}
-                    padding="none"
-                    radius="md"
-                    tone={accent ? "success" : "muted"}
-                  >
-                    <Icon
-                      className={cn(
-                        "h-3 w-3",
-                        accent ? "text-success" : "text-white/40",
-                      )}
-                    />
-                    <span
-                      className={cn(
-                        "font-medium",
-                        accent ? "text-success" : "text-white",
-                      )}
-                    >
-                      {value}
-                    </span>
-                    {label}
-                  </Card>
-                );
-              })}
-              {people.length > 0 ? (
-                <Card
-                  as="span"
-                  className="flex items-center gap-1.5 py-0.5 pr-2 pl-1 text-xs text-white/70"
-                  padding="none"
-                  radius="md"
-                  tone="muted"
-                >
-                  <span className="flex -space-x-1.5">
-                    {people.slice(0, 5).map((p) => (
-                      <UserAvatar
-                        className="ring-overlay ring-2"
-                        image={imageById.get(p.id) ?? null}
-                        key={p.id}
-                        name={p.name}
-                        size={18}
-                      />
-                    ))}
-                  </span>
-                  <span>
-                    <span className="font-medium text-white">
-                      {people.length}
-                    </span>{" "}
-                    {people.length === 1 ? "person" : "people"}
-                  </span>
-                </Card>
-              ) : null}
-            </div>
-
-            {activity.some((v) => v > 0) ? (
-              <Sparkline data={activity} start={digest.periodStart} />
-            ) : null}
-
-            <FormattedSummary
-              names={memberNames}
-              text={digest.content.summary}
+    <Drawer onOpenChange={onOpenChange} open={open} position="right">
+      <DrawerPopup showCloseButton variant="inset">
+        <DrawerHeader>
+          <DrawerTitle className="flex items-center gap-2">
+            <SparklesIcon
+              aria-hidden="true"
+              className="text-ai-foreground size-4"
             />
+            Weekly digest
+          </DrawerTitle>
+          <DrawerDescription>
+            {digest
+              ? formatDateRange(digest.periodStart, digest.periodEnd)
+              : "An AI summary of the last 7 days of board activity."}
+          </DrawerDescription>
+        </DrawerHeader>
 
-            {groups.length > 0 ? (
-              <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
-                {groups.map((g) => (
-                  <div className="flex flex-col gap-1.5" key={g.category}>
-                    {showLabels ? (
-                      <SectionLabel
-                        as="span"
-                        tone={g.category === "shipped" ? "success" : "neutral"}
-                      >
-                        {g.label}
-                      </SectionLabel>
-                    ) : null}
-                    <ul className="flex flex-col gap-1">
-                      {g.items.map((h, i) => (
-                        <HighlightRow
-                          highlight={h}
-                          image={
-                            h.actor
-                              ? (nameToImage.get(h.actor.toLowerCase()) ?? null)
-                              : null
-                          }
-                          key={i}
-                          onOpen={
-                            h.taskId && onOpenTask
-                              ? () => {
-                                  onOpenTask(h.taskId!);
-                                  onOpenChange(false);
-                                }
-                              : undefined
-                          }
+        <DrawerPanel>
+          {latest.isLoading ? (
+            <div className="text-muted-foreground flex items-center justify-center py-10">
+              <Spinner className="size-5" />
+            </div>
+          ) : digest ? (
+            <div className="flex flex-col gap-5">
+              <h3 className="font-heading text-lg leading-snug font-semibold">
+                {digest.content.headline}
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {STAT_DEFS.map(({ key, label, Icon, accent }) => {
+                  const value = digest.content.stats[key];
+                  if (!value) return null;
+                  return (
+                    <Badge key={key} variant={accent ? "success" : "secondary"}>
+                      <Icon aria-hidden="true" />
+                      <span className="font-semibold tabular-nums">
+                        {value}
+                      </span>
+                      {label}
+                    </Badge>
+                  );
+                })}
+                {people.length > 0 ? (
+                  <Badge className="ps-0.5" variant="secondary">
+                    <span className="flex -space-x-1">
+                      {people.slice(0, 5).map((p) => (
+                        <UserAvatar
+                          className="ring-popover ring-2"
+                          image={imageById.get(p.id) ?? null}
+                          key={p.id}
+                          name={p.name}
+                          size={16}
                         />
                       ))}
-                    </ul>
-                  </div>
-                ))}
+                    </span>
+                    <span className="font-semibold tabular-nums">
+                      {people.length}
+                    </span>
+                    {people.length === 1 ? "person" : "people"}
+                  </Badge>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        ) : (
-          <EmptyState size="md">
-            <p>
-              No digest yet.
-              {canWrite
-                ? " Generate one to see what happened this week."
-                : " Ask an editor to generate one."}
-            </p>
-          </EmptyState>
-        )}
+
+              {activity.some((v) => v > 0) ? (
+                <Sparkline data={activity} start={digest.periodStart} />
+              ) : null}
+
+              <FormattedSummary
+                names={memberNames}
+                text={digest.content.summary}
+              />
+
+              {groups.length > 0 ? (
+                <div className="flex flex-col gap-4 border-t pt-4">
+                  {groups.map((g) => (
+                    <section className="flex flex-col gap-1.5" key={g.category}>
+                      {showLabels ? (
+                        <h4
+                          className={
+                            g.category === "shipped"
+                              ? "text-success-foreground text-xs font-medium"
+                              : "text-muted-foreground text-xs font-medium"
+                          }
+                        >
+                          {g.label}
+                        </h4>
+                      ) : null}
+                      <ul className="flex flex-col gap-0.5">
+                        {g.items.map((h, i) => (
+                          <HighlightRow
+                            highlight={h}
+                            image={
+                              h.actor
+                                ? (nameToImage.get(h.actor.toLowerCase()) ??
+                                  null)
+                                : null
+                            }
+                            key={i}
+                            onOpen={
+                              h.taskId && onOpenTask
+                                ? () => {
+                                    onOpenTask(h.taskId!);
+                                    onOpenChange(false);
+                                  }
+                                : undefined
+                            }
+                          />
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Empty className="py-12 md:py-12">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <SparklesIcon aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No digest yet</EmptyTitle>
+                <EmptyDescription>
+                  {canWrite
+                    ? "Generate one to see what happened this week."
+                    : "Ask an editor to generate one."}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </DrawerPanel>
 
         {digest || canWrite ? (
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <span className="text-xs text-white/40">
+          <DrawerFooter className="items-center sm:justify-between">
+            <span className="text-muted-foreground text-xs">
               {digest ? `Generated ${formatRelative(digest.createdAt)}` : ""}
             </span>
             {canWrite ? (
               <Button
-                disabled={generate.isPending}
+                loading={generate.isPending}
                 onClick={() => generate.mutate({ boardId })}
                 size="sm"
-                variant={digest ? "ghost" : "default"}
+                variant={digest ? "outline" : "default"}
               >
-                {generate.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : digest ? (
-                  <RefreshCw className="h-3.5 w-3.5" />
+                {digest ? (
+                  <RefreshCwIcon aria-hidden="true" />
                 ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <SparklesIcon aria-hidden="true" />
                 )}
                 {digest ? "Regenerate" : "Generate this week"}
               </Button>
             ) : null}
-          </div>
+          </DrawerFooter>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </DrawerPopup>
+    </Drawer>
   );
 }

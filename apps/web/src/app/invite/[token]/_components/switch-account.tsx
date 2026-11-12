@@ -1,10 +1,11 @@
 "use client";
 
-import { Card } from "@/components/ui/surface";
+import { TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { toastManager } from "@/components/ui/toast";
 import { authClient } from "@/server/better-auth/client";
 
 export function SwitchAccount({
@@ -23,7 +24,10 @@ export function SwitchAccount({
     const res = await authClient.signOut();
     if (res.error) {
       setPending(false);
-      toast.error(res.error.message ?? "Couldn't sign out");
+      toastManager.add({
+        type: "error",
+        title: res.error.message ?? "Couldn't sign out",
+      });
       return;
     }
     // full nav -> drop cached session; /invite re-routes to login/signup
@@ -32,19 +36,22 @@ export function SwitchAccount({
 
   return (
     <div className="flex flex-col gap-5">
-      <Card className="flex flex-col gap-2 text-sm" tone="warning">
-        <p className="text-white">
+      <Alert variant="warning">
+        <TriangleAlertIcon aria-hidden="true" />
+        <AlertTitle>
           This invite was sent to{" "}
-          <span className="font-medium text-white">{invitedEmail}</span>.
-        </p>
-        <p className="text-white/70">
-          You&apos;re signed in as{" "}
-          <span className="text-white">{currentEmail}</span>. Switch to the
-          invited account to accept.
-        </p>
-      </Card>
-      <Button className="w-full" disabled={pending} onClick={onSwitch}>
-        {pending ? "Signing out…" : `Sign in as ${invitedEmail}`}
+          <span className="font-semibold">{invitedEmail}</span>
+        </AlertTitle>
+        <AlertDescription>
+          <p>
+            You&apos;re signed in as{" "}
+            <span className="text-foreground">{currentEmail}</span>. Switch to
+            the invited account to accept.
+          </p>
+        </AlertDescription>
+      </Alert>
+      <Button className="w-full" loading={pending} onClick={onSwitch} size="lg">
+        Sign in as {invitedEmail}
       </Button>
     </div>
   );

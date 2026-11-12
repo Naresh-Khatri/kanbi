@@ -1,25 +1,38 @@
 "use client";
 
-import { Archive, LogOut, Sparkles, UserRound } from "lucide-react";
+import {
+  ArchiveIcon,
+  BotIcon,
+  KeyboardIcon,
+  LogOutIcon,
+  SparklesIcon,
+  UserRoundIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { APP_VERSION } from "@/changelog";
-import { Button } from "@/components/ui/button";
+import { useAppShell } from "@/components/keybinds/shell-store";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { UserAvatar } from "@/components/ui/user-avatar";
+  Menu,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuItem,
+  MenuLinkItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuShortcut,
+  MenuTrigger,
+} from "@/components/ui/menu";
+import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/server/better-auth/client";
 import { api } from "@/trpc/react";
 
 export function UserMenu() {
   const router = useRouter();
   const me = api.user.me.useQuery().data;
+  const setCheatsheetOpen = useAppShell((s) => s.setCheatsheetOpen);
 
   async function onSignOut() {
     await authClient.signOut();
@@ -30,46 +43,47 @@ export function UserMenu() {
   if (!me) return null;
   const name = me.name ?? "You";
   const email = me.email ?? "";
-  const image = me.image ?? null;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label={name}
-          shape="pill"
-          size="icon-md"
-          title={name}
-          variant="ghost"
-        >
-          <UserAvatar image={image} name={name} size={24} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <div className="px-2 py-1.5 text-xs text-white/70">{email}</div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/app/profile">
-            <UserRound className="h-4 w-4" /> Profile
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/app/archive">
-            <Archive className="h-4 w-4" /> Archived projects
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/app/changelog">
-            <Sparkles className="h-4 w-4" /> What&apos;s new
-            <span className="ml-auto pl-3 font-mono text-xs text-white/40">
-              v{APP_VERSION}
-            </span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onSignOut}>
-          <LogOut className="h-4 w-4" /> Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Menu>
+      <MenuTrigger
+        aria-label="Account"
+        className="rounded-full"
+        render={<Button size="icon-sm" variant="ghost" />}
+      >
+        <UserAvatar image={me.image ?? null} name={name} size={24} />
+      </MenuTrigger>
+      <MenuPopup align="end" className="min-w-56">
+        <MenuGroup>
+          <MenuGroupLabel className="flex flex-col gap-0.5">
+            <span className="text-foreground truncate font-medium">{name}</span>
+            <span className="truncate font-normal">{email}</span>
+          </MenuGroupLabel>
+        </MenuGroup>
+        <MenuLinkItem render={<Link href="/app/profile" />}>
+          <UserRoundIcon aria-hidden="true" /> Profile
+        </MenuLinkItem>
+        <MenuLinkItem render={<Link href="/app/archive" />}>
+          <ArchiveIcon aria-hidden="true" /> Archived projects
+        </MenuLinkItem>
+        <MenuLinkItem render={<Link href="/app/changelog" />}>
+          <SparklesIcon aria-hidden="true" /> What&apos;s new
+          <MenuShortcut className="font-mono tracking-normal">
+            v{APP_VERSION}
+          </MenuShortcut>
+        </MenuLinkItem>
+        <MenuLinkItem render={<Link href="/docs/mcp" />}>
+          <BotIcon aria-hidden="true" /> Connect an agent
+        </MenuLinkItem>
+        <MenuItem onClick={() => setCheatsheetOpen(true)}>
+          <KeyboardIcon aria-hidden="true" /> Keyboard shortcuts
+          <MenuShortcut>?</MenuShortcut>
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem onClick={onSignOut}>
+          <LogOutIcon aria-hidden="true" /> Sign out
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
   );
 }

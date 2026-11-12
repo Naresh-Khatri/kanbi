@@ -1,13 +1,17 @@
 "use client";
 
-import { Archive, ChevronDown, X } from "lucide-react";
+import { ArchiveIcon, ChevronDownIcon, XIcon } from "lucide-react";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Toolbar,
+  ToolbarButton,
+  ToolbarGroup,
+  ToolbarSeparator,
+} from "@/components/ui/toolbar";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Priority } from "../priority";
 import { PRIORITIES, PRIORITY_META, PriorityIcon } from "../priority";
 import type { ColumnRow } from "./board-types";
@@ -28,61 +32,85 @@ export function BulkTaskActions({
   onPriorityChange: (priority: Priority) => void;
 }) {
   return (
-    <div className="bg-raised absolute bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-white/20 p-1.5">
-      <span className="shrink-0 px-2 text-sm font-medium">
-        {count} selected
-      </span>
-      <div className="mx-1 h-5 w-px bg-white/10" />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button className="gap-1.5" size="sm" variant="ghost">
-            Move
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="center">
-          {columns.map((column) => (
-            <DropdownMenuItem
-              key={column.id}
-              onSelect={() => onMove(column.id)}
-            >
-              {column.name}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button className="gap-1.5" size="sm" variant="ghost">
-            Priority
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="center">
-          {PRIORITIES.map((priority) => (
-            <DropdownMenuItem
-              key={priority}
-              onSelect={() => onPriorityChange(priority)}
-            >
-              <PriorityIcon className="h-3.5 w-3.5" priority={priority} />
-              {PRIORITY_META[priority].label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <Button className="gap-1.5" onClick={onArchive} size="sm" variant="ghost">
-        <Archive className="h-3.5 w-3.5" />
-        Archive
-      </Button>
-      <Button
-        aria-label="Clear task selection"
-        onClick={onClear}
-        size="icon"
-        title="Clear selection (Esc)"
-        variant="ghost"
+    <motion.div
+      animate={{ opacity: 1, y: 0 }}
+      className="absolute bottom-4 left-1/2 z-40 max-w-[calc(100vw-2rem)] -translate-x-1/2"
+      initial={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+    >
+      <Toolbar
+        aria-label="Selected tasks"
+        className="bg-popover overflow-x-auto shadow-lg/5"
       >
-        <X className="h-4 w-4" />
-      </Button>
-    </div>
+        <span className="shrink-0 px-2 text-sm font-medium tabular-nums">
+          {count} selected
+        </span>
+        <ToolbarSeparator />
+        <ToolbarGroup>
+          <Menu>
+            <MenuTrigger
+              render={
+                <ToolbarButton render={<Button size="sm" variant="ghost" />} />
+              }
+            >
+              Move
+              <ChevronDownIcon aria-hidden="true" />
+            </MenuTrigger>
+            <MenuPopup side="top">
+              {columns.map((column) => (
+                <MenuItem key={column.id} onClick={() => onMove(column.id)}>
+                  {column.name}
+                </MenuItem>
+              ))}
+            </MenuPopup>
+          </Menu>
+          <Menu>
+            <MenuTrigger
+              render={
+                <ToolbarButton render={<Button size="sm" variant="ghost" />} />
+              }
+            >
+              Priority
+              <ChevronDownIcon aria-hidden="true" />
+            </MenuTrigger>
+            <MenuPopup side="top">
+              {PRIORITIES.map((priority) => (
+                <MenuItem
+                  key={priority}
+                  onClick={() => onPriorityChange(priority)}
+                >
+                  <PriorityIcon priority={priority} />
+                  {PRIORITY_META[priority].label}
+                </MenuItem>
+              ))}
+            </MenuPopup>
+          </Menu>
+          <ToolbarButton
+            onClick={onArchive}
+            render={<Button size="sm" variant="ghost" />}
+          >
+            <ArchiveIcon aria-hidden="true" />
+            Archive
+          </ToolbarButton>
+        </ToolbarGroup>
+        <ToolbarSeparator />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <ToolbarButton
+                aria-label="Clear selection"
+                onClick={onClear}
+                render={<Button size="icon-sm" variant="ghost" />}
+              />
+            }
+          >
+            <XIcon aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipPopup>
+            Clear selection <Kbd>Esc</Kbd>
+          </TooltipPopup>
+        </Tooltip>
+      </Toolbar>
+    </motion.div>
   );
 }

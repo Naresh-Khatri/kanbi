@@ -1,17 +1,46 @@
 "use client";
 
 import { formatDate, formatRelative } from "@kanbi/shared";
-import { Columns3, Eye, Link2, List, Search, X } from "lucide-react";
+import {
+  Columns3Icon,
+  EyeIcon,
+  Link2Icon,
+  ListIcon,
+  SearchIcon,
+  SearchXIcon,
+  XIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 
-import { Badge, Dot } from "@/components/ui/badge";
+import { Logo } from "@/components/brand/logo";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
-import { Logo } from "@/components/ui/logo";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  Progress,
+  ProgressIndicator,
+  ProgressTrack,
+} from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { toastManager } from "@/components/ui/toast";
+import { Toggle } from "@/components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { UserAvatar } from "@/components/user-avatar";
 import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
@@ -21,12 +50,14 @@ import {
   DONE_CATEGORIES,
   type PublicBoard,
   type PublicChecklistItem,
+  type PublicImage,
   type PublicLabel,
   type TaskView,
 } from "./public-types";
 import { ShareUnavailable } from "./share-unavailable";
 
 type Layout = "board" | "list";
+type Focus = "started" | "dueSoon" | "overdue";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -49,6 +80,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
   const [labelIds, setLabelIds] = useState<Set<string>>(new Set());
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [hideDone, setHideDone] = useState(false);
+  const [focus, setFocus] = useState<Focus | null>(null);
   const [layout, setLayout] = useState<Layout>("board");
   const [openKey, setOpenKey] = useOpenTaskParam();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -75,6 +107,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
     const q = query.trim().toLowerCase();
     return views.filter((v) => {
       if (hideDone && v.done) return false;
+      if (focus && !matchesFocus(v, focus)) return false;
       if (assigneeId && v.task.assigneeId !== assigneeId) return false;
       if (labelIds.size > 0 && !v.labels.some((l) => labelIds.has(l.id))) {
         return false;
@@ -86,7 +119,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
         v.labels.some((l) => l.name.toLowerCase().includes(q))
       );
     });
-  }, [views, query, labelIds, assigneeId, hideDone]);
+  }, [views, query, labelIds, assigneeId, hideDone, focus]);
 
   const byColumn = useMemo(() => {
     const map = new Map<string, TaskView[]>(columns.map((c) => [c.id, []]));
@@ -98,7 +131,11 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
     ? columns.filter((c) => !DONE_CATEGORIES.has(c.category))
     : columns;
   const filtering =
-    query.trim() !== "" || labelIds.size > 0 || assigneeId != null || hideDone;
+    query.trim() !== "" ||
+    labelIds.size > 0 ||
+    assigneeId != null ||
+    hideDone ||
+    focus != null;
   const openView = openKey ? views.find((v) => v.key === openKey) : undefined;
 
   function clearFilters() {
@@ -106,22 +143,27 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
     setLabelIds(new Set());
     setAssigneeId(null);
     setHideDone(false);
+    setFocus(null);
   }
 
   return (
-    <main className="flex min-h-screen flex-col">
-      <header className="bg-canvas/80 sticky top-0 z-40 border-b border-white/10 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
-          <Dot color={board.projectColor ?? DEFAULT_PROJECT_COLOR} size="lg" />
+    <main className="flex min-h-dvh flex-col">
+      <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
+          <span
+            aria-hidden="true"
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ background: board.projectColor ?? DEFAULT_PROJECT_COLOR }}
+          />
           <h1 className="min-w-0 truncate text-base font-semibold sm:text-lg">
             {board.projectName}
           </h1>
-          <Badge className="hidden sm:inline-flex">
-            <Eye className="h-3 w-3" /> View only
+          <Badge className="max-sm:hidden" variant="outline">
+            <EyeIcon aria-hidden="true" /> View only
           </Badge>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-3">
             {data.updatedAt ? (
-              <span className="hidden text-xs text-white/40 md:inline">
+              <span className="text-muted-foreground text-xs max-md:hidden">
                 Updated {formatRelative(data.updatedAt)}
               </span>
             ) : null}
@@ -130,27 +172,35 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
                 const url = new URL(window.location.href);
                 url.search = "";
                 void navigator.clipboard.writeText(url.toString());
-                toast.success("Board link copied");
+                toastManager.add({
+                  type: "success",
+                  title: "Board link copied",
+                });
               }}
               size="sm"
-              type="button"
               variant="outline"
             >
-              <Link2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Copy link</span>
+              <Link2Icon aria-hidden="true" />
+              <span className="max-sm:sr-only">Copy link</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <Overview data={data} views={views} />
+      <Overview
+        data={data}
+        focus={focus}
+        onFocus={(f) => setFocus((cur) => (cur === f ? null : f))}
+        views={views}
+      />
 
-      <div className="flex flex-wrap items-center gap-2 px-4 pb-3 sm:px-6">
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
-          <Input
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-4 sm:px-6">
+        <InputGroup className="min-w-0 flex-1 sm:w-64 sm:flex-none">
+          <InputGroupAddon>
+            <SearchIcon aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
             aria-label="Search tasks"
-            className="h-8 pr-8 pl-8 text-sm"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
@@ -160,100 +210,116 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
             }}
             placeholder="Search tasks"
             ref={searchRef}
+            size="sm"
             value={query}
           />
           {query ? null : (
-            <Kbd className="absolute top-1/2 right-2 -translate-y-1/2">/</Kbd>
+            <InputGroupAddon align="inline-end">
+              <Kbd>/</Kbd>
+            </InputGroupAddon>
           )}
+        </InputGroup>
+        {/* mobile: own full-bleed row that scrolls sideways instead of wrapping */}
+        <div className="flex items-center gap-x-3 gap-y-2 max-sm:order-last max-sm:-mx-4 max-sm:w-[calc(100%+2rem)] max-sm:overflow-x-auto max-sm:px-4 max-sm:[scrollbar-width:none] sm:flex-wrap">
+          {data.labels.length > 0 ? <ToolbarDivider /> : null}
+          <LabelFilter
+            labels={data.labels}
+            onToggle={(id) =>
+              setLabelIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              })
+            }
+            selected={labelIds}
+          />
+          <ToolbarDivider />
+          {data.assignees.length > 0 ? (
+            <div className="flex shrink-0 items-center gap-0.5">
+              {data.assignees.map((a) => (
+                <Tooltip key={a.id}>
+                  <TooltipTrigger
+                    render={
+                      <Toggle
+                        aria-label={`Only ${a.name}'s tasks`}
+                        className={cn(
+                          "rounded-full",
+                          assigneeId && assigneeId !== a.id && "opacity-48",
+                        )}
+                        onPressedChange={() =>
+                          setAssigneeId((cur) => (cur === a.id ? null : a.id))
+                        }
+                        pressed={assigneeId === a.id}
+                        size="sm"
+                      />
+                    }
+                  >
+                    <UserAvatar image={a.image} name={a.name} size={22} />
+                  </TooltipTrigger>
+                  <TooltipPopup>{a.name}</TooltipPopup>
+                </Tooltip>
+              ))}
+            </div>
+          ) : null}
+          <Toggle
+            className="rounded-full px-3 text-xs font-normal"
+            onPressedChange={() => setHideDone((v) => !v)}
+            pressed={hideDone}
+            size="sm"
+            variant="outline"
+          >
+            Hide done
+          </Toggle>
+          {filtering ? (
+            <Button onClick={clearFilters} size="sm" variant="ghost">
+              <XIcon aria-hidden="true" /> Clear
+            </Button>
+          ) : null}
         </div>
-        <LabelFilter
-          labels={data.labels}
-          onToggle={(id) =>
-            setLabelIds((prev) => {
-              const next = new Set(prev);
-              if (next.has(id)) next.delete(id);
-              else next.add(id);
-              return next;
-            })
-          }
-          selected={labelIds}
-        />
-        {data.assignees.length > 0 ? (
-          <div className="flex items-center gap-1">
-            {data.assignees.map((a) => (
-              <button
-                aria-label={`Only ${a.name}'s tasks`}
-                aria-pressed={assigneeId === a.id}
-                className={cn(
-                  "rounded-full ring-2 transition-opacity",
-                  assigneeId === a.id ? "ring-info" : "ring-transparent",
-                  assigneeId && assigneeId !== a.id && "opacity-40",
-                )}
-                key={a.id}
-                onClick={() =>
-                  setAssigneeId((cur) => (cur === a.id ? null : a.id))
-                }
-                title={a.name}
-                type="button"
-              >
-                <UserAvatar image={a.image} name={a.name} size={24} />
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <Button
-          aria-pressed={hideDone}
-          onClick={() => setHideDone((v) => !v)}
-          size="xs"
-          type="button"
-          variant={hideDone ? "selected" : "toolbar"}
+        <ToggleGroup
+          className="ms-auto"
+          onValueChange={(value) => {
+            const next = value[0] as Layout | undefined;
+            if (next) setLayout(next);
+          }}
+          size="sm"
+          value={[layout]}
+          variant="outline"
         >
-          Hide done
-        </Button>
-        {filtering ? (
-          <Button
-            onClick={clearFilters}
-            size="xs"
-            type="button"
-            variant="quiet"
-          >
-            <X className="h-3.5 w-3.5" /> Clear
-          </Button>
-        ) : null}
-        <div className="ml-auto flex rounded-md border border-white/15 p-0.5">
-          <LayoutButton
-            active={layout === "board"}
-            label="Board"
-            onClick={() => setLayout("board")}
-          >
-            <Columns3 className="h-3.5 w-3.5" />
-          </LayoutButton>
-          <LayoutButton
-            active={layout === "list"}
-            label="List"
-            onClick={() => setLayout("list")}
-          >
-            <List className="h-3.5 w-3.5" />
-          </LayoutButton>
-        </div>
+          <ToggleGroupItem aria-label="Board view" value="board">
+            <Columns3Icon aria-hidden="true" />
+          </ToggleGroupItem>
+          <ToggleGroupItem aria-label="List view" value="list">
+            <ListIcon aria-hidden="true" />
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {filtering && filtered.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-20 text-center">
-          <p className="text-sm text-white/60">No tasks match these filters.</p>
-          <Button onClick={clearFilters} size="sm" variant="outline">
-            Clear filters
-          </Button>
-        </div>
+        <Empty className="flex-1">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <SearchXIcon aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>No matching tasks</EmptyTitle>
+            <EmptyDescription>No tasks match these filters.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button onClick={clearFilters} size="sm" variant="outline">
+              Clear filters
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : layout === "board" ? (
-        <div className="flex-1 snap-x snap-mandatory overflow-x-auto sm:snap-none">
-          <div className="flex min-w-max gap-3 px-4 pb-6 sm:px-6">
+        <div className="mx-auto w-full max-w-7xl flex-1 snap-x snap-mandatory scroll-px-4 overflow-x-auto sm:snap-none">
+          <div className="flex w-max min-w-full items-start gap-3 px-4 pb-8 sm:px-6">
             {visibleColumns.map((col) => {
               const items = byColumn.get(col.id) ?? [];
               return (
                 <section
                   aria-label={col.name}
-                  className="flex w-[85vw] shrink-0 snap-start flex-col gap-2 rounded-xl bg-white/[0.03] p-2 sm:w-72"
+                  className="bg-muted flex w-[85vw] shrink-0 snap-start flex-col gap-2 rounded-xl p-2 sm:w-auto sm:max-w-md sm:min-w-72 sm:flex-1"
                   key={col.id}
                 >
                   <ColumnHeading
@@ -262,12 +328,13 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
                     name={col.name}
                   />
                   {items.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-xs text-white/25">
-                      Nothing here
+                    <p className="text-muted-foreground/72 rounded-lg border border-dashed px-2 py-5 text-center text-xs">
+                      No tasks
                     </p>
                   ) : (
-                    items.map((v) => (
+                    items.map((v, i) => (
                       <PublicTaskCard
+                        index={i}
                         key={v.task.id}
                         onOpen={() => setOpenKey(v.key)}
                         view={v}
@@ -280,7 +347,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
           </div>
         </div>
       ) : (
-        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pb-6 sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pb-8 sm:px-6">
           {visibleColumns.map((col) => {
             const items = byColumn.get(col.id) ?? [];
             if (items.length === 0) return null;
@@ -295,9 +362,10 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
                   count={items.length}
                   name={col.name}
                 />
-                {items.map((v) => (
+                {items.map((v, i) => (
                   <PublicTaskCard
                     compact
+                    index={i}
                     key={v.task.id}
                     onOpen={() => setOpenKey(v.key)}
                     view={v}
@@ -309,19 +377,21 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
         </div>
       )}
 
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4 text-xs text-white/40 sm:px-6">
-        <span>
-          Read-only snapshot
-          {data.expiresAt
-            ? ` · link expires ${formatDate(data.expiresAt)}`
-            : ""}
-        </span>
-        <Link
-          className="inline-flex items-center gap-1.5 text-white/60 transition-colors hover:text-white"
-          href="/"
-        >
-          <Logo className="h-4 w-4" /> Made with Kanbi
-        </Link>
+      <footer className="border-t">
+        <div className="text-muted-foreground mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs sm:px-6">
+          <span>
+            Read-only snapshot
+            {data.expiresAt
+              ? ` · link expires ${formatDate(data.expiresAt)}`
+              : ""}
+          </span>
+          <Link
+            className="hover:text-foreground inline-flex items-center gap-1.5 rounded-sm"
+            href="/"
+          >
+            <Logo className="size-4" /> Made with Kanbi
+          </Link>
+        </div>
       </footer>
 
       <PublicTaskSheet
@@ -332,9 +402,18 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
   );
 }
 
-function Overview({ data, views }: { data: PublicBoard; views: TaskView[] }) {
+function Overview({
+  data,
+  views,
+  focus,
+  onFocus,
+}: {
+  data: PublicBoard;
+  views: TaskView[];
+  focus: Focus | null;
+  onFocus: (f: Focus) => void;
+}) {
   const stats = useMemo(() => {
-    const now = Date.now();
     let done = 0;
     let started = 0;
     let overdue = 0;
@@ -344,11 +423,9 @@ function Overview({ data, views }: { data: PublicBoard; views: TaskView[] }) {
         done++;
         continue;
       }
-      if (v.column.category === "started") started++;
-      if (v.overdue) overdue++;
-      else if (v.task.dueAt && v.task.dueAt.getTime() - now < WEEK_MS) {
-        dueSoon++;
-      }
+      if (matchesFocus(v, "started")) started++;
+      if (matchesFocus(v, "overdue")) overdue++;
+      else if (matchesFocus(v, "dueSoon")) dueSoon++;
     }
     return { total: views.length, done, started, overdue, dueSoon };
   }, [views]);
@@ -356,48 +433,55 @@ function Overview({ data, views }: { data: PublicBoard; views: TaskView[] }) {
   const pct = stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-5 sm:px-6">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 pt-5 pb-4 sm:px-6">
       {data.board.projectDescription ? (
-        <p className="max-w-2xl text-sm text-white/60">
+        <p className="text-muted-foreground max-w-2xl text-sm">
           {data.board.projectDescription}
         </p>
       ) : null}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-8">
-        <div className="flex min-w-56 flex-1 flex-col gap-1.5 sm:max-w-sm">
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-white/60">
-              <span className="text-lg font-semibold text-white tabular-nums">
-                {pct}%
-              </span>{" "}
-              complete
-            </span>
-            <span className="text-white/40 tabular-nums">
-              {stats.done} of {stats.total}
+      {/* gap-px over bg-border = hairline dividers that survive wrapping */}
+      <div className="bg-border grid grid-cols-3 gap-px overflow-hidden rounded-xl border sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+        <div className="bg-card col-span-3 flex flex-col justify-center gap-2 px-3 py-3 sm:col-span-1 sm:px-4">
+          <div className="flex items-baseline justify-between gap-3 text-xs">
+            <span className="text-muted-foreground">Complete</span>
+            <span className="text-muted-foreground tabular-nums">
+              {stats.done} of {stats.total} tasks
             </span>
           </div>
-          <div
-            aria-label={`${pct}% of tasks complete`}
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={pct}
-            className="h-1.5 overflow-hidden rounded-full bg-white/10"
-            role="progressbar"
-          >
-            <div
-              className="bg-success h-full rounded-full"
-              style={{ width: `${pct}%` }}
-            />
+          <div className="flex items-center gap-3">
+            <span className="w-11 text-lg font-semibold tabular-nums">
+              {pct}%
+            </span>
+            <Progress
+              aria-label={`${pct}% of tasks complete`}
+              className="flex-1"
+              value={pct}
+            >
+              <ProgressTrack>
+                <ProgressIndicator className="bg-success" />
+              </ProgressTrack>
+            </Progress>
           </div>
         </div>
-        <dl className="flex gap-6 text-xs">
-          <Stat label="In progress" value={stats.started} />
-          <Stat label="Due this week" value={stats.dueSoon} />
-          <Stat
-            label="Overdue"
-            tone={stats.overdue > 0 ? "danger" : undefined}
-            value={stats.overdue}
-          />
-        </dl>
+        <Stat
+          active={focus === "started"}
+          label="In progress"
+          onClick={() => onFocus("started")}
+          value={stats.started}
+        />
+        <Stat
+          active={focus === "dueSoon"}
+          label="Due this week"
+          onClick={() => onFocus("dueSoon")}
+          value={stats.dueSoon}
+        />
+        <Stat
+          active={focus === "overdue"}
+          label="Overdue"
+          onClick={() => onFocus("overdue")}
+          tone={stats.overdue > 0 ? "danger" : undefined}
+          value={stats.overdue}
+        />
       </div>
     </div>
   );
@@ -407,24 +491,47 @@ function Stat({
   label,
   value,
   tone,
+  active,
+  onClick,
 }: {
   label: string;
   value: number;
   tone?: "danger";
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="flex flex-col">
-      <dd
+    <button
+      aria-pressed={active}
+      className={cn(
+        "bg-card relative flex cursor-pointer touch-manipulation flex-col items-start gap-0.5 px-3 py-3 text-left text-xs outline-none sm:px-4",
+        "hover:bg-accent focus-visible:ring-ring transition-colors duration-150 ease-out focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset",
+        "disabled:hover:bg-card disabled:cursor-default",
+        // selected = filter on -> underline bar, not just a tint
+        "after:bg-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:opacity-0 after:transition-opacity sm:after:inset-x-4",
+        active && "bg-accent hover:bg-accent after:opacity-100",
+      )}
+      disabled={value === 0 && !active}
+      onClick={onClick}
+      title={active ? "Show all tasks" : `Show only ${label.toLowerCase()}`}
+      type="button"
+    >
+      <span className="text-muted-foreground">{label}</span>
+      <span
         className={cn(
           "text-lg font-semibold tabular-nums",
-          tone === "danger" ? "text-danger" : "text-white",
+          tone === "danger" ? "text-destructive-foreground" : "text-foreground",
+          value === 0 && !active && "text-muted-foreground/64",
         )}
       >
         {value}
-      </dd>
-      <dt className="order-first text-white/40">{label}</dt>
-    </div>
+      </span>
+    </button>
   );
+}
+
+function ToolbarDivider() {
+  return <Separator className="h-5 max-sm:hidden" orientation="vertical" />;
 }
 
 function LabelFilter({
@@ -438,56 +545,25 @@ function LabelFilter({
 }) {
   if (labels.length === 0) return null;
   return (
-    <div className="flex max-w-full flex-wrap items-center gap-1">
-      {labels.map((l) => {
-        const on = selected.has(l.id);
-        return (
-          <button
-            aria-pressed={on}
-            className={cn(
-              "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors",
-              on
-                ? "border-white/30 bg-white/10 text-white"
-                : "border-white/10 text-white/60 hover:border-white/20 hover:text-white",
-            )}
-            key={l.id}
-            onClick={() => onToggle(l.id)}
-            type="button"
-          >
-            <Dot color={l.color} size="xs" />
-            {l.name}
-          </button>
-        );
-      })}
+    <div className="flex shrink-0 items-center gap-1 sm:shrink sm:flex-wrap">
+      {labels.map((l) => (
+        <Toggle
+          className="gap-1.5 rounded-full ps-2.5 pe-3 text-xs font-normal"
+          key={l.id}
+          onPressedChange={() => onToggle(l.id)}
+          pressed={selected.has(l.id)}
+          size="sm"
+          variant="outline"
+        >
+          <span
+            aria-hidden="true"
+            className="size-1.5 rounded-full"
+            style={{ background: l.color }}
+          />
+          {l.name}
+        </Toggle>
+      ))}
     </div>
-  );
-}
-
-function LayoutButton({
-  active,
-  label,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      aria-label={`${label} view`}
-      aria-pressed={active}
-      className={cn(
-        "flex h-6 w-7 items-center justify-center rounded transition-colors",
-        active ? "bg-white/10 text-white" : "text-white/40 hover:text-white",
-      )}
-      onClick={onClick}
-      title={label}
-      type="button"
-    >
-      {children}
-    </button>
   );
 }
 
@@ -502,10 +578,27 @@ function ColumnHeading({
 }) {
   return (
     <div className="flex items-center gap-2 px-1.5 py-1">
-      <Dot color={color ?? "#ffffff40"} />
+      <span
+        aria-hidden="true"
+        className="size-2 shrink-0 rounded-full"
+        style={{ background: color ?? "var(--color-muted-foreground)" }}
+      />
       <h2 className="text-sm font-medium">{name}</h2>
-      <span className="text-xs text-white/40 tabular-nums">{count}</span>
+      <span className="text-muted-foreground text-xs tabular-nums">
+        {count}
+      </span>
     </div>
+  );
+}
+
+function matchesFocus(v: TaskView, focus: Focus): boolean {
+  if (v.done) return false;
+  if (focus === "started") return v.column.category === "started";
+  if (focus === "overdue") return v.overdue;
+  return (
+    !v.overdue &&
+    v.task.dueAt != null &&
+    v.task.dueAt.getTime() - Date.now() < WEEK_MS
   );
 }
 
@@ -530,6 +623,16 @@ function useTaskViews(data: PublicBoard): TaskView[] {
       checklistByTask.set(c.taskId, list);
     }
 
+    const imagesByTask = new Map<string, PublicImage[]>();
+    for (const img of data.images) {
+      const list = imagesByTask.get(img.taskId) ?? [];
+      list.push(img);
+      imagesByTask.set(img.taskId, list);
+    }
+    const hiddenByTask = new Map(
+      data.hiddenFiles.map((h) => [h.taskId, h.count]),
+    );
+
     const out: TaskView[] = [];
     for (const task of data.tasks) {
       const column = columnById.get(task.columnId);
@@ -544,6 +647,8 @@ function useTaskViews(data: PublicBoard): TaskView[] {
           ? (assigneeById.get(task.assigneeId) ?? null)
           : null,
         checklist: checklistByTask.get(task.id) ?? [],
+        images: imagesByTask.get(task.id) ?? [],
+        hiddenFiles: hiddenByTask.get(task.id) ?? 0,
         done,
         overdue: !done && task.dueAt != null && task.dueAt.getTime() < now,
       });

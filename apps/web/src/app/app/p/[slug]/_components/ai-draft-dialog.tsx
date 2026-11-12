@@ -1,32 +1,49 @@
 "use client";
 
 import {
-  ChevronDown,
-  ChevronUp,
-  Minus,
-  Plus,
-  Sparkles,
-  Timer,
-  X,
+  ChevronDownIcon,
+  MinusIcon,
+  PlusIcon,
+  SparklesIcon,
+  TimerIcon,
+  XIcon,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-
-import { Badge, Dot } from "@/components/ui/badge";
+import { RichTextEditor } from "@/components/rich-text/editor";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogPanel,
+  DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input, Textarea } from "@/components/ui/input";
-import { SectionLabel } from "@/components/ui/surface";
-import { segmentGroup, segmentVariants } from "@/components/ui/tabs";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { toastManager } from "@/components/ui/toast";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { ColumnPicker } from "./column-picker";
@@ -35,6 +52,7 @@ import {
   AssigneePicker,
   DueDatePicker,
   LabelsChip,
+  LabelSwatch,
   PriorityPicker,
 } from "./task-properties";
 
@@ -61,27 +79,30 @@ type EditableIssue = {
   skip: boolean;
 };
 
-// muted dot per confidence level
 const CONFIDENCE_META: Record<
   EditableIssue["confidence"],
   { label: string; dot: string }
 > = {
-  high: { label: "High confidence", dot: "bg-success/70" },
-  med: { label: "Medium confidence", dot: "bg-warning/70" },
-  low: { label: "Low confidence", dot: "bg-white/20" },
+  high: { label: "High confidence", dot: "bg-success" },
+  med: { label: "Medium confidence", dot: "bg-warning" },
+  low: { label: "Low confidence", dot: "bg-muted-foreground/48" },
 };
 
-// variant depth labels, keyed on explicit `kind` tag (not array position)
+// keyed on explicit `kind` tag (not array position)
 const VARIANT_LABELS: Record<Variant["kind"], string> = {
   concise: "Concise",
   medium: "Medium",
   verbose: "Verbose",
 };
 
-// animates height to fit content so swapping variants glides vs snaps.
-// overflow clipped only mid-animation -> idle editor popovers aren't cut off
+const toastError = (message: string) =>
+  toastManager.add({ type: "error", title: message });
+
+// glides height when swapping variants; overflow clipped only mid-animation
+// so idle editor popovers aren't cut off
 function AnimateHeight({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  const reduceMotion = useReducedMotion();
   const [height, setHeight] = useState<number | "auto">("auto");
   const [overflow, setOverflow] = useState<"hidden" | "visible">("visible");
 
@@ -102,10 +123,22 @@ function AnimateHeight({ children }: { children: React.ReactNode }) {
       onAnimationComplete={() => setOverflow("visible")}
       onAnimationStart={() => setOverflow("hidden")}
       style={{ overflow }}
-      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      transition={{
+        duration: reduceMotion ? 0 : 0.2,
+        ease: [0.23, 1, 0.32, 1],
+      }}
     >
       <div ref={ref}>{children}</div>
     </motion.div>
+  );
+}
+
+function ModEnter({ className }: { className?: string }) {
+  return (
+    <KbdGroup className={cn("max-sm:hidden", className)}>
+      <Kbd className="bg-primary-foreground/16 text-primary-foreground">⌘</Kbd>
+      <Kbd className="bg-primary-foreground/16 text-primary-foreground">↵</Kbd>
+    </KbdGroup>
   );
 }
 
@@ -139,20 +172,16 @@ export function AiDraftDialog({
 
   const [message, setMessage] = useState("");
   const [issues, setIssues] = useState<EditableIssue[] | null>(null);
-  // input = message editor, review = drafted cards. separate from `issues` so
-  // Back to tweak the message never discards edits
+  // separate from `issues` so going back to tweak the message keeps edits
   const [view, setView] = useState<"input" | "review">("input");
-  const [rawExpanded, setRawExpanded] = useState(false);
   const [columnId, setColumnId] = useState<string | null>(defaultColumnId);
   const [submitting, setSubmitting] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
-  // typed message or drafted issues = work worth guarding on close
   const isDirty = message.trim().length > 0 || (issues?.length ?? 0) > 0;
 
-  // intercepts every close path (Esc, overlay, X). successful create closes
-  // via onOpenChange directly, bypassing this guard
+  // guards esc/backdrop/x; successful create calls onOpenChange directly
   function requestOpenChange(next: boolean) {
     if (!next && isDirty) {
       setConfirmDiscard(true);
@@ -166,17 +195,15 @@ export function AiDraftDialog({
       setMessage("");
       setIssues(null);
       setView("input");
-      setRawExpanded(false);
       setColumnId(defaultColumnId);
       setConfirmDiscard(false);
-      setTimeout(() => messageRef.current?.focus(), 30);
     }
   }, [open, defaultColumnId]);
 
   const draft = api.task.draftFromMessage.useMutation({
     onSuccess: (data) => {
       if (data.issues.length === 0) {
-        toast.error("No actionable issues found in that message");
+        toastError("No actionable issues found in that message");
         return;
       }
       setIssues(
@@ -202,12 +229,12 @@ export function AiDraftDialog({
       );
       setView("review");
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toastError(err.message),
   });
 
   const createMany = api.task.createMany.useMutation();
 
-  async function handleParse() {
+  function handleParse() {
     if (!message.trim() || draft.isPending) return;
     draft.mutate({ boardId, message: message.trim() });
   }
@@ -235,7 +262,7 @@ export function AiDraftDialog({
       .filter((v): v is NonNullable<typeof v> => v !== null);
 
     if (picked.length === 0) {
-      toast.error("Nothing to create — every issue is skipped");
+      toastError("Nothing to create. Every issue is skipped.");
       return;
     }
 
@@ -244,12 +271,13 @@ export function AiDraftDialog({
       const res = await createMany.mutateAsync({ boardId, tasks: picked });
       await utils.board.get.invalidate({ boardId });
       const col = sortedColumns.find((c) => c.id === columnId);
-      toast.success(
-        `${res.count} task${res.count === 1 ? "" : "s"} created${col ? ` in ${col.name}` : ""}`,
-      );
+      toastManager.add({
+        type: "success",
+        title: `${res.count} task${res.count === 1 ? "" : "s"} created${col ? ` in ${col.name}` : ""}`,
+      });
       onOpenChange(false);
     } catch (err) {
-      toast.error((err as Error).message);
+      toastError((err as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -258,9 +286,9 @@ export function AiDraftDialog({
   function updateIssue(index: number, patch: Partial<EditableIssue>) {
     setIssues((prev) => {
       if (!prev) return prev;
-      const next = [...prev];
-      const current = next[index];
+      const current = prev[index];
       if (!current) return prev;
+      const next = [...prev];
       next[index] = { ...current, ...patch };
       return next;
     });
@@ -273,13 +301,12 @@ export function AiDraftDialog({
   ) {
     setIssues((prev) => {
       if (!prev) return prev;
-      const next = [...prev];
-      const issue = next[issueIndex];
-      if (!issue) return prev;
+      const issue = prev[issueIndex];
+      const v = issue?.variants[variantIndex];
+      if (!issue || !v) return prev;
       const variants = [...issue.variants];
-      const v = variants[variantIndex];
-      if (!v) return prev;
       variants[variantIndex] = { ...v, ...patch };
+      const next = [...prev];
       next[issueIndex] = { ...issue, variants };
       return next;
     });
@@ -288,220 +315,191 @@ export function AiDraftDialog({
   const activeCount = issues?.filter((i) => !i.skip).length ?? 0;
 
   return (
-    <Dialog onOpenChange={requestOpenChange} open={open}>
-      <DialogContent
-        className="max-h-dialog flex w-full max-w-3xl flex-col gap-0 p-0"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            if (view === "review") handleCreate();
-            else handleParse();
-          }
-        }}
-      >
-        <DialogHeader className="border-b border-white/10 px-5 py-3.5">
-          <DialogTitle className="flex items-center gap-2 text-sm font-medium text-white">
-            <Sparkles className="text-ai h-3.5 w-3.5" />
-            Draft tasks from a message
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Paste a client message and let AI suggest tasks.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          {view === "input" ? (
-            <div className="flex flex-col gap-3 px-5 py-4">
-              <Textarea
-                autoFocus
-                className="min-h-48 resize-y text-sm leading-relaxed"
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Paste the client message, bug report, or spec here…"
-                ref={messageRef}
-                value={message}
-              />
-              {draft.isPending ? <SkeletonCards /> : null}
-            </div>
-          ) : (
-            <>
-              <RawPreview
-                expanded={rawExpanded}
-                message={message}
-                onToggle={() => setRawExpanded((v) => !v)}
-              />
-              <div className="flex flex-col gap-2.5 px-5 py-4">
-                {issues?.map((issue, i) => (
-                  <IssueCard
-                    issue={issue}
-                    key={issue.id}
-                    labels={labels}
-                    members={members.data ?? []}
-                    onIssueEdit={(patch) => updateIssue(i, patch)}
-                    onSkip={(skip) => updateIssue(i, { skip })}
-                    onVariantChange={(variantIndex) =>
-                      updateIssue(i, { variantIndex })
-                    }
-                    onVariantEdit={(patch) =>
-                      updateVariant(i, issue.variantIndex, patch)
-                    }
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
-          {view === "input" ? (
-            <>
-              <span className="text-2xs max-w-3/5 leading-relaxed text-white/40">
-                Each issue comes with a priority, assignee, due date, labels, a
-                pomodoro estimate, and a checklist.
-              </span>
-              <div className="flex items-center gap-2">
-                {issues ? (
-                  <Button
-                    onClick={() => setView("review")}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    Review drafts →
-                  </Button>
-                ) : null}
-                <span className="text-2xs hidden text-white/40 sm:block">
-                  ⌘+↵ to draft
-                </span>
-                <Button
-                  disabled={!message.trim() || draft.isPending}
-                  onClick={handleParse}
-                  size="sm"
-                >
-                  {draft.isPending
-                    ? "Drafting…"
-                    : issues
-                      ? "Re-draft"
-                      : "Draft tasks"}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-xs text-white/70">
-                <span>Create all in</span>
-                <ColumnPicker
-                  columns={sortedColumns}
-                  onChange={setColumnId}
-                  value={columnId}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => setView("input")}
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                >
-                  Back
-                </Button>
-                <span className="text-2xs hidden text-white/40 sm:block">
-                  ⌘+↵
-                </span>
-                <Button
-                  disabled={activeCount === 0 || !columnId || submitting}
-                  onClick={handleCreate}
-                  size="sm"
-                >
-                  {submitting
-                    ? "Creating…"
-                    : `Create ${activeCount} task${activeCount === 1 ? "" : "s"}`}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      </DialogContent>
-
-      <Dialog onOpenChange={setConfirmDiscard} open={confirmDiscard}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Discard draft?</DialogTitle>
-            <DialogDescription>
-              Your message{issues ? " and the tasks drafted from it" : ""} will
-              be lost. This can’t be undone.
+    <>
+      <Dialog onOpenChange={requestOpenChange} open={open}>
+        <DialogPopup
+          className="max-w-3xl"
+          initialFocus={messageRef}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              if (view === "review") void handleCreate();
+              else handleParse();
+            }
+          }}
+        >
+          <DialogHeader className="flex-row items-center gap-2 pe-12 pb-3">
+            <Badge className="bg-ai/8 text-ai-foreground dark:bg-ai/16">
+              <SparklesIcon aria-hidden="true" />
+              AI
+            </Badge>
+            <DialogTitle className="font-medium font-sans text-base">
+              Draft tasks from a message
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Paste a client message and let AI suggest tasks.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => setConfirmDiscard(false)}
-              type="button"
-              variant="ghost"
-            >
+
+          {view === "input" ? (
+            <DialogPanel className="flex flex-col gap-4">
+              <Field>
+                <FieldLabel className="sr-only">Message</FieldLabel>
+                <Textarea
+                  className="[&_textarea]:max-h-[50vh] [&_textarea]:min-h-48 [&_textarea]:resize-y [&_textarea]:leading-relaxed"
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Paste the client message, bug report, or spec here…"
+                  ref={messageRef}
+                  value={message}
+                />
+                <FieldDescription>
+                  Each issue comes with a priority, assignee, due date, labels,
+                  a pomodoro estimate and a checklist.
+                </FieldDescription>
+              </Field>
+              {draft.isPending ? <SkeletonCards /> : null}
+            </DialogPanel>
+          ) : (
+            <DialogPanel className="flex flex-col gap-3">
+              <RawPreview message={message} />
+              {issues?.map((issue, i) => (
+                <IssueCard
+                  issue={issue}
+                  key={issue.id}
+                  labels={labels}
+                  members={members.data ?? []}
+                  onIssueEdit={(patch) => updateIssue(i, patch)}
+                  onSkip={(skip) => updateIssue(i, { skip })}
+                  onVariantChange={(variantIndex) =>
+                    updateIssue(i, { variantIndex })
+                  }
+                  onVariantEdit={(patch) =>
+                    updateVariant(i, issue.variantIndex, patch)
+                  }
+                />
+              ))}
+            </DialogPanel>
+          )}
+
+          <DialogFooter
+            className={cn(
+              "items-center",
+              view === "review" && "sm:justify-between",
+            )}
+          >
+            {view === "input" ? (
+              <>
+                <div className="flex items-center gap-2">
+                  {issues ? (
+                    <Button onClick={() => setView("review")} variant="ghost">
+                      Review drafts
+                    </Button>
+                  ) : null}
+                  <Button
+                    disabled={!message.trim()}
+                    loading={draft.isPending}
+                    onClick={handleParse}
+                  >
+                    {issues ? "Re-draft" : "Draft tasks"}
+                    <ModEnter />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                  Create all in
+                  <ColumnPicker
+                    columns={sortedColumns}
+                    onChange={setColumnId}
+                    value={columnId}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={() => setView("input")} variant="ghost">
+                    Back
+                  </Button>
+                  <Button
+                    disabled={activeCount === 0 || !columnId}
+                    loading={submitting}
+                    onClick={handleCreate}
+                  >
+                    Create {activeCount} task{activeCount === 1 ? "" : "s"}
+                    <ModEnter />
+                  </Button>
+                </div>
+              </>
+            )}
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+
+      <AlertDialog onOpenChange={setConfirmDiscard} open={confirmDiscard}>
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your message{issues ? " and the tasks drafted from it" : ""} will
+              be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="ghost" />}>
               Keep editing
-            </Button>
+            </AlertDialogClose>
             <Button
               onClick={() => {
                 setConfirmDiscard(false);
                 onOpenChange(false);
               }}
-              type="button"
               variant="destructive"
             >
               Discard
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+    </>
   );
 }
 
 function SkeletonCards() {
   return (
-    <div className="flex flex-col gap-3">
+    <div aria-busy="true" className="flex flex-col gap-3">
       {["a", "b"].map((k) => (
-        <div
-          className="animate-pulse rounded-lg border border-white/10 bg-white/5 p-4"
-          key={k}
-        >
-          <div className="mb-3 h-3 w-2/3 rounded-md bg-white/10" />
-          <div className="mb-2 h-3 w-1/2 rounded-md bg-white/10" />
-          <div className="h-3 w-3/4 rounded-md bg-white/10" />
+        <div className="flex flex-col gap-2.5 rounded-xl border p-4" key={k}>
+          <Skeleton className="h-3.5 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+          <Skeleton className="h-3 w-3/4" />
         </div>
       ))}
     </div>
   );
 }
 
-function RawPreview({
-  message,
-  expanded,
-  onToggle,
-}: {
-  message: string;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
+function RawPreview({ message }: { message: string }) {
   return (
-    <button
-      className="flex items-start gap-2 border-b border-white/10 px-5 py-2.5 text-left text-xs text-white/40 transition hover:text-white/70"
-      onClick={onToggle}
-      type="button"
-    >
-      {expanded ? (
-        <ChevronUp className="mt-0.5 h-3 w-3 shrink-0" />
-      ) : (
-        <ChevronDown className="mt-0.5 h-3 w-3 shrink-0" />
-      )}
-      <span
-        className={cn(
-          "flex-1 whitespace-pre-wrap",
-          expanded ? "" : "line-clamp-1",
-        )}
+    <Collapsible>
+      <CollapsibleTrigger
+        className="group/raw flex w-full items-start gap-2 rounded-lg px-1 py-1 text-start text-muted-foreground text-xs outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {message}
-      </span>
-    </button>
+        <ChevronDownIcon
+          aria-hidden="true"
+          className="mt-0.5 size-3.5 shrink-0 transition-transform group-data-panel-open/raw:rotate-180"
+        />
+        <span className="line-clamp-1 flex-1 group-data-panel-open/raw:hidden">
+          {message}
+        </span>
+        <span className="hidden group-data-panel-open/raw:inline">
+          Original message
+        </span>
+      </CollapsibleTrigger>
+      <CollapsiblePanel>
+        <p className="whitespace-pre-wrap ps-6 pt-1 text-muted-foreground text-xs">
+          {message}
+        </p>
+      </CollapsiblePanel>
+    </Collapsible>
   );
 }
 
@@ -525,28 +523,36 @@ function IssueCard({
   const variant = issue.variants[issue.variantIndex];
   const meta = CONFIDENCE_META[issue.confidence];
   const selectedLabels = new Set(issue.labelIds);
-  const multiVariant = issue.variants.length > 1;
+  const activeLabels = labels.filter((l) => selectedLabels.has(l.id));
 
   return (
-    <div
+    <section
+      aria-label={issue.summary}
       className={cn(
-        "rounded-lg border border-white/10 transition-opacity",
-        issue.skip ? "opacity-40" : "bg-white/5",
+        "rounded-xl border bg-card transition-opacity",
+        issue.skip && "bg-transparent opacity-64",
       )}
     >
-      <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2.5">
+      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          <Dot className={meta.dot} title={meta.label} />
-          <span className="truncate text-sm font-medium text-white">
-            {issue.summary}
-          </span>
+          <Tooltip>
+            <TooltipTrigger
+              aria-label={meta.label}
+              render={
+                <span
+                  className={cn("size-1.5 shrink-0 rounded-full", meta.dot)}
+                />
+              }
+            />
+            <TooltipPopup>{meta.label}</TooltipPopup>
+          </Tooltip>
+          <span className="truncate font-medium text-sm">{issue.summary}</span>
         </div>
         <Button
-          className="text-2xs shrink-0"
+          className="shrink-0 text-muted-foreground"
           onClick={() => onSkip(!issue.skip)}
-          size="inline"
-          type="button"
-          variant="link"
+          size="xs"
+          variant="ghost"
         >
           {issue.skip ? "Include" : "Skip"}
         </Button>
@@ -554,8 +560,8 @@ function IssueCard({
 
       {issue.skip || !variant ? null : (
         <>
-          {/* issue-wide attrs, shared across variants */}
-          <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2.5">
+          {/* issue-wide attrs; everything below the border is per-variant */}
+          <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
             <PriorityPicker
               onChange={(priority) => onIssueEdit({ priority })}
               value={issue.priority}
@@ -586,68 +592,64 @@ function IssueCard({
               }}
               selected={selectedLabels}
             />
-            {issue.labelIds.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {labels
-                  .filter((l) => selectedLabels.has(l.id))
-                  .map((l) => (
-                    <Badge color={l.color} fill="solid" key={l.id}>
-                      {l.name}
-                    </Badge>
-                  ))}
-              </div>
-            ) : null}
+            {activeLabels.length > 1
+              ? activeLabels.map((l) => (
+                  <Badge key={l.id} variant="outline">
+                    <LabelSwatch color={l.color} />
+                    {l.name}
+                  </Badge>
+                ))
+              : null}
           </div>
 
-          {/* divider = boundary: attrs above are issue-wide, content below is per-variant */}
-          <div className="mx-4 border-t border-white/10" />
-
-          {multiVariant ? (
-            <div className="px-4 pt-3">
-              <div className={segmentGroup}>
+          <div className="flex flex-col gap-2 border-t px-4 pt-3 pb-4">
+            {issue.variants.length > 1 ? (
+              <ToggleGroup
+                aria-label="Detail level"
+                className="self-start"
+                onValueChange={(next) => {
+                  const v = next[0] as string | undefined;
+                  if (v !== undefined) onVariantChange(Number(v));
+                }}
+                size="sm"
+                value={[String(issue.variantIndex)]}
+                variant="outline"
+              >
                 {issue.variants.map((v, i) => (
-                  <button
-                    aria-pressed={i === issue.variantIndex}
-                    className={segmentVariants({
-                      size: "xs",
-                      active: i === issue.variantIndex,
-                    })}
-                    key={v.id}
-                    onClick={() => onVariantChange(i)}
-                    type="button"
-                  >
+                  <ToggleGroupItem key={v.id} value={String(i)}>
                     {VARIANT_LABELS[v.kind] ?? `Variant ${i + 1}`}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
-            </div>
-          ) : null}
+              </ToggleGroup>
+            ) : null}
 
-          <AnimateHeight>
-            <div className="flex flex-col gap-1 px-4 pt-3 pb-4">
-              <Input
-                className="h-auto text-base font-medium"
-                onChange={(e) => onVariantEdit({ title: e.target.value })}
-                placeholder="Task title"
-                value={variant.title}
-                variant="bare"
-              />
-              <RichTextEditor
-                className="text-white/70"
-                minHeight="52px"
-                onChange={(html) => onVariantEdit({ description: html })}
-                placeholder="Add context and acceptance criteria…"
-                value={variant.description}
-              />
-              <ChecklistField
-                items={variant.checklist}
-                onChange={(checklist) => onVariantEdit({ checklist })}
-              />
-            </div>
-          </AnimateHeight>
+            <AnimateHeight>
+              <div className="flex flex-col gap-1">
+                <Input
+                  aria-label="Task title"
+                  className="[&_input]:h-auto [&_input]:px-0 [&_input]:py-1 [&_input]:font-medium [&_input]:text-base [&_input]:leading-snug"
+                  onChange={(e) => onVariantEdit({ title: e.target.value })}
+                  placeholder="Task title"
+                  unstyled
+                  value={variant.title}
+                />
+                <RichTextEditor
+                  className="text-muted-foreground"
+                  minHeight="52px"
+                  onChange={(html) => onVariantEdit({ description: html })}
+                  placeholder="Add context and acceptance criteria…"
+                  value={variant.description}
+                />
+                <ChecklistField
+                  items={variant.checklist}
+                  onChange={(checklist) => onVariantEdit({ checklist })}
+                />
+              </div>
+            </AnimateHeight>
+          </div>
         </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -659,32 +661,39 @@ function EstimateChip({
   onChange: (n: number) => void;
 }) {
   return (
-    <span className="inline-flex h-7 items-center gap-1 px-1 text-xs text-white/70">
+    <span className="inline-flex h-6 items-center gap-0.5 rounded-md border border-input px-0.5 text-xs">
       <Button
         aria-label="Decrease estimate"
         disabled={value <= 1}
         onClick={() => onChange(Math.max(1, value - 1))}
         size="icon-xs"
-        type="button"
-        variant="quiet"
+        variant="ghost"
       >
-        <Minus className="h-3 w-3" />
+        <MinusIcon aria-hidden="true" />
       </Button>
-      <Timer className="h-3.5 w-3.5" />
-      {value}
+      <span className="inline-flex items-center gap-1 px-0.5 tabular-nums">
+        <TimerIcon
+          aria-hidden="true"
+          className="size-3.5 text-muted-foreground"
+        />
+        <span className="sr-only">Estimate: </span>
+        {value}
+      </span>
       <Button
         aria-label="Increase estimate"
         disabled={value >= 8}
         onClick={() => onChange(Math.min(8, value + 1))}
         size="icon-xs"
-        type="button"
-        variant="quiet"
+        variant="ghost"
       >
-        <Plus className="h-3 w-3" />
+        <PlusIcon aria-hidden="true" />
       </Button>
     </span>
   );
 }
+
+const CHECKLIST_INPUT =
+  "flex-1 [&_input]:h-7 [&_input]:px-0 [&_input]:leading-7 sm:[&_input]:h-6.5 sm:[&_input]:leading-6.5";
 
 function ChecklistField({
   items,
@@ -705,49 +714,63 @@ function ChecklistField({
   if (items.length === 0 && text.length === 0) {
     return (
       <Input
-        className="h-7 text-xs"
+        aria-label="Add a checklist"
+        className={cn(CHECKLIST_INPUT, "text-xs")}
         onChange={(e) => setText(e.target.value)}
         placeholder="+ Add a checklist…"
+        size="sm"
+        unstyled
         value={text}
-        variant="bare"
       />
     );
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-1.5 border-t border-white/10 pt-3">
-      <SectionLabel className="mb-0.5">Checklist</SectionLabel>
+    <div className="mt-2 flex flex-col gap-1 border-t pt-3">
+      <h4 className="mb-1 font-medium text-muted-foreground text-xs">
+        Checklist
+      </h4>
       {items.map((item, idx) => (
-        <div className="group flex items-center gap-2.5" key={`${idx}-${item}`}>
-          <Dot className="ml-1 h-1 w-1 bg-white/20" />
-          <span className="flex-1 text-sm text-white/70">{item}</span>
+        <div
+          className="group/item flex items-center gap-2.5"
+          key={`${idx}-${item}`}
+        >
+          <span
+            aria-hidden="true"
+            className="ms-1 size-1 shrink-0 rounded-full bg-muted-foreground/48"
+          />
+          <span className="flex-1 text-sm">{item}</span>
           <Button
             aria-label="Remove item"
-            className="opacity-0 group-hover:opacity-100"
+            className="text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100 pointer-coarse:opacity-100"
             onClick={() => onChange(items.filter((_, i) => i !== idx))}
             size="icon-xs"
-            type="button"
-            variant="quiet"
+            variant="ghost"
           >
-            <X className="h-3.5 w-3.5" />
+            <XIcon aria-hidden="true" />
           </Button>
         </div>
       ))}
       <div className="flex items-center gap-2">
-        <Plus className="h-3 w-3 shrink-0 text-white/40" />
+        <PlusIcon
+          aria-hidden="true"
+          className="size-3 shrink-0 text-muted-foreground"
+        />
         <Input
+          aria-label="Add a step"
           autoFocus
-          className="h-7"
+          className={CHECKLIST_INPUT}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
               e.preventDefault();
               add();
             }
           }}
           placeholder="Add a step, press Enter"
+          size="sm"
+          unstyled
           value={text}
-          variant="bare"
         />
       </div>
     </div>

@@ -3,37 +3,39 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Archive,
-  GitBranch,
-  Link2,
-  MoreHorizontal,
-  Sun,
-  Timer,
+  ArchiveIcon,
+  GitBranchIcon,
+  Link2Icon,
+  MoreHorizontalIcon,
+  SunIcon,
+  TimerIcon,
+  Trash2Icon,
 } from "lucide-react";
+import { motion } from "motion/react";
 import { memo, useCallback, useEffect, useRef } from "react";
-import { toast } from "sonner";
-import { Dot } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { UserAvatar } from "@/components/ui/user-avatar";
+  ContextMenu,
+  ContextMenuPopup,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Menu, MenuPopup, MenuTrigger } from "@/components/ui/menu";
+import { toastManager } from "@/components/ui/toast";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
-import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
 import { copyBranchCommand, defaultBranchType } from "../copy-branch-command";
 import { copyTaskLink } from "../copy-task-link";
 import { type Priority, PriorityInline } from "../priority";
 import { useArchiveTask } from "../use-archive-task";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
+import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
+import { CONTEXT_MENU_PARTS, MENU_PARTS, type MenuParts } from "./menu-parts";
 
 const REVEAL =
-  "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100";
+  "opacity-0 in-[[data-slot=task-card]:hover]:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 pointer-coarse:opacity-100";
 
 const SORTABLE_TRANSITION = {
   duration: 150,
@@ -91,7 +93,8 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         <DropIndicator className="inset-x-0 -top-1" />
       ) : null}
       <div
-        className="touch-none select-none"
+        className="touch-manipulation select-none"
+        data-slot="task-card-sortable"
         ref={sortable.setNodeRef}
         style={style}
         {...sortable.attributes}
@@ -122,15 +125,16 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 export function DropIndicator({ className }: { className?: string }) {
   return (
     <div
-      aria-hidden
+      aria-hidden="true"
       className={cn(
-        "bg-info/70 pointer-events-none absolute z-10 h-0.5 rounded-full",
+        "bg-info pointer-events-none absolute z-10 h-0.5 rounded-full",
         className,
       )}
     />
   );
 }
 
+/** drag overlay: lifts + tilts on pickup; overlay unmount = drop anim (dnd-kit) */
 export function TaskCardPreview({
   task,
   assignee,
@@ -143,7 +147,12 @@ export function TaskCardPreview({
   projectKey: string;
 }) {
   return (
-    <div className="bg-raised w-72 rounded-lg border border-white/20 p-3 will-change-transform">
+    <motion.div
+      animate={{ rotate: -1.5, scale: 1.02 }}
+      className="bg-popover w-72 cursor-grabbing rounded-lg border p-2.5 shadow-lg/10 will-change-transform"
+      initial={{ rotate: 0, scale: 1 }}
+      transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+    >
       <p className="line-clamp-2 text-sm leading-snug">{task.title}</p>
       <CardBody
         assignee={assignee}
@@ -151,7 +160,7 @@ export function TaskCardPreview({
         projectKey={projectKey}
         task={task}
       />
-    </div>
+    </motion.div>
   );
 }
 
@@ -173,32 +182,33 @@ function CardBody({
   const priority = task.priority as Priority;
 
   return (
-    <div className="text-2xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="font-mono tracking-wide text-white/40">
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      <span className="text-muted-foreground font-mono tracking-wide">
         {projectKey}-{task.number}
       </span>
       {priority !== "none" ? <PriorityInline priority={priority} /> : null}
       {visibleLabels.map((l) => (
-        <span
-          className="inline-flex min-w-0 items-center gap-1 text-white/70"
-          key={l.id}
-        >
-          <Dot color={l.color} size="xs" />
+        <Badge className="min-w-0" key={l.id} size="sm" variant="outline">
+          <span
+            aria-hidden="true"
+            className="size-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: l.color }}
+          />
           <span className="max-w-24 truncate">{l.name}</span>
-        </span>
+        </Badge>
       ))}
       {overflowCount > 0 ? (
-        <span className="text-white/40">+{overflowCount}</span>
+        <span className="text-muted-foreground">+{overflowCount}</span>
       ) : null}
       {task.estimatePomodoros != null ? (
-        <span className="inline-flex items-center gap-1 text-white/40">
-          <Timer className="h-3 w-3" />
+        <span className="text-muted-foreground inline-flex items-center gap-1">
+          <TimerIcon aria-hidden="true" className="size-3" />
           {task.estimatePomodoros}
         </span>
       ) : null}
       {assignee ? (
         <UserAvatar
-          className="ml-auto"
+          className="ms-auto"
           image={assignee.image}
           name={assignee.name}
           size={20}
@@ -207,6 +217,53 @@ function CardBody({
     </div>
   );
 }
+
+type TaskActions = {
+  canWrite: boolean;
+  onToday: boolean;
+  onCopyLink: () => void;
+  onCopyBranch: () => void;
+  onToggleToday: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+};
+
+function TaskActionItems({
+  parts: P,
+  actions: a,
+}: {
+  parts: MenuParts;
+  actions: TaskActions;
+}) {
+  return (
+    <>
+      <P.Item onClick={a.onCopyLink}>
+        <Link2Icon aria-hidden="true" /> Copy link
+      </P.Item>
+      <P.Item onClick={a.onCopyBranch}>
+        <GitBranchIcon aria-hidden="true" /> Copy git branch
+      </P.Item>
+      {a.canWrite ? (
+        <>
+          <P.Item onClick={a.onToggleToday}>
+            <SunIcon aria-hidden="true" />
+            {a.onToday ? "Remove from Today" : "Add to Today"}
+          </P.Item>
+          <P.Item onClick={a.onArchive}>
+            <ArchiveIcon aria-hidden="true" /> Archive
+          </P.Item>
+          <P.Separator />
+          <P.Item onClick={a.onDelete} variant="destructive">
+            <Trash2Icon aria-hidden="true" /> Delete
+          </P.Item>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+// popups portal, but react events still bubble to the card -> don't open/drag it
+const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
 export const TaskCard = memo(function TaskCard({
   boardId,
@@ -242,115 +299,100 @@ export const TaskCard = memo(function TaskCard({
     if (focused) ref.current?.scrollIntoView({ block: "nearest" });
   }, [focused]);
 
+  const actions: TaskActions = {
+    canWrite,
+    onToday: toggleToday.onToday,
+    onCopyLink: () => copyTaskLink(task.id),
+    onCopyBranch: () =>
+      copyBranchCommand({
+        number: task.number,
+        title: task.title,
+        type: defaultBranchType(labels.map((l) => l.name)),
+      }),
+    onToggleToday: toggleToday.onSelect,
+    onArchive: () => archiveTask({ id: task.id, title: task.title }),
+    onDelete: () =>
+      void remove({ kind: "task", id: task.id, name: task.title }),
+  };
+
   return (
-    <div
-      className={cn(
-        "group bg-raised relative w-full cursor-pointer rounded-lg border border-white/10 p-3 transition hover:border-white/20",
-        focused && "border-info/70 ring-info/40 ring-2",
-        selected && "border-info/70 bg-info/10",
-      )}
-      onClick={(event) => {
-        if (event.shiftKey && onToggleSelection) {
-          event.preventDefault();
-          onToggleSelection(true);
-          return;
-        }
-        onOpen();
-      }}
-      ref={ref}
-    >
-      {onToggleSelection ? (
-        <Checkbox
-          aria-label={selected ? "Deselect task" : "Select task"}
-          checked={selected}
-          className={cn(
-            "absolute -top-1.5 -left-1.5 z-10",
-            REVEAL,
-            selected && "opacity-100",
-          )}
-          onCheckedChange={() => {}}
-          onClick={(event) => {
-            event.stopPropagation();
-            event.preventDefault(); // skip onCheckedChange; shiftKey needed
-            onToggleSelection(event.shiftKey);
-          }}
-          onPointerDown={(event) => event.stopPropagation()}
-          lifted
-          tone="info"
-        />
-      ) : null}
-      <p
+    <ContextMenu>
+      <ContextMenuTrigger
         className={cn(
-          "line-clamp-2 text-sm leading-snug",
-          completed && "text-white/70",
+          "bg-card hover:border-input relative w-full cursor-pointer rounded-lg border p-2.5 shadow-xs/5 transition-colors",
+          focused && "border-ring ring-ring/40 ring-2",
+          selected && "border-info/64 bg-info/8 dark:bg-info/16",
         )}
+        data-slot="task-card"
+        onClick={(event) => {
+          if (event.shiftKey && onToggleSelection) {
+            event.preventDefault();
+            onToggleSelection(true);
+            return;
+          }
+          onOpen();
+        }}
+        ref={ref}
       >
-        {task.title}
-      </p>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            aria-label={`More actions for ${task.title}`}
-            className={cn("bg-raised absolute top-1.5 right-1.5", REVEAL)}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            size="icon-xs"
-            title={`More actions for ${task.title}`}
-            variant="ghost"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenuItem onSelect={() => copyTaskLink(task.id)}>
-            <Link2 className="h-3.5 w-3.5" /> Copy link
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() =>
-              copyBranchCommand({
-                number: task.number,
-                title: task.title,
-                type: defaultBranchType(labels.map((l) => l.name)),
-              })
+        {onToggleSelection ? (
+          <Checkbox
+            aria-label={selected ? "Deselect task" : "Select task"}
+            checked={selected}
+            className={cn(
+              "bg-popover absolute -start-1.5 -top-1.5 z-10 shadow-sm/5",
+              REVEAL,
+              selected && "opacity-100",
+            )}
+            onCheckedChange={() => {}}
+            onClick={(event) => {
+              event.stopPropagation();
+              event.preventDefault(); // skip onCheckedChange; shiftKey needed
+              onToggleSelection(event.shiftKey);
+            }}
+            onPointerDown={stop}
+          />
+        ) : null}
+        <p
+          className={cn(
+            "line-clamp-2 pe-5 text-sm leading-snug",
+            completed && "text-muted-foreground",
+          )}
+        >
+          {task.title}
+        </p>
+        <Menu>
+          <MenuTrigger
+            render={
+              <Button
+                aria-label={`More actions for ${task.title}`}
+                className={cn(
+                  "bg-card text-muted-foreground absolute end-1.5 top-1.5",
+                  REVEAL,
+                )}
+                onClick={stop}
+                onPointerDown={stop}
+                size="icon-xs"
+                variant="ghost"
+              />
             }
           >
-            <GitBranch className="h-3.5 w-3.5" /> Copy git branch
-          </DropdownMenuItem>
-          {canWrite ? (
-            <>
-              <DropdownMenuItem onSelect={toggleToday.onSelect}>
-                <Sun className="h-3.5 w-3.5" />
-                {toggleToday.onToday ? "Remove from Today" : "Add to Today"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => archiveTask({ id: task.id, title: task.title })}
-              >
-                <Archive className="h-3.5 w-3.5" /> Archive
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                destructive
-                onSelect={() =>
-                  void remove({
-                    kind: "task",
-                    id: task.id,
-                    name: task.title,
-                  })
-                }
-              >
-                Delete
-              </DropdownMenuItem>
-            </>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <CardBody
-        assignee={assignee}
-        labels={labels}
-        projectKey={projectKey}
-        task={task}
-      />
-    </div>
+            <MoreHorizontalIcon aria-hidden="true" />
+          </MenuTrigger>
+          <MenuPopup align="end" className="w-48" onClick={stop}>
+            <TaskActionItems actions={actions} parts={MENU_PARTS} />
+          </MenuPopup>
+        </Menu>
+        <CardBody
+          assignee={assignee}
+          labels={labels}
+          projectKey={projectKey}
+          task={task}
+        />
+      </ContextMenuTrigger>
+      <ContextMenuPopup className="w-48" onClick={stop}>
+        <TaskActionItems actions={actions} parts={CONTEXT_MENU_PARTS} />
+      </ContextMenuPopup>
+    </ContextMenu>
   );
 });
 
@@ -375,7 +417,7 @@ function useToggleToday(taskId: string) {
     },
     onError: (e, _vars, ctx) => {
       if (ctx?.previous) utils.today.ids.setData(undefined, ctx.previous);
-      toast.error(e.message);
+      toastManager.add({ type: "error", title: e.message });
     },
     onSettled: invalidate,
   });
@@ -390,7 +432,7 @@ function useToggleToday(taskId: string) {
     },
     onError: (e, _vars, ctx) => {
       if (ctx?.previous) utils.today.ids.setData(undefined, ctx.previous);
-      toast.error(e.message);
+      toastManager.add({ type: "error", title: e.message });
     },
     onSettled: invalidate,
   });

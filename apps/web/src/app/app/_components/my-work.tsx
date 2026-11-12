@@ -1,11 +1,12 @@
 "use client";
 
 import {
-  AlertTriangle,
-  AtSign,
-  CalendarClock,
-  ChevronDown,
-  ListTodo,
+  AtSignIcon,
+  CalendarClockIcon,
+  CheckCheckIcon,
+  ChevronDownIcon,
+  ListTodoIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -16,8 +17,22 @@ import {
 } from "@/app/app/p/[slug]/_components/priority";
 import { formatDate, formatDateTime, formatRelative } from "@kanbi/shared";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, EmptyState, SectionTitle } from "@/components/ui/surface";
+import {
+  Card,
+  CardAction,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { TodayQueue } from "./today-queue";
@@ -63,34 +78,44 @@ export function MyWork() {
     data.mentions.length === 0;
 
   return (
-    <section className="flex flex-col gap-4 border-t border-white/10 pt-10">
-      <SectionTitle>My work</SectionTitle>
+    <section className="flex flex-col gap-4">
+      <h2 className="font-heading text-lg font-semibold">My work</h2>
       <TodayQueue />
       {empty ? (
-        <EmptyState size="sm">Nothing needs your attention.</EmptyState>
+        <Empty className="rounded-2xl border border-dashed py-10 md:py-12">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <CheckCheckIcon aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>All clear</EmptyTitle>
+            <EmptyDescription>
+              Nothing assigned or mentioning you needs attention.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <Section
             danger
-            icon={<AlertTriangle className="h-4 w-4" />}
+            icon={<TriangleAlertIcon aria-hidden="true" />}
             items={overdue}
             renderItem={(t) => <TaskRow danger key={t.id} task={t} />}
             title="Overdue"
           />
           <Section
-            icon={<CalendarClock className="h-4 w-4" />}
+            icon={<CalendarClockIcon aria-hidden="true" />}
             items={dueSoon}
             renderItem={(t) => <TaskRow key={t.id} task={t} />}
             title="Due soon"
           />
           <Section
-            icon={<ListTodo className="h-4 w-4" />}
+            icon={<ListTodoIcon aria-hidden="true" />}
             items={later}
             renderItem={(t) => <TaskRow key={t.id} task={t} />}
             title="Assigned to me"
           />
           <Section
-            icon={<AtSign className="h-4 w-4" />}
+            icon={<AtSignIcon aria-hidden="true" />}
             items={data.mentions}
             renderItem={(m) => <MentionRow key={m.id} mention={m} />}
             title="Recently mentioned"
@@ -101,11 +126,7 @@ export function MyWork() {
   );
 }
 
-/**
- * A titled card that shows a short preview of its items and reveals the rest
- * inline. Short lists render as one compact column; longer ones flow into a
- * few columns so they use the page width instead of running off the bottom.
- */
+// long lists flow into columns so they use page width instead of height
 function Section<T>({
   title,
   items,
@@ -127,66 +148,79 @@ function Section<T>({
   const multiColumn = visible.length > 5;
 
   return (
-    <Card className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <span className={cn("text-white/70", danger && "text-danger")}>
+    <Card>
+      <CardHeader className="flex items-center gap-2 px-4 pt-3.5 pb-1.5">
+        <span
+          className={cn(
+            "text-muted-foreground [&_svg]:size-4",
+            danger && "text-destructive-foreground",
+          )}
+        >
           {icon}
         </span>
-        <h2 className="text-sm font-medium">{title}</h2>
-        <span className="text-xs text-white/40">{items.length}</span>
-      </div>
-      <ul
-        className={cn(
-          "gap-x-6",
-          multiColumn ? "columns-1 sm:columns-2 xl:columns-3" : "flex flex-col",
-        )}
-      >
-        {visible.map((item) => renderItem(item))}
-      </ul>
-      {overflow > 0 ? (
-        <Button
-          className="mt-1 gap-1 self-start"
-          onClick={() => setShowAll((v) => !v)}
-          size="inline"
-          type="button"
-          variant="link"
+        <CardTitle className="font-sans text-sm font-medium">{title}</CardTitle>
+        <Badge size="sm" variant={danger ? "error" : "secondary"}>
+          {items.length}
+        </Badge>
+        {overflow > 0 ? (
+          <CardAction className="ms-auto self-center">
+            <Button
+              onClick={() => setShowAll((v) => !v)}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              {showAll ? "Show less" : `Show ${overflow} more`}
+              <ChevronDownIcon
+                aria-hidden="true"
+                className={cn(
+                  "transition-transform duration-200",
+                  showAll && "rotate-180",
+                )}
+              />
+            </Button>
+          </CardAction>
+        ) : null}
+      </CardHeader>
+      <CardPanel className="px-2 pt-0 pb-2">
+        <ul
+          className={cn(
+            "gap-x-2",
+            multiColumn
+              ? "columns-1 sm:columns-2 xl:columns-3"
+              : "flex flex-col",
+          )}
         >
-          <ChevronDown
-            className={cn(
-              "h-3.5 w-3.5 transition-transform",
-              showAll && "rotate-180",
-            )}
-          />
-          {showAll ? "Show less" : `Show ${overflow} more`}
-        </Button>
-      ) : null}
+          {visible.map((item) => renderItem(item))}
+        </ul>
+      </CardPanel>
     </Card>
   );
 }
 
+const rowClass =
+  "flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent";
+
 function TaskRow({ task: t, danger }: { task: Assigned; danger?: boolean }) {
   return (
     <li className="break-inside-avoid">
-      <Link
-        className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-white/5"
-        href={`/app/p/${t.projectSlug}?task=${t.id}`}
-      >
+      <Link className={rowClass} href={`/app/p/${t.projectSlug}?task=${t.id}`}>
         <PriorityIcon
-          className="h-3.5 w-3.5 shrink-0"
+          className="size-3.5 shrink-0"
           priority={t.priority as Priority}
         />
         <span className="min-w-0 flex-1 truncate text-sm">{t.title}</span>
         {t.dueAt ? (
           <span
             className={cn(
-              "shrink-0 text-xs text-white/40",
-              danger && "text-danger",
+              "text-muted-foreground shrink-0 text-xs tabular-nums",
+              danger && "text-destructive-foreground",
             )}
           >
             {formatDate(t.dueAt)}
           </span>
         ) : null}
-        <span className="max-w-28 shrink-0 truncate text-xs text-white/40">
+        <span className="text-muted-foreground max-w-28 shrink-0 truncate text-xs">
           {t.projectName}
         </span>
       </Link>
@@ -198,14 +232,12 @@ function MentionRow({ mention: m }: { mention: Mention }) {
   const body = (
     <>
       <span className="min-w-0 flex-1 truncate text-sm">
-        <span className="text-white">{m.actorName ?? "Someone"}</span>
-        <span className="text-white/70"> mentioned you</span>
-        {m.taskTitle ? (
-          <span className="text-white"> in “{m.taskTitle}”</span>
-        ) : null}
+        <span className="font-medium">{m.actorName ?? "Someone"}</span>
+        <span className="text-muted-foreground"> mentioned you</span>
+        {m.taskTitle ? <span> in “{m.taskTitle}”</span> : null}
       </span>
       <span
-        className="shrink-0 text-xs text-white/40"
+        className="text-muted-foreground shrink-0 text-xs"
         title={formatDateTime(m.createdAt)}
       >
         {formatRelative(m.createdAt)}
@@ -216,15 +248,13 @@ function MentionRow({ mention: m }: { mention: Mention }) {
     <li className="break-inside-avoid">
       {m.taskId && m.projectSlug ? (
         <Link
-          className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-white/5"
+          className={rowClass}
           href={`/app/p/${m.projectSlug}?task=${m.taskId}`}
         >
           {body}
         </Link>
       ) : (
-        <span className="-mx-2 flex items-center gap-2 px-2 py-1.5">
-          {body}
-        </span>
+        <span className="flex items-center gap-2 px-2 py-1.5">{body}</span>
       )}
     </li>
   );

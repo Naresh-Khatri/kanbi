@@ -1,53 +1,72 @@
+"use client";
+
+import { SearchIcon } from "lucide-react";
 import Link from "next/link";
-import { Bot } from "lucide-react";
 
 import { NotificationBell } from "@/app/app/_components/notification-bell";
 import { UserMenu } from "@/app/app/_components/user-menu";
+import { Logo } from "@/components/brand/logo";
+import { useAppShell } from "@/components/keybinds/shell-store";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 
+// h-header keeps h-below-header math valid for board/docs
 export function AppHeader({
   start,
   end,
-  showAgentLink = false,
 }: {
   start?: React.ReactNode;
   end?: React.ReactNode;
-  showAgentLink?: boolean;
 }) {
+  const setPaletteOpen = useAppShell((s) => s.setPaletteOpen);
+
   return (
-    <header className="bg-canvas/80 h-header sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-white/10 px-4 backdrop-blur sm:px-6">
-      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-        <Link
-          aria-label="Kanbi"
-          className="flex shrink-0 items-center gap-2 text-lg font-semibold"
-          href="/app"
+    <header className="h-header bg-background sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b px-3">
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label="Home"
+              render={<Link href="/app" />}
+              size="icon-sm"
+              variant="ghost"
+            />
+          }
         >
-          <Logo className="h-5 w-5" />
-          <span className="hidden sm:inline">Kanbi</span>
-        </Link>
-        {start ? (
-          <>
-            <span aria-hidden className="h-4 w-px bg-white/15" />
-            {start}
-          </>
-        ) : null}
+          <Logo className="size-4.5" />
+        </TooltipTrigger>
+        <TooltipPopup>
+          Home <Kbd>G</Kbd> <Kbd>H</Kbd>
+        </TooltipPopup>
+      </Tooltip>
+      {/* slash hides when start renders nothing (home) */}
+      <div className="before:text-muted-foreground/50 flex min-w-0 flex-1 items-center gap-2 before:text-sm before:content-['/'] empty:before:hidden">
+        {start}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+      <div className="flex shrink-0 items-center gap-1">
         {end}
-        {showAgentLink ? (
-          <Button
-            asChild
-            className="hidden gap-1.5 sm:inline-flex"
-            size="sm"
-            variant="quiet"
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label="Search"
+                onClick={() => setPaletteOpen(true)}
+                size="icon-sm"
+                variant="ghost"
+              />
+            }
           >
-            <Link href="/docs/mcp">
-              <Bot className="h-3.5 w-3.5" />
-              Connect agent
-            </Link>
-          </Button>
-        ) : null}
+            <SearchIcon aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipPopup>
+            Search{" "}
+            <KbdGroup>
+              <Kbd>⌘</Kbd>
+              <Kbd>K</Kbd>
+            </KbdGroup>
+          </TooltipPopup>
+        </Tooltip>
         <NotificationBell />
         <UserMenu />
       </div>

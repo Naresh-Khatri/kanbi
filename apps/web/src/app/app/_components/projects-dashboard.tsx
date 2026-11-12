@@ -1,56 +1,68 @@
 "use client";
 
 import {
-  Archive,
-  ChevronRight,
-  MoreHorizontal,
-  PauseCircle,
-  PlayCircle,
-  Plus,
-  Settings,
-  Trash2,
+  ArchiveIcon,
+  ChevronRightIcon,
+  EllipsisIcon,
+  FolderKanbanIcon,
+  PauseCircleIcon,
+  PlayCircleIcon,
+  PlusIcon,
+  SettingsIcon,
+  Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 import { DeleteProjectDialog } from "@/app/app/p/[slug]/settings/_components/delete-project-dialog";
 import { useAppShell } from "@/components/keybinds/shell-store";
+import { ProjectDot } from "@/components/project-dot";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
+import { Frame, FramePanel } from "@/components/ui/frame";
+import { Input } from "@/components/ui/input";
+import {
+  Menu,
+  MenuItem,
+  MenuLinkItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "@/components/ui/menu";
+import { Textarea } from "@/components/ui/textarea";
+import { toastManager } from "@/components/ui/toast";
+import { api } from "@/trpc/react";
 import { invalidateProjectLifecycle } from "./invalidate-project-lifecycle";
 import {
   ProjectLifecycleDialog,
   shouldSkipProjectLifecycleDialog,
   type ProjectLifecycleAction,
 } from "./project-lifecycle-dialog";
-
-import { Dot } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input, Textarea } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  cardVariants,
-  EmptyState,
-  PageSubtitle,
-  PageTitle,
-} from "@/components/ui/surface";
-import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
-import { api } from "@/trpc/react";
 
 type ProjectCard = {
   id: string;
@@ -68,125 +80,145 @@ type ProjectCard = {
 
 export function ProjectsDashboard() {
   const [projects] = api.project.list.useSuspenseQuery();
-  const [showOnHold, setShowOnHold] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const active = projects.filter((p) => p.status === "active");
   const onHold = projects.filter((p) => p.status === "on_hold");
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+    <section className="flex flex-col gap-6">
+      <div className="flex items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <PageTitle>Projects</PageTitle>
-          <PageSubtitle>
+          <h1 className="font-heading text-2xl font-semibold">Projects</h1>
+          <p className="text-muted-foreground text-sm">
             Create a project, get a board, start shipping.
-          </PageSubtitle>
+          </p>
         </div>
+        <Button onClick={() => setNewOpen(true)}>
+          <PlusIcon aria-hidden="true" /> New project
+        </Button>
         <NewProjectDialog onOpenChange={setNewOpen} open={newOpen} />
       </div>
 
-      {projects.length === 0 ? (
-        <EmptyState size="lg">
-          No projects yet. Create your first one.
-        </EmptyState>
+      {active.length === 0 ? (
+        <Empty className="rounded-2xl border border-dashed md:py-16">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FolderKanbanIcon aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>
+              {projects.length === 0 ? "No projects yet" : "No active projects"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {projects.length === 0
+                ? "Every project comes with a board. Create your first one."
+                : "Reactivate one from On hold below, or start something new."}
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button onClick={() => setNewOpen(true)} variant="outline">
+              <PlusIcon aria-hidden="true" /> New project
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : (
-        <>
-          {active.length > 0 ? (
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {active.map((p) => (
-                <ProjectCardItem key={p.id} project={p} />
-              ))}
-              <li className="flex">
-                <Button
-                  className="min-h-32 w-full flex-col"
-                  onClick={() => setNewOpen(true)}
-                  type="button"
-                  variant="dashed"
-                >
-                  <Plus className="h-4 w-4" />
-                  New project
-                </Button>
-              </li>
-            </ul>
-          ) : (
-            <EmptyState size="sm">No active projects.</EmptyState>
-          )}
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {active.map((p) => (
+            <ProjectCardItem key={p.id} project={p} />
+          ))}
+          <li className="flex">
+            <button
+              className="text-muted-foreground hover:border-ring/48 hover:bg-accent/48 hover:text-foreground focus-visible:ring-ring flex min-h-36 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed text-sm transition-colors outline-none focus-visible:ring-2"
+              onClick={() => setNewOpen(true)}
+              type="button"
+            >
+              <PlusIcon aria-hidden="true" className="size-4" />
+              New project
+            </button>
+          </li>
+        </ul>
+      )}
 
-          {onHold.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <Button
-                aria-controls="on-hold-projects"
-                aria-expanded={showOnHold}
-                className="w-fit gap-1.5 px-1"
-                onClick={() => setShowOnHold((open) => !open)}
-                size="xs"
-                type="button"
-                variant="link"
-              >
-                <ChevronRight
-                  className={`h-3.5 w-3.5 transition-transform ${showOnHold ? "rotate-90" : ""}`}
-                />
-                On hold · {onHold.length}
-              </Button>
-              {showOnHold ? (
-                <ul
-                  className="flex flex-col divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10"
-                  id="on-hold-projects"
-                >
+      {onHold.length > 0 ? (
+        <Collapsible className="flex flex-col gap-2">
+          <CollapsibleTrigger
+            className="group text-muted-foreground w-fit"
+            render={<Button size="xs" variant="ghost" />}
+          >
+            <ChevronRightIcon
+              aria-hidden="true"
+              className="transition-transform duration-200 group-data-panel-open:rotate-90"
+            />
+            On hold · {onHold.length}
+          </CollapsibleTrigger>
+          <CollapsiblePanel>
+            <Frame>
+              <FramePanel className="p-0">
+                <ul className="flex flex-col divide-y">
                   {onHold.map((p) => (
                     <OnHoldRow key={p.id} project={p} />
                   ))}
                 </ul>
-              ) : null}
-            </div>
-          ) : null}
-        </>
-      )}
-    </div>
+              </FramePanel>
+            </Frame>
+          </CollapsiblePanel>
+        </Collapsible>
+      ) : null}
+    </section>
   );
 }
 
 function ProjectCardItem({ project }: { project: ProjectCard }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const isOwner = project.role === "owner";
+  const pct =
+    project.totalTasks > 0
+      ? Math.round((project.doneTasks / project.totalTasks) * 100)
+      : 0;
+
   return (
     <li className="relative">
-      <Link
-        className={cn(
-          cardVariants({ tone: "muted", padding: "none", interactive: true }),
-          "flex h-full min-h-32 flex-col justify-between gap-4 p-4",
-        )}
-        href={`/app/p/${project.slug}`}
+      <Card
+        className="hover:bg-accent/48 focus-visible:ring-ring h-full min-h-36 justify-between gap-4 p-4 transition-colors outline-none focus-visible:ring-2"
+        render={<Link href={`/app/p/${project.slug}`} />}
       >
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 pr-8">
-            <Dot color={project.color ?? DEFAULT_PROJECT_COLOR} size="lg" />
+          <div className="flex items-center gap-2 pe-8">
+            <ProjectDot className="size-2.5" color={project.color} />
             <span className="truncate font-medium">{project.name}</span>
           </div>
           {project.description ? (
-            <p className="line-clamp-2 text-xs text-white/70">
+            <p className="text-muted-foreground line-clamp-2 text-xs">
               {project.description}
             </p>
           ) : null}
         </div>
-        <p className="flex items-center gap-3 text-xs text-white/40 tabular-nums">
-          {project.inProgressTasks > 0 ? (
-            <span>{project.inProgressTasks} in progress</span>
-          ) : null}
-          {project.totalTasks > 0 ? (
-            <span className="ml-auto">
-              {project.doneTasks}/{project.totalTasks} done
+        <div className="flex flex-col gap-2">
+          <div className="text-muted-foreground flex items-center gap-3 text-xs tabular-nums">
+            {project.inProgressTasks > 0 ? (
+              <span className="text-info-foreground">
+                {project.inProgressTasks} in progress
+              </span>
+            ) : null}
+            <span className="ms-auto">
+              {project.totalTasks > 0
+                ? `${project.doneTasks}/${project.totalTasks} done`
+                : "No tasks yet"}
             </span>
-          ) : null}
-        </p>
-      </Link>
-      <div className="absolute top-3.5 right-3">
+          </div>
+          <div className="bg-muted h-1 overflow-hidden rounded-full">
+            <div
+              className="bg-foreground/48 h-full rounded-full"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      </Card>
+      <div className="absolute end-3 top-3">
         <ProjectMenu
           onDeleteRequest={() => setDeleteOpen(true)}
           project={project}
         />
       </div>
-      {isOwner ? (
+      {project.role === "owner" ? (
         <DeleteProjectDialog
           onOpenChange={setDeleteOpen}
           open={deleteOpen}
@@ -200,17 +232,16 @@ function ProjectCardItem({ project }: { project: ProjectCard }) {
 
 function OnHoldRow({ project }: { project: ProjectCard }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const isOwner = project.role === "owner";
 
   return (
-    <li className="flex items-center gap-2 px-3 py-2 opacity-60 transition hover:opacity-100">
+    <li className="flex items-center gap-2 py-1.5 ps-4 pe-2">
       <Link
-        className="flex min-w-0 flex-1 items-center gap-2"
+        className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-2.5 transition-colors"
         href={`/app/p/${project.slug}`}
       >
-        <Dot color={project.color ?? DEFAULT_PROJECT_COLOR} />
+        <ProjectDot color={project.color} />
         <span className="truncate text-sm">{project.name}</span>
-        <span className="ml-auto shrink-0 text-xs text-white/40 tabular-nums">
+        <span className="ms-auto shrink-0 text-xs tabular-nums">
           {project.doneTasks}/{project.totalTasks}
         </span>
       </Link>
@@ -218,7 +249,7 @@ function OnHoldRow({ project }: { project: ProjectCard }) {
         onDeleteRequest={() => setDeleteOpen(true)}
         project={project}
       />
-      {isOwner ? (
+      {project.role === "owner" ? (
         <DeleteProjectDialog
           onOpenChange={setDeleteOpen}
           open={deleteOpen}
@@ -247,16 +278,20 @@ function ProjectMenu({
     onSuccess: async (_data, variables) => {
       setLifecycleAction(null);
       await invalidateProjectLifecycle(utils);
-      if (variables.status === "archived") toast.success("Project archived");
+      if (variables.status === "archived") {
+        toastManager.add({ type: "success", title: "Project archived" });
+      }
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastManager.add({
+        type: "error",
+        title: "Couldn't update project",
+        description: err.message,
+      }),
   });
 
   function applyStatus(status: "active" | ProjectLifecycleAction) {
-    setStatus.mutate({
-      projectId: project.id,
-      status,
-    });
+    setStatus.mutate({ projectId: project.id, status });
   }
 
   function requestLifecycleAction(action: ProjectLifecycleAction) {
@@ -264,71 +299,56 @@ function ProjectMenu({
       applyStatus(action);
       return;
     }
-
     setLifecycleAction(action);
   }
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            aria-label="Project actions"
-            onClick={(e) => e.preventDefault()}
-            size="icon-sm"
-            type="button"
-            variant="quiet"
+      <Menu>
+        <MenuTrigger
+          aria-label="Project actions"
+          render={<Button size="icon-sm" variant="ghost" />}
+        >
+          <EllipsisIcon aria-hidden="true" />
+        </MenuTrigger>
+        <MenuPopup align="end" className="min-w-44">
+          <MenuLinkItem
+            render={<Link href={`/app/p/${project.slug}/settings`} />}
           >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem asChild>
-            <Link href={`/app/p/${project.slug}/settings`}>
-              <Settings className="h-4 w-4" /> Settings
-            </Link>
-          </DropdownMenuItem>
+            <SettingsIcon aria-hidden="true" /> Settings
+          </MenuLinkItem>
           {canWrite ? (
-            <DropdownMenuItem
-              onSelect={() => {
-                if (project.status === "active") {
-                  requestLifecycleAction("on_hold");
-                } else {
-                  applyStatus("active");
-                }
-              }}
+            <MenuItem
+              onClick={() =>
+                project.status === "active"
+                  ? requestLifecycleAction("on_hold")
+                  : applyStatus("active")
+              }
             >
               {project.status === "active" ? (
                 <>
-                  <PauseCircle className="h-4 w-4" /> Put on hold
+                  <PauseCircleIcon aria-hidden="true" /> Put on hold
                 </>
               ) : (
                 <>
-                  <PlayCircle className="h-4 w-4" /> Reactivate
+                  <PlayCircleIcon aria-hidden="true" /> Reactivate
                 </>
               )}
-            </DropdownMenuItem>
+            </MenuItem>
           ) : null}
           {isOwner ? (
-            <DropdownMenuItem
-              onSelect={() => requestLifecycleAction("archived")}
-            >
-              <Archive className="h-4 w-4" /> Archive
-            </DropdownMenuItem>
+            <>
+              <MenuItem onClick={() => requestLifecycleAction("archived")}>
+                <ArchiveIcon aria-hidden="true" /> Archive
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem onClick={onDeleteRequest} variant="destructive">
+                <Trash2Icon aria-hidden="true" /> Delete
+              </MenuItem>
+            </>
           ) : null}
-          {isOwner ? (
-            <DropdownMenuItem
-              destructive
-              onSelect={(e) => {
-                e.preventDefault();
-                onDeleteRequest();
-              }}
-            >
-              <Trash2 className="h-4 w-4" /> Delete
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </MenuPopup>
+      </Menu>
 
       <ProjectLifecycleDialog
         action={lifecycleAction}
@@ -351,7 +371,6 @@ function NewProjectDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const setOpen = onOpenChange;
   const utils = api.useUtils();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -360,38 +379,32 @@ function NewProjectDialog({
   const createProjectToken = useAppShell((s) => s.createProjectToken);
 
   useEffect(() => {
-    if (createProjectToken > 0) setOpen(true);
-  }, [createProjectToken, setOpen]);
+    if (createProjectToken > 0) onOpenChange(true);
+  }, [createProjectToken, onOpenChange]);
 
   const create = api.project.create.useMutation({
     onSuccess: async () => {
-      toast.success("Project created");
-      setOpen(false);
+      toastManager.add({ type: "success", title: "Project created" });
+      onOpenChange(false);
       setName("");
       setDescription("");
       setSystemPrompt("");
       setShowSystemPrompt(false);
       await utils.project.list.invalidate();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) =>
+      toastManager.add({
+        type: "error",
+        title: "Couldn't create project",
+        description: err.message,
+      }),
   });
 
   return (
-    <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4" /> New project
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
-          <DialogDescription>
-            Each project comes with a board out of the box.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          className="flex flex-col gap-3"
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogPopup>
+        <Form
+          className="contents"
           onSubmit={(e) => {
             e.preventDefault();
             create.mutate({
@@ -401,65 +414,64 @@ function NewProjectDialog({
             });
           }}
         >
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="project-name">Name</Label>
-            <Input
-              autoFocus
-              id="project-name"
-              onChange={(e) => setName(e.target.value)}
-              required
-              value={name}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="project-description">Description</Label>
-            <Textarea
-              id="project-description"
-              onChange={(e) => setDescription(e.target.value)}
-              value={description}
-            />
-          </div>
-          {showSystemPrompt ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="project-system-prompt">
-                AI context
-                <span className="ml-2 text-xs font-normal text-white/40">
-                  optional — helps the task drafter understand your project
-                </span>
-              </Label>
-              <Textarea
-                id="project-system-prompt"
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder="e.g. This is a SaaS for dentists. Common issues: appointment booking, payments, patient records. We triage aggressively — small fixes go straight to In Progress."
-                rows={4}
-                value={systemPrompt}
+          <DialogHeader>
+            <DialogTitle>New project</DialogTitle>
+            <DialogDescription>
+              Each project comes with a board out of the box.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="flex flex-col gap-4">
+            <Field>
+              <FieldLabel>Name</FieldLabel>
+              <Input
+                autoFocus
+                onChange={(e) => setName(e.target.value)}
+                required
+                value={name}
               />
-            </div>
-          ) : (
-            <Button
-              className="self-start"
-              onClick={() => setShowSystemPrompt(true)}
-              size="inline"
-              type="button"
-              variant="link"
-            >
-              + Add AI context
-            </Button>
-          )}
+            </Field>
+            <Field>
+              <FieldLabel>Description</FieldLabel>
+              <Textarea
+                onChange={(e) => setDescription(e.target.value)}
+                value={description}
+              />
+            </Field>
+            {showSystemPrompt ? (
+              <Field>
+                <FieldLabel>AI context</FieldLabel>
+                <Textarea
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  placeholder="e.g. This is a SaaS for dentists. Common issues: appointment booking, payments, patient records. We triage aggressively — small fixes go straight to In Progress."
+                  rows={4}
+                  value={systemPrompt}
+                />
+                <FieldDescription>
+                  Optional. Helps the task drafter understand your project.
+                </FieldDescription>
+              </Field>
+            ) : (
+              <Button
+                className="self-start"
+                onClick={() => setShowSystemPrompt(true)}
+                size="xs"
+                type="button"
+                variant="ghost"
+              >
+                <PlusIcon aria-hidden="true" /> Add AI context
+              </Button>
+            )}
+          </DialogPanel>
           <DialogFooter>
-            <Button
-              onClick={() => setOpen(false)}
-              type="button"
-              variant="ghost"
-            >
+            <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
-            </Button>
-            <Button disabled={create.isPending} type="submit">
-              {create.isPending ? "Creating…" : "Create"}
+            </DialogClose>
+            <Button loading={create.isPending} type="submit">
+              Create project
             </Button>
           </DialogFooter>
-        </form>
-      </DialogContent>
+        </Form>
+      </DialogPopup>
     </Dialog>
   );
 }

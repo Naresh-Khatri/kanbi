@@ -1,20 +1,23 @@
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function DocsLoading() {
   return (
-    <main className="h-below-header flex animate-pulse">
-      <div className="hidden w-64 border-r border-white/10 bg-white/5 p-4 md:block">
-        <div className="h-8 rounded-md bg-white/5" />
-        <div className="mt-6 space-y-2">
-          <div className="h-6 rounded-md bg-white/5" />
-          <div className="ml-4 h-6 rounded-md bg-white/5" />
-          <div className="h-6 rounded-md bg-white/5" />
+    <main className="h-below-header bg-background flex">
+      <div className="bg-sidebar hidden w-64 flex-col gap-2 border-e p-3 md:flex">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="mt-2 h-7 w-full rounded-lg" />
+        <div className="mt-4 flex flex-col gap-2">
+          <Skeleton className="h-5 w-4/5" />
+          <Skeleton className="ms-4 h-5 w-3/5" />
+          <Skeleton className="h-5 w-2/3" />
         </div>
       </div>
-      <div className="mx-auto w-full max-w-4xl p-8 md:p-14">
-        <div className="h-4 w-40 rounded-md bg-white/5" />
-        <div className="mt-6 h-10 w-2/3 rounded-md bg-white/5" />
-        <div className="mt-10 space-y-3">
-          <div className="h-4 rounded-md bg-white/5" />
-          <div className="h-4 w-5/6 rounded-md bg-white/5" />
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-6 py-10 md:px-10 md:py-14">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-9 w-2/3" />
+        <div className="mt-6 flex flex-col gap-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
         </div>
       </div>
     </main>

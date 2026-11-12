@@ -10,8 +10,9 @@ export default async function AppLayout({
   if (!session?.user) redirect("/login");
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="flex-1">{children}</div>
+    // fixed height so board/docs can fill with flex-1 min-h-0
+    <div className="flex h-svh min-w-0 flex-col">
+      {children}
       <KeybindProvider />
     </div>
   );

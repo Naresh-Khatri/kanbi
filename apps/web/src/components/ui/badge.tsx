@@ -1,120 +1,64 @@
-import { cva, type VariantProps } from "class-variance-authority";
-import * as React from "react";
+"use client";
 
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
+import { cva, type VariantProps } from "class-variance-authority";
+import type React from "react";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva(
-  "text-2xs inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 tracking-wide whitespace-nowrap",
+export const badgeVariants = cva(
+  "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-sm border border-transparent font-medium outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
   {
-    variants: {
-      tone: {
-        neutral: "border-white/10 text-white/70",
-        info: "border-info/40 text-info",
-        success: "border-success/40 text-success",
-        warning: "border-warning/40 text-warning",
-        danger: "border-danger/40 text-danger",
-        ai: "border-ai/40 text-ai",
-        // emphatic marker on a card edge ("last used")
-        inverse: "border-transparent bg-white font-medium text-black",
-        // data colour (label/priority) supplied via `color`
-        custom: "",
-      },
-      fill: { outline: "", solid: "border-transparent" },
+    defaultVariants: {
+      size: "default",
+      variant: "default",
     },
-    compoundVariants: [
-      { fill: "solid", tone: "neutral", class: "bg-white/10 text-white" },
-      { fill: "solid", tone: "info", class: "bg-info/15" },
-      { fill: "solid", tone: "success", class: "bg-success/15" },
-      { fill: "solid", tone: "warning", class: "bg-warning/15" },
-      { fill: "solid", tone: "danger", class: "bg-danger/15" },
-      { fill: "solid", tone: "ai", class: "bg-ai/15" },
-      // data colour bg -> dark text
-      { fill: "solid", tone: "custom", class: "text-black" },
-    ],
-    defaultVariants: { tone: "neutral", fill: "outline" },
+    variants: {
+      size: {
+        default:
+          "h-5.5 min-w-5.5 px-[calc(--spacing(1)-1px)] text-sm sm:h-4.5 sm:min-w-4.5 sm:text-xs",
+        lg: "h-6.5 min-w-6.5 px-[calc(--spacing(1.5)-1px)] text-base sm:h-5.5 sm:min-w-5.5 sm:text-sm",
+        sm: "h-5 min-w-5 rounded-[.25rem] px-[calc(--spacing(1)-1px)] text-xs sm:h-4 sm:min-w-4 sm:text-[.625rem]",
+      },
+      variant: {
+        default:
+          "bg-primary text-primary-foreground [button&,a&]:hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-white [button&,a&]:hover:bg-destructive/90",
+        error:
+          "bg-destructive/8 text-destructive-foreground dark:bg-destructive/16",
+        info: "bg-info/8 text-info-foreground dark:bg-info/16",
+        outline:
+          "border-input bg-background text-foreground dark:bg-input/32 [button&,a&]:hover:bg-accent/50 dark:[button&,a&]:hover:bg-input/48",
+        secondary:
+          "bg-secondary text-secondary-foreground [button&,a&]:hover:bg-secondary/90",
+        success: "bg-success/8 text-success-foreground dark:bg-success/16",
+        warning: "bg-warning/8 text-warning-foreground dark:bg-warning/16",
+      },
+    },
   },
 );
 
-export interface BadgeProps
-  extends
-    Omit<React.HTMLAttributes<HTMLSpanElement>, "color">,
-    VariantProps<typeof badgeVariants> {
-  /** hex data colour; implies tone="custom" */
-  color?: string | null;
+export interface BadgeProps extends useRender.ComponentProps<"span"> {
+  variant?: VariantProps<typeof badgeVariants>["variant"];
+  size?: VariantProps<typeof badgeVariants>["size"];
 }
 
 export function Badge({
   className,
-  tone,
-  fill,
-  color,
-  style,
-  ...props
-}: BadgeProps) {
-  const custom = color
-    ? fill === "solid"
-      ? { backgroundColor: color }
-      : { borderColor: `${color}55`, color }
-    : undefined;
-  return (
-    <span
-      className={cn(
-        badgeVariants({ tone: color ? "custom" : tone, fill }),
-        className,
-      )}
-      style={{ ...custom, ...style }}
-      {...props}
-    />
-  );
-}
-
-const countVariants = cva("text-2xs rounded px-1 tabular-nums", {
-  variants: {
-    tone: {
-      neutral: "bg-white/10 text-white/70",
-      info: "bg-info/15 text-info",
-      danger: "bg-danger-solid text-white",
-      // drag overlay multi-count
-      "info-solid": "bg-info text-black",
-    },
-  },
-  defaultVariants: { tone: "neutral" },
-});
-
-export function CountBadge({
-  className,
-  tone,
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof countVariants>) {
-  return <span className={cn(countVariants({ tone }), className)} {...props} />;
-}
-
-const dotVariants = cva("inline-block shrink-0 rounded-full", {
-  variants: {
-    size: {
-      xs: "h-1.5 w-1.5",
-      sm: "h-2 w-2",
-      md: "h-2.5 w-2.5",
-      lg: "h-3 w-3",
-    },
-  },
-  defaultVariants: { size: "sm" },
-});
-
-export function Dot({
-  className,
+  variant,
   size,
-  color,
-  style,
+  render,
   ...props
-}: Omit<React.HTMLAttributes<HTMLSpanElement>, "color"> &
-  VariantProps<typeof dotVariants> & { color?: string | null }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(dotVariants({ size }), className)}
-      style={{ backgroundColor: color ?? undefined, ...style }}
-      {...props}
-    />
-  );
+}: BadgeProps): React.ReactElement {
+  const defaultProps = {
+    className: cn(badgeVariants({ className, size, variant })),
+    "data-slot": "badge",
+  };
+
+  return useRender({
+    defaultTagName: "span",
+    props: mergeProps<"span">(defaultProps, props),
+    render,
+  });
 }

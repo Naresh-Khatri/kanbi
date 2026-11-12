@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { toastManager } from "@/components/ui/toast";
 import { api } from "@/trpc/react";
 
 /**
@@ -29,18 +29,21 @@ export function useArchiveTask(boardId: string) {
     },
     onError: (e, _vars, ctx) => {
       if (ctx?.previous) utils.board.get.setData({ boardId }, ctx.previous);
-      toast.error(e.message);
+      toastManager.add({ type: "error", title: e.message });
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
 
   return function archiveTask(task: { id: string; title: string }) {
     setArchived.mutate({ boardId, taskId: task.id, archived: true });
-    toast(`Archived "${task.title}"`, {
-      action: {
-        label: "Undo",
-        onClick: () =>
-          setArchived.mutate({ boardId, taskId: task.id, archived: false }),
+    const toastId = toastManager.add({
+      title: `Archived "${task.title}"`,
+      actionProps: {
+        children: "Undo",
+        onClick: () => {
+          toastManager.close(toastId);
+          setArchived.mutate({ boardId, taskId: task.id, archived: false });
+        },
       },
     });
   };

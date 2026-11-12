@@ -1,9 +1,11 @@
 import "@/styles/globals.css";
 
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import { Toaster } from "sonner";
+import { Geist_Mono, Inter } from "next/font/google";
 
+import { ToastProvider } from "@/components/ui/toast";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { TRPCReactProvider } from "@/trpc/react";
 
 export const metadata: Metadata = {
@@ -12,19 +14,28 @@ export const metadata: Metadata = {
   description: "A fast, keyboard-first kanban.",
 };
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html className={`${geist.variable} dark`} lang="en">
-      <body className="bg-canvas text-white antialiased">
-        <TRPCReactProvider>{children}</TRPCReactProvider>
-        <Toaster position="bottom-right" theme="dark" />
+    <html
+      className={cn("dark", inter.variable, geistMono.variable)}
+      lang="en"
+    >
+      <body className="antialiased">
+        <TRPCReactProvider>
+          <TooltipProvider>
+            <ToastProvider>
+              {/* isolate = base ui portal layering */}
+              <div className="relative isolate flex min-h-dvh flex-col">
+                {children}
+              </div>
+            </ToastProvider>
+          </TooltipProvider>
+        </TRPCReactProvider>
       </body>
     </html>
   );

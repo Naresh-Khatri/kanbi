@@ -1,44 +1,63 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { CheckIcon, CopyIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/surface";
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@/components/ui/frame";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 
-/**
- * A monospace command/config block with a copy button, styled to match the
- * product card idiom (hairline border + faint fill). Used on the public docs
- * pages where setup is copy-paste.
- */
-export function CodeBlock({ code }: { code: string }) {
+/** copy-paste command/config block for the public docs */
+export function CodeBlock({
+  code,
+  label = "Terminal",
+}: {
+  code: string;
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+
   return (
-    <Card className="relative" padding="none" tone="muted">
-      <pre className="overflow-x-auto px-4 py-3 pr-12 font-mono text-sm leading-relaxed text-white">
-        <code>{code}</code>
-      </pre>
-      <Button
-        aria-label="Copy to clipboard"
-        className="absolute top-2 right-2"
-        size="icon-sm"
-        variant="quiet"
-        onClick={() => {
-          void navigator.clipboard.writeText(code);
-          setCopied(true);
-          toast.success("Copied");
-          setTimeout(() => setCopied(false), 1500);
-        }}
-        type="button"
-      >
-        {copied ? (
-          <Check className="h-3.5 w-3.5" />
-        ) : (
-          <Copy className="h-3.5 w-3.5" />
-        )}
-      </Button>
-    </Card>
+    <Frame>
+      <FrameHeader className="flex-row items-center justify-between py-1 ps-3 pe-1">
+        <FrameTitle className="font-normal text-muted-foreground text-xs">
+          {label}
+        </FrameTitle>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={copied ? "Copied" : "Copy to clipboard"}
+                onClick={() => {
+                  void navigator.clipboard.writeText(code);
+                  setCopied(true);
+                }}
+                size="icon-xs"
+                type="button"
+                variant="ghost"
+              />
+            }
+          >
+            {copied ? (
+              <CheckIcon aria-hidden="true" className="text-success-foreground" />
+            ) : (
+              <CopyIcon aria-hidden="true" />
+            )}
+          </TooltipTrigger>
+          <TooltipPopup>{copied ? "Copied" : "Copy"}</TooltipPopup>
+        </Tooltip>
+      </FrameHeader>
+      <FramePanel className="overflow-x-auto p-0">
+        <pre className="px-4 py-3 font-mono text-[0.8125rem] text-foreground leading-relaxed">
+          <code>{code}</code>
+        </pre>
+      </FramePanel>
+    </Frame>
   );
 }

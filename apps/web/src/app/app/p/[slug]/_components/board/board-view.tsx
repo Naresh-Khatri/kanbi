@@ -11,8 +11,9 @@ import {
   type DragStartEvent,
   defaultDropAnimationSideEffects,
   KeyboardSensor,
+  MouseSensor,
   pointerWithin,
-  PointerSensor,
+  TouchSensor,
   type DropAnimation,
   useSensor,
   useSensors,
@@ -24,11 +25,11 @@ import {
 } from "@dnd-kit/sortable";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { toast } from "sonner";
 import { useAppShell } from "@/components/keybinds/shell-store";
 import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
-import { CountBadge } from "@/components/ui/badge";
-import { OPEN_TASK_EVENT } from "@/components/ui/rich-text-mention";
+import { Badge } from "@/components/ui/badge";
+import { toastManager } from "@/components/ui/toast";
+import { OPEN_TASK_EVENT } from "@/components/rich-text/mention";
 import { POSITION_STEP, positionBetween } from "@/lib/position";
 import { compareTasks } from "@/lib/task-sort";
 import { api } from "@/trpc/react";
@@ -322,7 +323,7 @@ export function BoardView({
       if (context?.previous) {
         utils.board.get.setData({ boardId }, context.previous);
       }
-      toast.error(error.message);
+      toastManager.add({ type: "error", title: error.message });
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
@@ -359,7 +360,7 @@ export function BoardView({
       if (context?.previous) {
         utils.board.get.setData({ boardId }, context.previous);
       }
-      toast.error(error.message);
+      toastManager.add({ type: "error", title: error.message });
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
@@ -559,7 +560,11 @@ export function BoardView({
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    // press-and-hold on touch so swipes still pan the board
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
@@ -725,7 +730,9 @@ export function BoardView({
       );
       const targetSort = preferences.sorts[targetColumnId]?.mode ?? "manual";
       if (targetSort !== "manual" && allAlreadyInTarget) {
-        toast("Clear sort to reorder tasks within this column");
+        toastManager.add({
+          title: "Clear sort to reorder tasks within this column",
+        });
         return;
       }
 
@@ -899,21 +906,21 @@ export function BoardView({
     if (taskIds.length === 0) return;
     bulkUpdateTasks.mutate({ boardId, taskIds, archived: true });
     clearTaskSelection();
-    toast(
-      `Archived ${taskIds.length} ${taskIds.length === 1 ? "task" : "tasks"}`,
-      {
-        action: {
-          label: "Undo",
-          onClick: () =>
-            bulkUpdateTasks.mutate({ boardId, taskIds, archived: false }),
+    const toastId = toastManager.add({
+      title: `Archived ${taskIds.length} ${taskIds.length === 1 ? "task" : "tasks"}`,
+      actionProps: {
+        children: "Undo",
+        onClick: () => {
+          toastManager.close(toastId);
+          bulkUpdateTasks.mutate({ boardId, taskIds, archived: false });
         },
       },
-    );
+    });
   }
 
   function hideColumn(columnId: string) {
     if (visibleColumns.length <= 1) {
-      toast("Keep at least one column visible");
+      toastManager.add({ title: "Keep at least one column visible" });
       return;
     }
     setColumnHidden(columnId, true);
@@ -1100,7 +1107,7 @@ export function BoardView({
   );
 
   return (
-    <main className="h-below-header relative flex flex-col">
+    <main className="relative flex min-h-0 flex-1 flex-col">
       <BoardToolbar
         archivedCount={archivedTasks.length}
         expanded={toolbarExpanded}
@@ -1198,16 +1205,17 @@ export function BoardView({
               />
               {selectedTaskIds.has(active.task.id) &&
               selectedTaskIds.size > 1 ? (
-                <CountBadge
-                  className="absolute -top-2 -right-2"
-                  tone="info-solid"
+                <Badge
+                  className="absolute -end-2 -top-2 tabular-nums shadow-sm/5"
+                  size="sm"
+                  variant="info"
                 >
                   +{selectedTaskIds.size - 1}
-                </CountBadge>
+                </Badge>
               ) : null}
             </div>
           ) : active?.kind === "column" ? (
-            <div className="w-72 rounded-lg bg-white/10 p-3">
+            <div className="bg-popover w-72 -rotate-1 rounded-xl border p-3 shadow-lg/10">
               <div className="text-sm font-medium">{active.column.name}</div>
             </div>
           ) : null}

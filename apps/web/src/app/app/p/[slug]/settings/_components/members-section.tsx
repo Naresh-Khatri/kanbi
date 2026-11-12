@@ -1,26 +1,68 @@
 "use client";
 
-import { Check, ChevronDown, Trash2 } from "lucide-react";
+import {
+  EllipsisIcon,
+  LinkIcon,
+  MailIcon,
+  Trash2Icon,
+  UserMinusIcon,
+} from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
+import { UserAvatar } from "@/components/user-avatar";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { CardPanel } from "@/components/ui/card";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  Menu,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "@/components/ui/menu";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toastManager } from "@/components/ui/toast";
 import { api } from "@/trpc/react";
 import { Section } from "./section";
 
 type Role = "owner" | "editor" | "viewer";
+type AssignableRole = Exclude<Role, "owner">;
 
 const ROLE_RANK: Record<Role, number> = { owner: 0, editor: 1, viewer: 2 };
+
+const ROLE_ITEMS: { value: AssignableRole; label: string }[] = [
+  { value: "editor", label: "Editor" },
+  { value: "viewer", label: "Viewer" },
+];
+
+// full-bleed rows inside the card: align first/last cells with card padding
+const TABLE_EDGE = "[&_tr>*:first-child]:ps-6 [&_tr>*:last-child]:pe-6";
 
 export function MembersSection({
   projectId,
@@ -36,35 +78,41 @@ export function MembersSection({
   const invites =
     api.project.listInvites.useQuery({ projectId }, { enabled: isOwner })
       .data ?? [];
+  const pending = invites.filter((i) => !i.acceptedAt);
 
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"editor" | "viewer">("editor");
+  const [role, setRole] = useState<AssignableRole>("editor");
+  const [removing, setRemoving] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
 
   const invite = api.project.invite.useMutation({
     onSuccess: async () => {
       setEmail("");
-      toast.success("Invite sent");
+      toastManager.add({ type: "success", title: "Invite sent" });
       await utils.project.listInvites.invalidate({ projectId });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
   const revoke = api.project.revokeInvite.useMutation({
     onSuccess: () => utils.project.listInvites.invalidate({ projectId }),
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
   const setMemberRole = api.project.setMemberRole.useMutation({
     onSuccess: () => {
-      toast.success("Role updated");
+      toastManager.add({ type: "success", title: "Role updated" });
       return utils.project.members.invalidate({ projectId });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
   const removeMember = api.project.removeMember.useMutation({
     onSuccess: () => {
-      toast.success("Member removed");
+      toastManager.add({ type: "success", title: "Member removed" });
+      setRemoving(null);
       return utils.project.members.invalidate({ projectId });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
 
   const sorted = [...members].sort((a, b) => {
@@ -77,27 +125,42 @@ export function MembersSection({
     return `${window.location.origin}/invite/${token}`;
   }
 
+  async function copyInvite(token: string) {
+    try {
+      await navigator.clipboard.writeText(inviteUrl(token));
+      toastManager.add({ type: "success", title: "Invite link copied" });
+    } catch {
+      toastManager.add({ type: "error", title: "Couldn't copy" });
+    }
+  }
+
   return (
     <Section
+      action={
+        <Badge variant="outline">
+          {members.length} member{members.length === 1 ? "" : "s"}
+        </Badge>
+      }
       description={
         isOwner
           ? "Invite collaborators by email. They'll get a link to join."
           : "People with access to this project."
       }
+      className="overflow-hidden"
       id="members"
       title="Members"
     >
-      <div className="flex flex-col gap-6">
-        {isOwner ? (
-          <form
-            className="flex flex-col gap-2"
+      {isOwner ? (
+        <CardPanel>
+          <Form
+            className="flex flex-col gap-2 sm:flex-row sm:items-end"
             onSubmit={(e) => {
               e.preventDefault();
               invite.mutate({ projectId, email, role });
             }}
           >
-            <Label htmlFor={`invite-email-${slug}`}>Invite by email</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <Field className="flex-1" name="email">
+              <FieldLabel>Invite by email</FieldLabel>
               <Input
                 id={`invite-email-${slug}`}
                 onChange={(e) => setEmail(e.target.value)}
@@ -106,41 +169,59 @@ export function MembersSection({
                 type="email"
                 value={email}
               />
-              <RoleDropdown onChange={setRole} value={role} />
-              <Button disabled={invite.isPending} type="submit">
-                {invite.isPending ? "Sending…" : "Send invite"}
+            </Field>
+            <div className="flex gap-2">
+              <RoleSelect
+                aria-label="Role for invite"
+                onChange={setRole}
+                value={role}
+              />
+              <Button loading={invite.isPending} type="submit">
+                <MailIcon aria-hidden="true" />
+                Send invite
               </Button>
             </div>
-          </form>
-        ) : null}
+          </Form>
+        </CardPanel>
+      ) : null}
 
-        <div className="flex flex-col gap-2">
-          <Label>
-            {members.length} member{members.length === 1 ? "" : "s"}
-          </Label>
-          <ul className="flex flex-col divide-y divide-white/10 rounded-md border border-white/10">
-            {sorted.map((m) => {
-              const editable = isOwner && m.role !== "owner";
-              const busy =
-                (setMemberRole.isPending &&
-                  setMemberRole.variables?.userId === m.userId) ||
-                (removeMember.isPending &&
-                  removeMember.variables?.userId === m.userId);
-              return (
-                <li
-                  className="flex items-center gap-3 px-3 py-2 text-sm"
-                  key={m.userId}
-                >
-                  <UserAvatar image={m.image} name={m.name} size={28} />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate">{m.name}</span>
-                    <span className="truncate text-xs text-white/40">
-                      {m.email}
-                    </span>
+      <Table className={TABLE_EDGE} render={<div className="mt-2 border-t" />}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Member</TableHead>
+            <TableHead className="w-32 max-sm:w-24">Role</TableHead>
+            {isOwner ? (
+              <TableHead className="w-12">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            ) : null}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((m) => {
+            const editable = isOwner && m.role !== "owner";
+            const busy =
+              (setMemberRole.isPending &&
+                setMemberRole.variables?.userId === m.userId) ||
+              (removeMember.isPending &&
+                removeMember.variables?.userId === m.userId);
+            return (
+              <TableRow key={m.userId}>
+                <TableCell>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <UserAvatar image={m.image} name={m.name} size={28} />
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className="truncate font-medium">{m.name}</span>
+                      <span className="text-muted-foreground truncate text-xs">
+                        {m.email}
+                      </span>
+                    </div>
                   </div>
+                </TableCell>
+                <TableCell>
                   {editable ? (
-                    <RoleDropdown
-                      ariaLabel={`Role for ${m.name}`}
+                    <RoleSelect
+                      aria-label={`Role for ${m.name}`}
                       disabled={busy}
                       onChange={(next) =>
                         setMemberRole.mutate({
@@ -150,125 +231,178 @@ export function MembersSection({
                         })
                       }
                       size="sm"
-                      value={m.role as "editor" | "viewer"}
+                      value={m.role as AssignableRole}
                     />
                   ) : (
-                    <span className="text-xs text-white/70 capitalize">
+                    <Badge
+                      className="capitalize"
+                      variant={m.role === "owner" ? "secondary" : "outline"}
+                    >
                       {m.role}
-                    </span>
+                    </Badge>
                   )}
-                  {editable ? (
-                    <Button
-                      aria-label={`Remove ${m.name}`}
-                      disabled={busy}
-                      onClick={() =>
-                        removeMember.mutate({ projectId, userId: m.userId })
-                      }
-                      size="icon-xs"
-                      type="button"
-                      variant="quiet-danger"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+                </TableCell>
+                {isOwner ? (
+                  <TableCell className="text-end">
+                    {editable ? (
+                      <Menu>
+                        <MenuTrigger
+                          render={
+                            <Button
+                              aria-label={`Actions for ${m.name}`}
+                              disabled={busy}
+                              size="icon-sm"
+                              variant="ghost"
+                            />
+                          }
+                        >
+                          <EllipsisIcon aria-hidden="true" />
+                        </MenuTrigger>
+                        <MenuPopup align="end">
+                          <MenuItem
+                            onClick={() =>
+                              setRemoving({ userId: m.userId, name: m.name })
+                            }
+                            variant="destructive"
+                          >
+                            <UserMinusIcon aria-hidden="true" />
+                            Remove from project
+                          </MenuItem>
+                        </MenuPopup>
+                      </Menu>
+                    ) : null}
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
 
-        {isOwner && invites.filter((i) => !i.acceptedAt).length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <Label>Pending invites</Label>
-            <ul className="flex flex-col divide-y divide-white/10 rounded-md border border-white/10">
-              {invites
-                .filter((i) => !i.acceptedAt)
-                .map((i) => (
-                  <li
-                    className="flex items-center gap-3 px-3 py-2 text-sm"
-                    key={i.id}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{i.email}</span>
-                    <Badge className="capitalize">{i.role}</Badge>
-                    <Button
-                      onClick={() => {
-                        navigator.clipboard.writeText(inviteUrl(i.token));
-                        toast.success("Invite link copied");
-                      }}
-                      size="inline"
-                      type="button"
-                      variant="link"
-                    >
-                      copy link
-                    </Button>
-                    <Button
-                      aria-label="Revoke invite"
-                      onClick={() =>
-                        revoke.mutate({ projectId, inviteId: i.id })
+      {isOwner && pending.length > 0 ? (
+        <Table className={TABLE_EDGE} render={<div className="border-t" />}>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Pending invites</TableHead>
+              <TableHead className="w-32 max-sm:w-24">Role</TableHead>
+              <TableHead className="w-12">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pending.map((i) => (
+              <TableRow key={i.id}>
+                <TableCell className="max-w-0 truncate">{i.email}</TableCell>
+                <TableCell>
+                  <Badge className="capitalize" variant="outline">
+                    {i.role}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-end">
+                  <Menu>
+                    <MenuTrigger
+                      render={
+                        <Button
+                          aria-label={`Actions for invite to ${i.email}`}
+                          size="icon-sm"
+                          variant="ghost"
+                        />
                       }
-                      size="icon-xs"
-                      type="button"
-                      variant="quiet-danger"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
+                      <EllipsisIcon aria-hidden="true" />
+                    </MenuTrigger>
+                    <MenuPopup align="end">
+                      <MenuItem onClick={() => void copyInvite(i.token)}>
+                        <LinkIcon aria-hidden="true" />
+                        Copy invite link
+                      </MenuItem>
+                      <MenuSeparator />
+                      <MenuItem
+                        onClick={() =>
+                          revoke.mutate({ projectId, inviteId: i.id })
+                        }
+                        variant="destructive"
+                      >
+                        <Trash2Icon aria-hidden="true" />
+                        Revoke invite
+                      </MenuItem>
+                    </MenuPopup>
+                  </Menu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) setRemoving(null);
+        }}
+        open={removing !== null}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {removing?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They lose access to this project right away. You can invite them
+              again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="ghost" />}>
+              Cancel
+            </AlertDialogClose>
+            <Button
+              loading={removeMember.isPending}
+              onClick={() => {
+                if (removing)
+                  removeMember.mutate({ projectId, userId: removing.userId });
+              }}
+              variant="destructive"
+            >
+              Remove member
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
     </Section>
   );
 }
 
-const ROLE_OPTIONS: { value: "editor" | "viewer"; label: string }[] = [
-  { value: "editor", label: "Editor" },
-  { value: "viewer", label: "Viewer" },
-];
-
-function RoleDropdown({
+function RoleSelect({
   value,
   onChange,
   disabled,
-  size = "md",
-  ariaLabel,
+  size = "default",
+  "aria-label": ariaLabel,
 }: {
-  value: "editor" | "viewer";
-  onChange: (next: "editor" | "viewer") => void;
+  value: AssignableRole;
+  onChange: (next: AssignableRole) => void;
   disabled?: boolean;
-  size?: "sm" | "md";
-  ariaLabel?: string;
+  size?: "sm" | "default";
+  "aria-label": string;
 }) {
-  const current = ROLE_OPTIONS.find((o) => o.value === value)?.label ?? value;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label={ariaLabel}
-          className="justify-between"
-          disabled={disabled}
-          size={size === "sm" ? "xs" : "default"}
-          type="button"
-          variant="outline"
-        >
-          <span>{current}</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-28">
-        {ROLE_OPTIONS.map((opt) => (
-          <DropdownMenuItem
-            key={opt.value}
-            onSelect={() => onChange(opt.value)}
-          >
-            <Check
-              className={`h-3.5 w-3.5 ${opt.value === value ? "opacity-100" : "opacity-0"}`}
-            />
-            <span>{opt.label}</span>
-          </DropdownMenuItem>
+    <Select
+      disabled={disabled}
+      items={ROLE_ITEMS}
+      onValueChange={(next) => {
+        if (next) onChange(next);
+      }}
+      value={value}
+    >
+      <SelectTrigger aria-label={ariaLabel} className="min-w-24 sm:min-w-28" size={size}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectPopup>
+        {ROLE_ITEMS.map((r) => (
+          <SelectItem key={r.value} value={r.value}>
+            {r.label}
+          </SelectItem>
         ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </SelectPopup>
+    </Select>
   );
 }

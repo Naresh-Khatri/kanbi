@@ -7,9 +7,12 @@ import { APP_VERSION, releases } from "@/changelog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  DialogClose,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
+  DialogPanel,
+  DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
 
@@ -38,39 +41,31 @@ export function WhatsNewDialog() {
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent>
+      <DialogPopup>
         <DialogHeader>
           <DialogTitle>What&apos;s new in v{latest.version}</DialogTitle>
           <DialogDescription>
             Here&apos;s what changed since you were last here.
           </DialogDescription>
         </DialogHeader>
-        <ul className="flex flex-col gap-2 text-sm text-white/70">
-          {latest.entries.map((entry) => (
-            <li className="flex gap-2" key={entry}>
-              <span aria-hidden className="text-white/40">
-                —
-              </span>
-              <span>{entry}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-          <Button asChild size="inline" variant="link">
-            <Link href="/app/changelog" onClick={() => onOpenChange(false)}>
-              All releases
-            </Link>
-          </Button>
+        <DialogPanel>
+          <ul className="text-muted-foreground marker:text-muted-foreground/48 flex list-disc flex-col gap-2 ps-5 text-sm">
+            {latest.entries.map((entry) => (
+              <li key={entry}>{entry}</li>
+            ))}
+          </ul>
+        </DialogPanel>
+        <DialogFooter className="sm:justify-between">
           <Button
             onClick={() => onOpenChange(false)}
-            size="sm"
-            type="button"
-            variant="outline"
+            render={<Link href="/app/changelog" />}
+            variant="ghost"
           >
-            Got it
+            All releases
           </Button>
-        </div>
-      </DialogContent>
+          <DialogClose render={<Button />}>Got it</DialogClose>
+        </DialogFooter>
+      </DialogPopup>
     </Dialog>
   );
 }

@@ -1,23 +1,43 @@
 "use client";
 
-import { IconTile } from "@/components/ui/surface";
-import { Plug, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
-
 import { formatRelative } from "@kanbi/shared";
+import { PlugIcon, Trash2Icon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toastManager } from "@/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { authClient } from "@/server/better-auth/client";
 import { api } from "@/trpc/react";
 
-/** A single granted OAuth consent, as returned by the provider client. */
 type Consent = NonNullable<
   Awaited<ReturnType<typeof authClient.oauth2.getConsents>>["data"]
 >[number];
 
-/** Short pill labels for the scopes the MCP provider issues. */
 const SCOPE_LABEL: Record<string, string> = {
   openid: "Identity",
   profile: "Profile",
@@ -27,26 +47,21 @@ const SCOPE_LABEL: Record<string, string> = {
   "kanbi:write": "Write",
 };
 
-/**
- * Connected-apps manager: lists the OAuth grants the user has authorized (the
- * agents/tools that reach Kanbi over MCP) and lets them revoke each one. This
- * is the settings page the consent screen points to ("revoke anytime from your
- * Kanbi settings"). Backed by the Better Auth OAuth provider client rather than
- * tRPC, mirroring the consent flow.
- */
+// oauth grants for MCP agents; the consent screen points here to revoke.
+// better auth client, not trpc, to mirror the consent flow
 export function ConnectedAppsSection() {
   const revokeConnectedApp = api.user.revokeConnectedApp.useMutation();
   const [consents, setConsents] = useState<Consent[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
-  const [revoking, setRevoking] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<Consent | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   const load = useCallback(async () => {
     const res = await authClient.oauth2.getConsents();
     const rows = res.data ?? [];
     setConsents(rows);
 
-    // The consent row only carries a clientId; resolve a human name per distinct
-    // client with the same public lookup the consent screen uses.
+    // consent row only has clientId -> resolve names via public lookup
     const ids = [...new Set(rows.map((r) => r.clientId))];
     const resolved = await Promise.all(
       ids.map(async (clientId) => {
@@ -65,87 +80,142 @@ export function ConnectedAppsSection() {
   }, [load]);
 
   async function revoke(c: Consent) {
-    const label = names[c.clientId] ?? "this app";
-    if (
-      !confirm(`Revoke access for ${label}? It will need to be re-authorized.`)
-    ) {
-      return;
-    }
-    setRevoking(c.id);
+    setRevoking(true);
     try {
       await revokeConnectedApp.mutateAsync({ consentId: c.id });
       setConsents(
         (prev) => prev?.filter((x) => x.clientId !== c.clientId) ?? prev,
       );
-      toast.success("Access revoked");
+      setConfirming(null);
+      toastManager.add({ type: "success", title: "Access revoked" });
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to revoke access",
-      );
+      toastManager.add({
+        type: "error",
+        title:
+          error instanceof Error ? error.message : "Failed to revoke access",
+      });
     } finally {
-      setRevoking(null);
+      setRevoking(false);
     }
   }
 
+  const confirmingLabel = confirming
+    ? (names[confirming.clientId] ?? "this app")
+    : "";
+
   return (
-    <section className="mt-12 border-t border-white/10 pt-8">
-      <header className="mb-4">
-        <h2 className="text-sm font-medium text-white">Connected apps</h2>
-        <p className="mt-1 text-xs text-white/70">
+    <Card className="overflow-hidden">
+      <CardHeader>
+        <CardTitle className="text-base" render={<h2 />}>
+          Connected apps
+        </CardTitle>
+        <CardDescription>
           Agents and tools you&apos;ve authorized to reach your Kanbi account
           over MCP. Revoke any you no longer use.
-        </p>
-      </header>
+        </CardDescription>
+      </CardHeader>
 
-      <ul className="divide-y divide-white/10 rounded-lg border border-white/10">
-        {consents === null ? (
-          <li className="px-4 py-3 text-xs text-white/40">Loading…</li>
-        ) : consents.length === 0 ? (
-          <li className="px-4 py-3 text-xs text-white/40">
-            No connected apps.
-          </li>
-        ) : (
-          consents.map((c) => (
-            <li
-              key={c.id}
-              className="flex items-center justify-between gap-3 px-4 py-3"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <IconTile size="sm">
-                  <Plug className="h-4 w-4" />
-                </IconTile>
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-white">
-                    {names[c.clientId] ?? c.clientId}
-                  </p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                    {c.scopes
-                      .filter((s: string) => SCOPE_LABEL[s])
-                      .map((s: string) => (
-                        <Badge key={s}>{SCOPE_LABEL[s]}</Badge>
-                      ))}
-                    {c.createdAt ? (
-                      <span className="text-2xs text-white/40">
-                        · granted {formatRelative(c.createdAt)}
-                      </span>
-                    ) : null}
+      {consents === null ? (
+        <div className="flex flex-col gap-2 border-t px-6 py-4">
+          <Skeleton className="h-8 w-2/3" />
+          <Skeleton className="h-8 w-1/2" />
+        </div>
+      ) : consents.length === 0 ? (
+        <Empty className="border-t py-8 md:py-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PlugIcon aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle className="text-base">No connected apps</EmptyTitle>
+            <EmptyDescription>
+              Connect an agent like Claude Code or Cursor over MCP and it shows
+              up here.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <ul className="divide-y border-t">
+          {consents.map((c) => {
+            const label = names[c.clientId] ?? c.clientId;
+            return (
+              <li
+                className="flex items-center justify-between gap-3 px-6 py-3"
+                key={c.id}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md border">
+                    <PlugIcon aria-hidden="true" className="size-4" />
+                  </span>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <p className="truncate text-sm font-medium">{label}</p>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {c.scopes
+                        .filter((s: string) => SCOPE_LABEL[s])
+                        .map((s: string) => (
+                          <Badge key={s} size="sm" variant="outline">
+                            {SCOPE_LABEL[s]}
+                          </Badge>
+                        ))}
+                      {c.createdAt ? (
+                        <span className="text-muted-foreground text-xs">
+                          · granted {formatRelative(c.createdAt)}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <Button
-                aria-label="Revoke access"
-                disabled={revoking === c.id}
-                onClick={() => revoke(c)}
-                size="icon-sm"
-                type="button"
-                variant="quiet-danger"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </li>
-          ))
-        )}
-      </ul>
-    </section>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        aria-label={`Revoke access for ${label}`}
+                        onClick={() => setConfirming(c)}
+                        size="icon-sm"
+                        variant="ghost"
+                      />
+                    }
+                  >
+                    <Trash2Icon aria-hidden="true" />
+                  </TooltipTrigger>
+                  <TooltipPopup>Revoke access</TooltipPopup>
+                </Tooltip>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) setConfirming(null);
+        }}
+        open={confirming !== null}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Revoke access for {confirmingLabel}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              It will need to be re-authorized before it can reach Kanbi again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="ghost" />}>
+              Cancel
+            </AlertDialogClose>
+            <Button
+              loading={revoking}
+              onClick={() => {
+                if (confirming) void revoke(confirming);
+              }}
+              variant="destructive"
+            >
+              Revoke access
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+    </Card>
   );
 }

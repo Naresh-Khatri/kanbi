@@ -1,50 +1,50 @@
 "use client";
 
-import { FileText, SquareKanban } from "lucide-react";
+import { FileTextIcon, SettingsIcon, SquareKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { segmentVariants } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 
 export function ProjectSectionNav({ slug }: { slug: string }) {
   const pathname = usePathname();
-  const docsActive = pathname.startsWith(`/app/p/${slug}/docs`);
-  const boardActive = pathname === `/app/p/${slug}`;
+  const base = `/app/p/${slug}`;
+  const value = pathname.startsWith(`${base}/docs`)
+    ? "docs"
+    : pathname.startsWith(`${base}/settings`)
+      ? "settings"
+      : pathname === base
+        ? "board"
+        : null;
+
+  const tabs = [
+    { value: "board", href: base, label: "Board", icon: SquareKanbanIcon },
+    { value: "docs", href: `${base}/docs`, label: "Docs", icon: FileTextIcon },
+    {
+      value: "settings",
+      href: `${base}/settings`,
+      label: "Settings",
+      icon: SettingsIcon,
+    },
+  ];
 
   return (
-    <nav aria-label="Project sections" className="flex shrink-0 items-center gap-0.5">
-      <SectionLink active={boardActive} href={`/app/p/${slug}`}>
-        <SquareKanban className="h-3.5 w-3.5" />
-        <span className="sr-only sm:not-sr-only">Board</span>
-      </SectionLink>
-      <SectionLink active={docsActive} href={`/app/p/${slug}/docs`}>
-        <FileText className="h-3.5 w-3.5" />
-        <span className="sr-only sm:not-sr-only">Docs</span>
-      </SectionLink>
-    </nav>
-  );
-}
-
-function SectionLink({
-  active,
-  href,
-  children,
-}: {
-  active: boolean;
-  href: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      aria-current={active ? "page" : undefined}
-      className={segmentVariants({
-        size: "sm",
-        active,
-        tone: "nav",
-      })}
-      href={href}
-    >
-      {children}
-    </Link>
+    // tabs as route links; value mirrors pathname, navigation drives selection
+    <Tabs className="shrink-0" value={value}>
+      <TabsList aria-label="Project sections" size="sm">
+        {tabs.map(({ value: v, href, label, icon: Icon }) => (
+          <TabsTab
+            aria-label={label}
+            key={v}
+            nativeButton={false}
+            render={<Link href={href} />}
+            value={v}
+          >
+            <Icon aria-hidden="true" />
+            <span className="max-sm:hidden">{label}</span>
+          </TabsTab>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }

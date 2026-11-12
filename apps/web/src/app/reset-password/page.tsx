@@ -1,17 +1,32 @@
 "use client";
 
+import { LinkIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { toast } from "sonner";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Wordmark } from "@/components/ui/logo";
+import { toastManager } from "@/components/ui/toast";
 import { authClient } from "@/server/better-auth/client";
-import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export default function ResetPasswordPage() {
   return (
@@ -33,7 +48,7 @@ function ResetPasswordForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
-      toast.error("Passwords don't match");
+      toastManager.add({ type: "error", title: "Passwords don't match" });
       return;
     }
     setPending(true);
@@ -43,71 +58,87 @@ function ResetPasswordForm() {
     });
     setPending(false);
     if (res.error) {
-      toast.error(res.error.message ?? "Reset failed");
+      toastManager.add({
+        type: "error",
+        title: res.error.message ?? "Reset failed",
+      });
       return;
     }
-    toast.success("Password updated. Please sign in.");
+    toastManager.add({
+      type: "success",
+      title: "Password updated",
+      description: "Please sign in with your new password.",
+    });
     router.push("/login");
   }
 
   if (!token || error) {
     return (
       <AuthShell>
-        <div className="flex w-full max-w-sm flex-col gap-4">
-          <Link href="/">
-            <Wordmark />
-          </Link>
-          <PageTitle>Link expired</PageTitle>
-          <PageSubtitle>
-            This reset link is invalid or has expired. Request a new one.
-          </PageSubtitle>
-          <Link className="text-white underline" href="/forgot-password">
-            Send a new link
-          </Link>
-        </div>
+        <Card className="w-full max-w-sm">
+          <Empty className="p-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <LinkIcon aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle>Link expired</EmptyTitle>
+              <EmptyDescription>
+                This reset link is invalid or has expired. Request a new one.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button render={<Link href="/forgot-password" />} variant="outline">
+                Send a new link
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </Card>
       </AuthShell>
     );
   }
 
   return (
     <AuthShell>
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link href="/">
-          <Wordmark />
-        </Link>
-        <div className="flex flex-col gap-1">
-          <PageTitle>Choose a new password</PageTitle>
-        </div>
-        <form className="flex flex-col gap-3" onSubmit={onSubmit}>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password">New password</Label>
-            <Input
-              autoComplete="new-password"
-              id="password"
-              minLength={8}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="confirm">Confirm password</Label>
-            <Input
-              autoComplete="new-password"
-              id="confirm"
-              minLength={8}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              type="password"
-              value={confirm}
-            />
-          </div>
-          <Button disabled={pending} type="submit">
-            {pending ? "Saving…" : "Update password"}
-          </Button>
-        </form>
-      </div>
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-xl">Choose a new password</CardTitle>
+          <CardDescription>Use at least 8 characters.</CardDescription>
+        </CardHeader>
+        <CardPanel>
+          <Form className="flex flex-col gap-4" onSubmit={onSubmit}>
+            <Field name="password">
+              <FieldLabel>New password</FieldLabel>
+              <Input
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                size="lg"
+                type="password"
+                value={password}
+              />
+              <FieldError match="tooShort">
+                Use at least 8 characters.
+              </FieldError>
+            </Field>
+            <Field name="confirm">
+              <FieldLabel>Confirm password</FieldLabel>
+              <Input
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                size="lg"
+                type="password"
+                value={confirm}
+              />
+            </Field>
+            <Button className="mt-2 w-full" loading={pending} size="lg" type="submit">
+              Update password
+            </Button>
+          </Form>
+        </CardPanel>
+      </Card>
     </AuthShell>
   );
 }

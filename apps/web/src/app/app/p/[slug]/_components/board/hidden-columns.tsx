@@ -1,14 +1,16 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
-import { CountBadge } from "@/components/ui/badge";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Menu,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuItem,
+  MenuPopup,
+  MenuTrigger,
+} from "@/components/ui/menu";
 import type { ColumnRow } from "./board-types";
 
 export function HiddenColumns({
@@ -21,22 +23,33 @@ export function HiddenColumns({
   if (columns.length === 0) return null;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button className="shrink-0" size="sm" variant="quiet">
-          <EyeOff className="h-4 w-4" />
-          Hidden columns
-          <CountBadge>{columns.length}</CountBadge>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {columns.map((column) => (
-          <DropdownMenuItem key={column.id} onSelect={() => onShow(column.id)}>
-            <Eye className="h-3.5 w-3.5" />
-            <span className="min-w-0 flex-1 truncate">{column.name}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Menu>
+      <MenuTrigger
+        render={
+          <Button
+            className="text-muted-foreground shrink-0"
+            size="sm"
+            variant="ghost"
+          />
+        }
+      >
+        <EyeOffIcon aria-hidden="true" />
+        Hidden
+        <Badge size="sm" variant="secondary">
+          {columns.length}
+        </Badge>
+      </MenuTrigger>
+      <MenuPopup align="end">
+        <MenuGroup>
+          <MenuGroupLabel>Show column</MenuGroupLabel>
+          {columns.map((column) => (
+            <MenuItem key={column.id} onClick={() => onShow(column.id)}>
+              <EyeIcon aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate">{column.name}</span>
+            </MenuItem>
+          ))}
+        </MenuGroup>
+      </MenuPopup>
+    </Menu>
   );
 }

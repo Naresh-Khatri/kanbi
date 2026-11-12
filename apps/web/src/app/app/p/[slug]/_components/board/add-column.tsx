@@ -1,10 +1,10 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toastManager } from "@/components/ui/toast";
 import { api } from "@/trpc/react";
 
 export function AddColumn({ boardId }: { boardId: string }) {
@@ -17,24 +17,24 @@ export function AddColumn({ boardId }: { boardId: string }) {
       setName("");
       await utils.board.get.invalidate({ boardId });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
 
   if (!open) {
     return (
       <Button
-        className="shrink-0 snap-center md:[scroll-snap-align:none]"
+        className="text-muted-foreground shrink-0 snap-center md:[scroll-snap-align:none]"
         onClick={() => setOpen(true)}
         size="sm"
-        variant="quiet"
+        variant="ghost"
       >
-        <Plus className="h-4 w-4" /> Add column
+        <PlusIcon aria-hidden="true" /> Add column
       </Button>
     );
   }
   return (
     <form
-      className="flex w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-2 rounded-lg border border-white/10 p-3 md:w-72 md:[scroll-snap-align:none]"
+      className="bg-card flex w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-2 rounded-xl border p-2 md:w-72 md:[scroll-snap-align:none]"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -42,18 +42,17 @@ export function AddColumn({ boardId }: { boardId: string }) {
       }}
     >
       <Input
+        aria-label="Column name"
         autoFocus
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Escape") setOpen(false);
         }}
         placeholder="Column name"
+        size="sm"
         value={name}
       />
-      <div className="flex gap-2">
-        <Button disabled={create.isPending} size="sm" type="submit">
-          Add
-        </Button>
+      <div className="flex justify-end gap-2">
         <Button
           onClick={() => setOpen(false)}
           size="sm"
@@ -61,6 +60,9 @@ export function AddColumn({ boardId }: { boardId: string }) {
           variant="ghost"
         >
           Cancel
+        </Button>
+        <Button loading={create.isPending} size="sm" type="submit">
+          Add
         </Button>
       </div>
     </form>

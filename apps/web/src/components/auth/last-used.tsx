@@ -27,7 +27,7 @@ export function useLastUsedAuth() {
 
 export function LastUsedBadge() {
   return (
-    <Badge className="absolute -top-2 right-2" tone="inverse">
+    <Badge className="pointer-events-none absolute -top-2 right-2 z-10" size="sm">
       Last used
     </Badge>
   );

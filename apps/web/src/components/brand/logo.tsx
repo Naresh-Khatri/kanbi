@@ -17,11 +17,30 @@ export function Logo({ className }: { className?: string }) {
 }
 
 /** logo + name lockup for auth / standalone pages */
-export function Wordmark({ className }: { className?: string }) {
+export function Wordmark({
+  className,
+  size = "default",
+}: {
+  className?: string;
+  size?: "sm" | "default";
+}) {
   return (
-    <span className={cn("flex items-center gap-2.5", className)}>
-      <Logo className="h-8 w-8" />
-      <span className="text-xl font-extrabold tracking-tight">Kanbi</span>
+    <span
+      className={cn(
+        "flex items-center text-foreground",
+        size === "sm" ? "gap-2" : "gap-2.5",
+        className,
+      )}
+    >
+      <Logo className={size === "sm" ? "size-6" : "size-8"} />
+      <span
+        className={cn(
+          "font-bold font-heading tracking-tight",
+          size === "sm" ? "text-base" : "text-xl",
+        )}
+      >
+        Kanbi
+      </span>
     </span>
   );
 }

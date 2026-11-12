@@ -7,10 +7,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRightIcon, InboxIcon, PlusIcon } from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/surface";
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   ColumnRow,
@@ -109,8 +115,8 @@ export const SortableColumn = memo(function SortableColumn({
     return (
       <div
         className={cn(
-          "flex h-full w-12 shrink-0 snap-center flex-col items-center rounded-lg border border-white/10 py-2 md:[scroll-snap-align:none]",
-          dropTarget && "bg-white/5 ring-1 ring-white/20",
+          "bg-muted flex h-full w-12 shrink-0 snap-center flex-col items-center rounded-xl py-2 md:[scroll-snap-align:none]",
+          dropTarget && "bg-accent ring-ring/40 ring-1",
         )}
         ref={sortable.setNodeRef}
         style={style}
@@ -118,13 +124,13 @@ export const SortableColumn = memo(function SortableColumn({
         <Button
           aria-label={`Expand ${column.name}`}
           onClick={() => onCollapseChange(false)}
-          size="icon"
+          size="icon-sm"
           variant="ghost"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRightIcon aria-hidden="true" />
         </Button>
         <button
-          className="mt-2 flex min-h-0 flex-1 cursor-grab touch-none items-center gap-2 text-sm font-medium text-white/70 [writing-mode:vertical-rl] active:cursor-grabbing"
+          className="text-muted-foreground mt-2 flex min-h-0 flex-1 cursor-grab touch-none items-center gap-2 text-sm font-medium [writing-mode:vertical-rl] active:cursor-grabbing"
           onClick={() => onCollapseChange(false)}
           ref={setDropRef}
           type="button"
@@ -134,10 +140,10 @@ export const SortableColumn = memo(function SortableColumn({
           <span className="rotate-180 truncate">{column.name}</span>
           <span
             className={cn(
-              "rotate-180 text-xs text-white/40",
+              "text-muted-foreground rotate-180 text-xs tabular-nums",
               column.wipLimit != null &&
                 totalTaskCount > column.wipLimit &&
-                "text-warning",
+                "text-warning-foreground",
             )}
           >
             {column.wipLimit != null
@@ -152,11 +158,12 @@ export const SortableColumn = memo(function SortableColumn({
   return (
     <div
       className={cn(
-        "group/column flex h-full w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-2 rounded-lg border border-white/10 p-2 md:w-72 md:[scroll-snap-align:none]",
+        "group/column bg-muted flex h-full w-[calc(100vw-2rem)] shrink-0 snap-center flex-col gap-1.5 rounded-xl p-1.5 md:w-72 md:[scroll-snap-align:none]",
         column.wipLimit != null &&
           totalTaskCount > column.wipLimit &&
           "ring-warning/40 ring-1",
       )}
+      data-slot="board-column"
       ref={sortable.setNodeRef}
       style={style}
     >
@@ -217,27 +224,36 @@ export const SortableColumn = memo(function SortableColumn({
             ))}
           </SortableContext>
           {tasks.length === 0 && !dropTarget ? (
-            <EmptyState size="sm">
-              <p>{totalTaskCount > 0 ? "No matching tasks" : "No tasks yet"}</p>
+            <Empty className="gap-3 px-2 py-6 md:py-6">
+              <EmptyHeader>
+                <EmptyMedia className="mb-3" variant="icon">
+                  <InboxIcon aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle className="text-muted-foreground font-sans text-sm font-medium">
+                  {totalTaskCount > 0 ? "No matching tasks" : "No tasks yet"}
+                </EmptyTitle>
+              </EmptyHeader>
               {canWrite && totalTaskCount === 0 ? (
-                <Button
-                  onClick={() => onAddTask(column.id)}
-                  size="sm"
-                  variant="property"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add task
-                </Button>
+                <EmptyContent>
+                  <Button
+                    onClick={() => onAddTask(column.id)}
+                    size="xs"
+                    variant="outline"
+                  >
+                    <PlusIcon aria-hidden="true" /> Add task
+                  </Button>
+                </EmptyContent>
               ) : null}
-            </EmptyState>
+            </Empty>
           ) : null}
           {canWrite && tasks.length > 0 ? (
             <Button
-              className="justify-start"
+              className="text-muted-foreground justify-start"
               onClick={() => onAddTask(column.id)}
               size="sm"
-              variant="quiet"
+              variant="ghost"
             >
-              <Plus className="h-4 w-4" /> Add task
+              <PlusIcon aria-hidden="true" /> Add task
             </Button>
           ) : null}
           {!sortBlocked &&
@@ -247,7 +263,7 @@ export const SortableColumn = memo(function SortableColumn({
             <DropIndicator className="inset-x-1 -bottom-px" />
           ) : null}
           {tasks.length === 0 && dropTarget ? (
-            <div className="pointer-events-none absolute inset-0 rounded-md border border-dashed border-white/20 bg-white/5" />
+            <div className="border-ring/40 bg-accent pointer-events-none absolute inset-0 rounded-lg border border-dashed" />
           ) : null}
         </div>
       </ScrollArea>
