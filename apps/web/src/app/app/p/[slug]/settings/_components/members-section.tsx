@@ -189,7 +189,7 @@ export function MembersSection({
         <TableHeader>
           <TableRow>
             <TableHead>Member</TableHead>
-            <TableHead className="w-32">Role</TableHead>
+            <TableHead className="w-32 max-sm:w-24">Role</TableHead>
             {isOwner ? (
               <TableHead className="w-12">
                 <span className="sr-only">Actions</span>
@@ -284,7 +284,7 @@ export function MembersSection({
           <TableHeader>
             <TableRow>
               <TableHead>Pending invites</TableHead>
-              <TableHead className="w-32">Role</TableHead>
+              <TableHead className="w-32 max-sm:w-24">Role</TableHead>
               <TableHead className="w-12">
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -393,7 +393,7 @@ function RoleSelect({
       }}
       value={value}
     >
-      <SelectTrigger aria-label={ariaLabel} className="min-w-28" size={size}>
+      <SelectTrigger aria-label={ariaLabel} className="min-w-24 sm:min-w-28" size={size}>
         <SelectValue />
       </SelectTrigger>
       <SelectPopup>

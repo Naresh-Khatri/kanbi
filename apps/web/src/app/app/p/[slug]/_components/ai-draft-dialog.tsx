@@ -742,7 +742,7 @@ function ChecklistField({
           <span className="flex-1 text-sm">{item}</span>
           <Button
             aria-label="Remove item"
-            className="text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100"
+            className="text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100 pointer-coarse:opacity-100"
             onClick={() => onChange(items.filter((_, i) => i !== idx))}
             size="icon-xs"
             variant="ghost"

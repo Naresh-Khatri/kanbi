@@ -62,7 +62,7 @@ export function DocsTree({
   const tree = useMemo(() => buildTree(documents), [documents]);
 
   return (
-    <aside className="bg-sidebar flex max-h-72 w-full shrink-0 flex-col border-b md:max-h-none md:w-64 md:border-e md:border-b-0">
+    <aside className="bg-sidebar flex max-h-48 w-full shrink-0 flex-col border-b md:max-h-none md:w-64 md:border-e md:border-b-0">
       <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
         <h2 className="text-sm font-medium">Pages</h2>
         {actions.canWrite ? (

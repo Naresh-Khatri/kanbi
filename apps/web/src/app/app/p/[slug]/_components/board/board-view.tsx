@@ -11,8 +11,9 @@ import {
   type DragStartEvent,
   defaultDropAnimationSideEffects,
   KeyboardSensor,
+  MouseSensor,
   pointerWithin,
-  PointerSensor,
+  TouchSensor,
   type DropAnimation,
   useSensor,
   useSensors,
@@ -559,7 +560,11 @@ export function BoardView({
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    // press-and-hold on touch so swipes still pan the board
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),

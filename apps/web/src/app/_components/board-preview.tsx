@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Frame, FrameHeader, FramePanel } from "@/components/ui/frame";
 import { Kbd } from "@/components/ui/kbd";
 import { DEFAULT_LABELS } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 
 type Label = (typeof DEFAULT_LABELS)[number]["name"];
 type FakeCard = {
@@ -94,9 +95,13 @@ export function BoardPreview() {
           New task <Kbd>C</Kbd>
         </span>
       </FrameHeader>
-      <FramePanel className="grid grid-cols-3 gap-2 p-2 sm:gap-3 sm:p-3">
-        {COLUMNS.map((col) => (
-          <div className="flex min-w-0 flex-col gap-2" key={col.name}>
+      <FramePanel className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:gap-3 sm:p-3">
+        {COLUMNS.map((col, i) => (
+          <div
+            // 2 cols on phones so titles fit
+            className={cn("flex min-w-0 flex-col gap-2", i === 2 && "max-sm:hidden")}
+            key={col.name}
+          >
             <div className="flex items-center gap-2 px-1 py-0.5 font-medium text-xs">
               {col.name}
               <span className="text-muted-foreground tabular-nums">

@@ -1113,7 +1113,7 @@ function ChecklistPanel({
               {canWrite ? (
                 <Button
                   aria-label="Remove item"
-                  className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                  className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
                   onClick={() => remove.mutate({ boardId, itemId: it.id })}
                   size="icon-xs"
                   type="button"
@@ -1282,7 +1282,7 @@ function AttachmentsPanel({
                   {canWrite ? (
                     <Button
                       aria-label="Remove attachment"
-                      className="absolute end-1 top-1 bg-popover/80 opacity-0 backdrop-blur-sm focus-visible:opacity-100 group-hover:opacity-100"
+                      className="absolute end-1 top-1 bg-popover/80 opacity-0 backdrop-blur-sm focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
                       onClick={() =>
                         remove.mutate({ boardId, attachmentId: a.id })
                       }
@@ -1596,7 +1596,7 @@ function CommentItem({
                 render={
                   <Button
                     aria-label="Comment actions"
-                    className="ms-auto opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-popup-open:opacity-100"
+                    className="ms-auto opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-popup-open:opacity-100 pointer-coarse:opacity-100"
                     size="icon-xs"
                     variant="ghost"
                   />

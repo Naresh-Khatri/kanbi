@@ -562,7 +562,7 @@ export function QuickAddTaskDialog({
                       )}
                       <Button
                         aria-label={`Remove ${s.file.name}`}
-                        className="absolute end-1 top-1 bg-background/80 opacity-0 backdrop-blur-sm focus-visible:opacity-100 group-hover/file:opacity-100"
+                        className="absolute end-1 top-1 bg-background/80 opacity-0 backdrop-blur-sm focus-visible:opacity-100 group-hover/file:opacity-100 pointer-coarse:opacity-100"
                         onClick={() => removeStaged(s.id)}
                         size="icon-xs"
                         type="button"
@@ -729,7 +729,7 @@ function SortableChecklistItem({
     >
       <Button
         aria-label="Drag to reorder"
-        className="cursor-grab text-muted-foreground opacity-0 focus-visible:opacity-100 active:cursor-grabbing group-hover/item:opacity-100"
+        className="cursor-grab text-muted-foreground opacity-0 focus-visible:opacity-100 active:cursor-grabbing group-hover/item:opacity-100 pointer-coarse:opacity-100"
         size="icon-xs"
         type="button"
         variant="ghost"
@@ -752,7 +752,7 @@ function SortableChecklistItem({
       />
       <Button
         aria-label="Remove item"
-        className="text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100"
+        className="text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/item:opacity-100 pointer-coarse:opacity-100"
         onClick={() => onRemove(item.id)}
         size="icon-xs"
         type="button"

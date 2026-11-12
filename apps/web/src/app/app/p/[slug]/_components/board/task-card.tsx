@@ -93,7 +93,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         <DropIndicator className="inset-x-0 -top-1" />
       ) : null}
       <div
-        className="touch-none select-none"
+        className="touch-manipulation select-none"
         data-slot="task-card-sortable"
         ref={sortable.setNodeRef}
         style={style}

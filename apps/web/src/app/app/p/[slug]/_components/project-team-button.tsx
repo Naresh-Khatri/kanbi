@@ -77,7 +77,8 @@ export function ProjectTeamButton() {
     <Popover>
       <PopoverTrigger
         aria-label="Team & presence"
-        className="gap-1.5 px-1.5"
+        // presence is a desktop nicety; access lives in settings on phones
+        className="gap-1.5 px-1.5 max-sm:hidden"
         render={<Button size="sm" variant="ghost" />}
       >
         <span className="flex -space-x-1.5">

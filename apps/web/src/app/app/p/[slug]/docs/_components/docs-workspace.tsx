@@ -62,7 +62,8 @@ export function DocsWorkspace({
   const list = documents.data ?? [];
 
   return (
-    <main className="min-h-below-header bg-background md:h-below-header relative flex flex-col overflow-x-clip md:flex-row md:overflow-hidden">
+    // phones: main is the scroller so the sticky header stays put
+    <main className="bg-background relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto md:flex-row md:overflow-hidden">
       <DocsTree
         activeId={initialDocumentId}
         canWrite={canWrite}
@@ -76,7 +77,7 @@ export function DocsWorkspace({
         slug={slug}
       />
 
-      <ScrollArea className="min-w-0 flex-1" render={<section />}>
+      <ScrollArea className="min-w-0 max-md:flex-none md:flex-1" render={<section />}>
         {initialDocumentId ? (
           <DocumentView
             canWrite={canWrite}

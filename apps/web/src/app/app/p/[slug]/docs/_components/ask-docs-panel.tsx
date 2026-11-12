@@ -98,7 +98,7 @@ export function AskDocsPanel({
         <motion.aside
           animate={{ opacity: 1, transform: "translateX(0)" }}
           aria-label="Ask docs"
-          className="bg-background flex h-96 w-full shrink-0 flex-col border-t md:h-auto md:w-80 md:border-s md:border-t-0 xl:w-96"
+          className="bg-background flex w-full shrink-0 flex-col border-t max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:h-[70svh] max-md:rounded-t-xl max-md:shadow-lg md:h-auto md:w-80 md:border-s md:border-t-0 xl:w-96"
           exit={{
             opacity: 0,
             transform: reduceMotion ? "translateX(0)" : "translateX(16px)",

@@ -296,10 +296,10 @@
 
 /* full-height views under the sticky app header */
 @utility h-below-header {
-  height: calc(100dvh - var(--spacing-header));
+  height: calc(100svh - var(--spacing-header));
 }
 @utility min-h-below-header {
-  min-height: calc(100dvh - var(--spacing-header));
+  min-height: calc(100svh - var(--spacing-header));
 }
 
 /* tiptap placeholder: extension sets is-editor-empty + data-placeholder */
