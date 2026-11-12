@@ -155,6 +155,7 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
   --background: var(--color-white);
   --foreground: var(--color-neutral-800);
@@ -210,6 +211,8 @@
 }
 
 .dark {
+  /* native scrollbars/inputs follow theme */
+  color-scheme: dark;
   --background: color-mix(
     in srgb,
     var(--color-neutral-950) 95%,
