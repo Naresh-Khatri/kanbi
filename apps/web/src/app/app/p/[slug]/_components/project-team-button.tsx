@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDownIcon, UserPlusIcon } from "lucide-react";
+import { ChevronDownIcon, UserPlusIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
@@ -69,36 +69,61 @@ export function ProjectTeamButton() {
     return r !== 0 ? r : a.name.localeCompare(b.name);
   });
   const onlineCount = sorted.filter((m) => online.has(m.userId)).length;
-  const shown = sorted.slice(0, 3);
-  const extra = sorted.length - shown.length;
+  const othersOnline = sorted.filter(
+    (m) => m.userId !== me?.id && online.has(m.userId),
+  );
+  const selfOnline = sorted.find(
+    (m) => m.userId === me?.id && online.has(m.userId),
+  );
+  // online only; later = on top, self rightmost
+  const shown = [
+    ...othersOnline.slice(0, selfOnline ? 2 : 3),
+    ...(selfOnline ? [selfOnline] : []),
+  ];
+  const extra = othersOnline.length + (selfOnline ? 1 : 0) - shown.length;
   const memberLabel = `${members.length} member${members.length === 1 ? "" : "s"}`;
+  const onlineNames = [
+    ...othersOnline.map((m) => m.name),
+    ...(selfOnline ? ["you"] : []),
+  ];
+  const presenceLabel =
+    onlineNames.length > 0 ? `${onlineNames.join(", ")} online` : memberLabel;
 
   return (
     <Popover>
       <PopoverTrigger
-        aria-label="Team & presence"
+        aria-label={`Team: ${presenceLabel}`}
         // presence is a desktop nicety; access lives in settings on phones
         className="gap-1.5 px-1.5 max-sm:hidden"
         render={<Button size="sm" variant="ghost" />}
+        title={presenceLabel}
       >
-        <span className="flex -space-x-1.5">
-          {shown.map((m) => (
-            <span
-              className={cn(
-                "rounded-full ring-2",
-                online.has(m.userId) ? "ring-success" : "ring-background",
-              )}
-              key={m.userId}
-            >
-              <UserAvatar image={m.image} name={m.name} size={20} />
+        {shown.length > 0 ? (
+          <span className="flex items-center -space-x-1.5">
+            {extra > 0 ? (
+              <span className="bg-background text-muted-foreground ring-background inset-ring-border flex size-5 items-center justify-center rounded-full text-[10px] font-medium ring-2 inset-ring">
+                +{extra}
+              </span>
+            ) : null}
+            {shown.map((m) => (
+              <UserAvatar
+                // opaque bg: initials fallback is translucent, overlap would show through
+                className="bg-background ring-background ring-2"
+                image={m.image}
+                key={m.userId}
+                name={m.name}
+                size={20}
+              />
+            ))}
+          </span>
+        ) : (
+          <>
+            <UsersIcon aria-hidden="true" />
+            <span className="text-muted-foreground tabular-nums">
+              {members.length}
             </span>
-          ))}
-          {extra > 0 ? (
-            <span className="bg-muted text-muted-foreground ring-background flex size-5 items-center justify-center rounded-full text-[10px] font-medium ring-2">
-              +{extra}
-            </span>
-          ) : null}
-        </span>
+          </>
+        )}
         {pending > 0 ? (
           <span
             aria-hidden="true"
