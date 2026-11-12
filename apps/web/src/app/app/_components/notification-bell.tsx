@@ -213,6 +213,8 @@ export function NotificationBell() {
       </Tooltip>
       <PopoverPopup
         align="end"
+        // never flip beside the bell; shrink the list instead
+        collisionAvoidance={{ fallbackAxisSide: "none" }}
         className="w-96 *:data-[slot=popover-viewport]:p-0"
       >
         <div className="flex h-11 items-center justify-between gap-2 border-b ps-4 pe-2">
@@ -244,7 +246,8 @@ export function NotificationBell() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <ScrollArea className="max-h-[min(28rem,var(--available-height))]">
+          // not --available-height: base ui measures with it = max-content -> uncapped list, tall positioner
+          <ScrollArea className="max-h-[min(28rem,calc(100svh-7rem))]">
             <ul className="flex flex-col divide-y">
               {items.map((n) => {
                 const { text, href, actions } = describe(n);

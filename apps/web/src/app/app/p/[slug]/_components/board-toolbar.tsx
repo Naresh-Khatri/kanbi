@@ -451,7 +451,11 @@ function FilterMenu({
           </Badge>
         ) : null}
       </MenuTrigger>
-      <MenuPopup align="start" className="max-h-80 min-w-48">
+      <MenuPopup
+        align="start"
+        // cap the inner scroller; max-h on popup lets long label lists spill out
+        className="min-w-48 *:max-h-[min(20rem,var(--available-height))]"
+      >
         {children}
       </MenuPopup>
     </Menu>
