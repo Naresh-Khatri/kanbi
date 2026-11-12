@@ -1,27 +1,24 @@
-import Link from "next/link";
-
 import { ArchivedProjects } from "@/app/app/_components/archived-projects";
-import { Button } from "@/components/ui/button";
 import { api, HydrateClient } from "@/trpc/server";
-import { PageContainer, PageTitle } from "@/components/ui/surface";
+
+export const metadata = { title: "Archived projects" };
 
 export default function ArchivedProjectsPage() {
   void api.project.listArchived.prefetch();
 
   return (
     <HydrateClient>
-      <PageContainer className="gap-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 sm:px-6">
         <header className="flex flex-col gap-1">
-          <Button asChild className="mb-2 w-fit" size="inline" variant="link">
-            <Link href="/app">← Projects</Link>
-          </Button>
-          <PageTitle>Archived projects</PageTitle>
-          <p className="text-sm text-white/70">
+          <h1 className="font-heading text-2xl font-semibold">
+            Archived projects
+          </h1>
+          <p className="text-muted-foreground text-sm">
             Kept out of your daily views until you need them again.
           </p>
         </header>
         <ArchivedProjects />
-      </PageContainer>
+      </div>
     </HydrateClient>
   );
 }

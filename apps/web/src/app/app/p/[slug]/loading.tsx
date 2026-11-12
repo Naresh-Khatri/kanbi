@@ -1,12 +1,15 @@
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function Loading() {
   return (
-    <main className="h-below-header flex flex-col">
-      <div className="flex gap-4 p-6">
+    <main className="flex min-h-0 flex-1 flex-col">
+      <div className="flex gap-3 p-4">
         {[0, 1, 2].map((i) => (
-          <div
-            className="h-64 w-72 shrink-0 animate-pulse rounded-lg bg-white/5"
-            key={i}
-          />
+          <div className="flex w-72 shrink-0 flex-col gap-2" key={i}>
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-16 rounded-xl" />
+          </div>
         ))}
       </div>
     </main>

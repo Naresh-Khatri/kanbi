@@ -15,12 +15,19 @@ import type {
   SuggestionOptions,
   SuggestionProps,
 } from "@tiptap/suggestion";
-import { ArrowUpRight, Hash } from "lucide-react";
-import { HoverCard } from "radix-ui";
+import { ArrowUpRightIcon, HashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-
-import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  cloneElement,
+  forwardRef,
+  useEffect, useImperativeHandle, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  PreviewCard,
+  PreviewCardPopup,
+  PreviewCardTrigger,
+} from "@/components/ui/preview-card";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 
 export type MentionItem = {
@@ -43,15 +50,11 @@ export type TicketMentionItem = {
   href?: string;
 };
 
-/** Tailwind class applied to a rendered user-mention chip (editor + read-only). */
 const MENTION_CLASS =
-  "rounded bg-blue-500/15 px-1 py-0.5 font-medium text-blue-300";
-/** Ticket-mention chip — visually distinct from user mentions, and clickable. */
+  "rounded-sm bg-info/12 px-1 py-0.5 font-medium text-info-foreground";
+// tickets read as identifiers (mono) vs people; clickable in read-only renders
 const TICKET_CLASS =
-  "cursor-pointer rounded bg-ai/15 text-ai px-1 py-0.5 font-medium no-underline hover:bg-ai/20";
-/** Shared dark hover-card surface. */
-const HOVER_CONTENT_CLASS =
-  "z-[200] w-64 rounded-lg border border-white/10 bg-raised p-3 text-white shadow-xl";
+  "cursor-pointer rounded-sm bg-muted px-1 py-0.5 font-medium font-mono text-[0.9em] text-foreground no-underline hover:bg-accent";
 
 const PRIORITY_LABEL: Record<string, string> = {
   urgent: "Urgent",
@@ -68,9 +71,10 @@ type SuggestionHandle = {
   onKeyDown: (props: SuggestionKeyDownProps) => boolean;
 };
 
-// ── Hover-card node views ────────────────────────────────────────────────────
+const PREVIEW_DELAY = 150;
+const PREVIEW_CLOSE_DELAY = 100;
 
-/** User-mention chip: "@Name" badge with an avatar/email hover card. */
+/** User-mention chip: "@Name" with an avatar/email preview card. */
 function MentionChip({
   node,
   getItems,
@@ -87,47 +91,44 @@ function MentionChip({
       className={MENTION_CLASS}
       data-id={id ?? undefined}
       data-type="mention"
-    >
-      @{name}
-    </span>
+    />
   );
   if (!item) {
     return (
       <NodeViewWrapper as="span" className="inline">
-        {chip}
+        {cloneElement(chip, undefined, `@${name}`)}
       </NodeViewWrapper>
     );
   }
   return (
     <NodeViewWrapper as="span" className="inline">
-      <HoverCard.Root closeDelay={100} openDelay={150}>
-        <HoverCard.Trigger asChild>{chip}</HoverCard.Trigger>
-        <HoverCard.Portal>
-          <HoverCard.Content
-            className={HOVER_CONTENT_CLASS}
-            side="top"
-            sideOffset={6}
-            style={{ pointerEvents: "auto" }}
-          >
-            <div className="flex items-center gap-2.5">
-              <UserAvatar image={item.image} name={item.label} size={36} />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{item.label}</div>
-                {item.sublabel ? (
-                  <div className="truncate text-xs text-white/40">
-                    {item.sublabel}
-                  </div>
-                ) : null}
-              </div>
+      <PreviewCard>
+        <PreviewCardTrigger
+          closeDelay={PREVIEW_CLOSE_DELAY}
+          delay={PREVIEW_DELAY}
+          render={chip}
+        >
+          @{name}
+        </PreviewCardTrigger>
+        <PreviewCardPopup className="w-auto max-w-72 p-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <UserAvatar image={item.image} name={item.label} size={36} />
+            <div className="min-w-0">
+              <div className="truncate font-medium text-sm">{item.label}</div>
+              {item.sublabel ? (
+                <div className="truncate text-muted-foreground text-xs">
+                  {item.sublabel}
+                </div>
+              ) : null}
             </div>
-          </HoverCard.Content>
-        </HoverCard.Portal>
-      </HoverCard.Root>
+          </div>
+        </PreviewCardPopup>
+      </PreviewCard>
     </NodeViewWrapper>
   );
 }
 
-/** Ticket-mention chip: "KEY-123" badge that opens the task and shows a summary card. */
+/** Ticket-mention chip: "KEY-123" that opens the task, with a summary preview card. */
 function TicketChip({
   node,
   editor,
@@ -152,9 +153,8 @@ function TicketChip({
       new CustomEvent(OPEN_TASK_EVENT, { detail: { taskId: id } }),
     );
   };
+  // editable editor: click places the cursor; preview card CTA still opens
   const onChipClick = () => {
-    // Navigate only from read-only renders; in an editable editor a click should
-    // place the cursor / select the chip (the hover-card CTA stays available).
     if (editor.isEditable) return;
     openTask();
   };
@@ -165,14 +165,12 @@ function TicketChip({
       data-id={id ?? undefined}
       data-type="ticket"
       onClick={onChipClick}
-    >
-      {label}
-    </span>
+    />
   );
   if (!item) {
     return (
       <NodeViewWrapper as="span" className="inline">
-        {chip}
+        {cloneElement(chip, undefined, label)}
       </NodeViewWrapper>
     );
   }
@@ -185,194 +183,201 @@ function TicketChip({
 
   return (
     <NodeViewWrapper as="span" className="inline">
-      <HoverCard.Root closeDelay={100} openDelay={150}>
-        <HoverCard.Trigger asChild>{chip}</HoverCard.Trigger>
-        <HoverCard.Portal>
-          <HoverCard.Content
-            className={HOVER_CONTENT_CLASS}
-            side="top"
-            sideOffset={6}
-            style={{ pointerEvents: "auto" }}
+      <PreviewCard>
+        <PreviewCardTrigger
+          closeDelay={PREVIEW_CLOSE_DELAY}
+          delay={PREVIEW_DELAY}
+          render={chip}
+        >
+          {label}
+        </PreviewCardTrigger>
+        <PreviewCardPopup className="flex-col gap-1.5 p-3">
+          <span className="font-mono text-muted-foreground text-xs">
+            {item.label}
+          </span>
+          <span className="font-medium text-sm leading-snug">
+            {item.title}
+          </span>
+          {meta.length > 0 ? (
+            <span className="text-muted-foreground text-xs">
+              {meta.join(" · ")}
+            </span>
+          ) : null}
+          <Button
+            className="mt-1"
+            onClick={openTask}
+            size="xs"
+            type="button"
+            variant="outline"
           >
-            <div className="flex flex-col gap-1.5">
-              <span className="font-mono text-xs text-violet-300">
-                {item.label}
-              </span>
-              <span className="text-sm leading-snug font-medium">
-                {item.title}
-              </span>
-              {meta.length > 0 ? (
-                <span className="flex flex-wrap items-center gap-1.5 text-xs text-white/40">
-                  {meta.map((m, i) => (
-                    <span className="flex items-center gap-1.5" key={i}>
-                      {i > 0 ? <span className="text-white/40">·</span> : null}
-                      {m}
-                    </span>
-                  ))}
-                </span>
-              ) : null}
-              <button
-                className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
-                onClick={openTask}
-                type="button"
-              >
-                <ArrowUpRight className="h-3.5 w-3.5" /> Open task
-              </button>
-            </div>
-          </HoverCard.Content>
-        </HoverCard.Portal>
-      </HoverCard.Root>
+            <ArrowUpRightIcon aria-hidden="true" />
+            Open task
+          </Button>
+        </PreviewCardPopup>
+      </PreviewCard>
     </NodeViewWrapper>
   );
 }
 
-// ── User @-mention suggestion list ───────────────────────────────────────────
+// ── suggestion lists (styled as a coss menu popup) ───────────────────────────
 
-type MentionListProps = {
-  items: MentionItem[];
+type ListProps<T> = {
+  items: T[];
   command: (item: { id: string; label: string }) => void;
 };
 
-const MentionList = forwardRef<SuggestionHandle, MentionListProps>(
-  function MentionList({ items, command }, ref) {
-    const [selected, setSelected] = useState(0);
+function useSuggestionNav<T extends { id: string; label: string }>(
+  { items, command }: ListProps<T>,
+  ref: React.ForwardedRef<SuggestionHandle>,
+) {
+  const [selected, setSelected] = useState(0);
+  useEffect(() => setSelected(0), [items]);
 
-    useEffect(() => setSelected(0), [items]);
+  const select = (index: number) => {
+    const item = items[index];
+    if (item) command({ id: item.id, label: item.label });
+  };
 
-    const select = (index: number) => {
-      const item = items[index];
-      if (item) command({ id: item.id, label: item.label });
-    };
+  useImperativeHandle(ref, () => ({
+    onKeyDown: ({ event }) => {
+      if (items.length === 0) return false;
+      if (event.key === "ArrowUp") {
+        setSelected((s) => (s + items.length - 1) % items.length);
+        return true;
+      }
+      if (event.key === "ArrowDown") {
+        setSelected((s) => (s + 1) % items.length);
+        return true;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        select(selected);
+        return true;
+      }
+      return false;
+    },
+  }));
 
-    useImperativeHandle(ref, () => ({
-      onKeyDown: ({ event }) => {
-        if (items.length === 0) return false;
-        if (event.key === "ArrowUp") {
-          setSelected((s) => (s + items.length - 1) % items.length);
-          return true;
-        }
-        if (event.key === "ArrowDown") {
-          setSelected((s) => (s + 1) % items.length);
-          return true;
-        }
-        if (event.key === "Enter" || event.key === "Tab") {
-          select(selected);
-          return true;
-        }
-        return false;
-      },
-    }));
+  return { selected, setSelected, select };
+}
 
-    if (items.length === 0) return null;
+function SuggestionMenu<T extends { id: string }>({
+  items,
+  selected,
+  onHover,
+  onSelect,
+  label,
+  className,
+  children,
+}: {
+  items: T[];
+  selected: number;
+  onHover: (i: number) => void;
+  onSelect: (i: number) => void;
+  label: string;
+  className?: string;
+  children: (item: T) => React.ReactNode;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div
+      aria-label={label}
+      className={cn(
+        "relative max-h-64 min-w-48 overflow-y-auto rounded-lg border bg-popover not-dark:bg-clip-padding p-1 text-popover-foreground shadow-lg/5",
+        className,
+      )}
+      role="listbox"
+    >
+      {items.map((item, i) => (
+        <div
+          aria-selected={i === selected}
+          className="flex min-h-8 cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground sm:min-h-7 sm:text-sm [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-80"
+          key={item.id}
+          onClick={() => onSelect(i)}
+          // keep focus in the editor
+          onMouseDown={(e) => e.preventDefault()}
+          onMouseEnter={() => onHover(i)}
+          role="option"
+          tabIndex={-1}
+        >
+          {children(item)}
+        </div>
+      ))}
+    </div>
+  );
+}
 
+const MentionList = forwardRef<SuggestionHandle, ListProps<MentionItem>>(
+  function MentionList(props, ref) {
+    const { selected, setSelected, select } = useSuggestionNav(props, ref);
     return (
-      <div className="bg-raised min-w-44 overflow-hidden rounded-md border border-white/10 p-1 shadow-xl">
-        {items.map((item, i) => (
-          <button
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition",
-              i === selected
-                ? "bg-white/10 text-white"
-                : "text-white/70 hover:bg-white/5",
-            )}
-            key={item.id}
-            onClick={() => select(i)}
-            onMouseEnter={() => setSelected(i)}
-            type="button"
-          >
+      <SuggestionMenu
+        items={props.items}
+        label="Mention a teammate"
+        onHover={setSelected}
+        onSelect={select}
+        selected={selected}
+      >
+        {(item) => (
+          <>
             <UserAvatar image={item.image} name={item.label} size={20} />
             <span className="truncate">{item.label}</span>
-          </button>
-        ))}
-      </div>
+          </>
+        )}
+      </SuggestionMenu>
     );
   },
 );
 
-// ── Ticket #-mention suggestion list ─────────────────────────────────────────
-
-type TicketListProps = {
-  items: TicketMentionItem[];
-  command: (item: { id: string; label: string }) => void;
-};
-
-const TicketList = forwardRef<SuggestionHandle, TicketListProps>(
-  function TicketList({ items, command }, ref) {
-    const [selected, setSelected] = useState(0);
-
-    useEffect(() => setSelected(0), [items]);
-
-    const select = (index: number) => {
-      const item = items[index];
-      if (item) command({ id: item.id, label: item.label });
-    };
-
-    useImperativeHandle(ref, () => ({
-      onKeyDown: ({ event }) => {
-        if (items.length === 0) return false;
-        if (event.key === "ArrowUp") {
-          setSelected((s) => (s + items.length - 1) % items.length);
-          return true;
-        }
-        if (event.key === "ArrowDown") {
-          setSelected((s) => (s + 1) % items.length);
-          return true;
-        }
-        if (event.key === "Enter" || event.key === "Tab") {
-          select(selected);
-          return true;
-        }
-        return false;
-      },
-    }));
-
-    if (items.length === 0) return null;
-
+const TicketList = forwardRef<SuggestionHandle, ListProps<TicketMentionItem>>(
+  function TicketList(props, ref) {
+    const { selected, setSelected, select } = useSuggestionNav(props, ref);
     return (
-      <div className="bg-raised max-h-64 min-w-60 overflow-y-auto rounded-md border border-white/10 p-1 shadow-xl">
-        {items.map((item, i) => (
-          <button
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition",
-              i === selected
-                ? "bg-white/10 text-white"
-                : "text-white/70 hover:bg-white/5",
-            )}
-            key={item.id}
-            onClick={() => select(i)}
-            onMouseEnter={() => setSelected(i)}
-            type="button"
-          >
-            <Hash className="h-3.5 w-3.5 shrink-0 text-violet-300" />
-            <span className="shrink-0 font-medium text-violet-300">
+      <SuggestionMenu
+        className="w-72"
+        items={props.items}
+        label="Link a task"
+        onHover={setSelected}
+        onSelect={select}
+        selected={selected}
+      >
+        {(item) => (
+          <>
+            <HashIcon aria-hidden="true" />
+            <span className="shrink-0 font-mono text-muted-foreground text-xs">
               {item.label}
             </span>
-            <span className="truncate text-white/70">{item.title}</span>
-          </button>
-        ))}
-      </div>
+            <span className="truncate">{item.title}</span>
+          </>
+        )}
+      </SuggestionMenu>
     );
   },
 );
 
-// ── Shared suggestion popup plumbing ─────────────────────────────────────────
+// ── suggestion popup plumbing ────────────────────────────────────────────────
 
-/** Create the body-mounted popup container shared by both suggestion menus. */
-function createPopup() {
+// mount inside the open dialog/drawer: base ui treats clicks outside its popup
+// as outside-press and would dismiss it
+function createPopup(editor: Editor) {
+  const host =
+    editor.view.dom.closest<HTMLElement>(
+      '[role="dialog"], [role="alertdialog"]',
+    ) ?? document.body;
   const popup = document.createElement("div");
   popup.style.position = "fixed";
-  popup.style.zIndex = "200";
-  // Re-enable pointer events: a modal Radix dialog sets the body to
-  // pointer-events:none, which would otherwise swallow clicks here.
+  popup.style.zIndex = "60";
   popup.style.pointerEvents = "auto";
-  document.body.appendChild(popup);
+  host.appendChild(popup);
 
   const place = (clientRect?: (() => DOMRect | null) | null) => {
-    if (!clientRect) return;
-    const rect = clientRect();
+    const rect = clientRect?.();
     if (!rect) return;
-    popup.style.left = `${rect.left}px`;
-    popup.style.top = `${rect.bottom + 6}px`;
+    // transformed hosts re-base `fixed`; measure the real origin first
+    popup.style.left = "0px";
+    popup.style.top = "0px";
+    const origin = popup.getBoundingClientRect();
+    popup.style.left = `${rect.left - origin.left}px`;
+    popup.style.top = `${rect.bottom + 6 - origin.top}px`;
   };
 
   return { popup, place };
@@ -392,7 +397,10 @@ function buildSuggestion(
         .slice(0, 8);
     },
     render: () => {
-      let component: ReactRenderer<SuggestionHandle, MentionListProps> | null =
+      let component: ReactRenderer<
+        SuggestionHandle,
+        ListProps<MentionItem>
+      > | null =
         null;
       let mount: ReturnType<typeof createPopup> | null = null;
 
@@ -402,7 +410,7 @@ function buildSuggestion(
             editor: props.editor,
             props,
           });
-          mount = createPopup();
+          mount = createPopup(props.editor);
           mount.popup.appendChild(component.element);
           mount.place(props.clientRect);
         },
@@ -412,6 +420,9 @@ function buildSuggestion(
         },
         onKeyDown: (props: SuggestionKeyDownProps) => {
           if (props.event.key === "Escape") {
+            // stop host esc handlers (dialogs, docs discard) from also firing
+            props.event.preventDefault();
+            props.event.stopPropagation();
             mount?.popup.remove();
             return true;
           }
@@ -444,7 +455,10 @@ function buildTicketSuggestion(
         .slice(0, 8);
     },
     render: () => {
-      let component: ReactRenderer<SuggestionHandle, TicketListProps> | null =
+      let component: ReactRenderer<
+        SuggestionHandle,
+        ListProps<TicketMentionItem>
+      > | null =
         null;
       let mount: ReturnType<typeof createPopup> | null = null;
 
@@ -454,7 +468,7 @@ function buildTicketSuggestion(
             editor: props.editor,
             props,
           });
-          mount = createPopup();
+          mount = createPopup(props.editor);
           mount.popup.appendChild(component.element);
           mount.place(props.clientRect);
         },
@@ -464,6 +478,9 @@ function buildTicketSuggestion(
         },
         onKeyDown: (props: SuggestionKeyDownProps) => {
           if (props.event.key === "Escape") {
+            // stop host esc handlers (dialogs, docs discard) from also firing
+            props.event.preventDefault();
+            props.event.stopPropagation();
             mount?.popup.remove();
             return true;
           }

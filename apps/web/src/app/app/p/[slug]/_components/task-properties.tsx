@@ -1,18 +1,33 @@
 "use client";
 
 import { formatDate } from "@kanbi/shared";
-import { CalendarDays, Check, Tag, User as UserIcon, X } from "lucide-react";
-import { useRef } from "react";
-import { Dot } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { UserAvatar } from "@/components/ui/user-avatar";
+  CalendarDaysIcon,
+  PlusIcon,
+  TagIcon,
+  UserIcon,
+  XIcon,
+} from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
+import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectPrimitive,
+} from "@/components/ui/select";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import type { RouterOutputs } from "@/trpc/react";
 import {
@@ -23,27 +38,10 @@ import {
 } from "./priority";
 
 type Members = RouterOutputs["project"]["members"];
-type LabelOption = { id: string; name: string; color: string };
+export type LabelOption = { id: string; name: string; color: string };
 
-// chip = compact xs chips in dialogs; row = md property rows in the detail sheet
+// chip = outline xs chips in dialogs; row = ghost property rows in the detail drawer
 export type PropertySize = "chip" | "row";
-
-const SIZE = {
-  chip: {
-    button: "xs",
-    icon: "h-3.5 w-3.5",
-    priorityIcon: "h-3.5 w-3.5",
-    triggerAvatar: 16,
-    menuAvatar: 20,
-  },
-  row: {
-    button: "md",
-    icon: "h-4 w-4 shrink-0 text-white/40",
-    priorityIcon: "h-4 w-4 shrink-0",
-    triggerAvatar: 20,
-    menuAvatar: 18,
-  },
-} as const;
 
 // parse as local date so YYYY-MM-DD isn't shifted by timezone
 export function formatDueDate(iso: string) {
@@ -52,50 +50,76 @@ export function formatDueDate(iso: string) {
   return formatDate(new Date(y, m - 1, d));
 }
 
-function TriggerLabel({
-  size,
+function parseIsoDate(iso: string | null) {
+  if (!iso) return undefined;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d);
+}
+
+function toIsoDate(d: Date) {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+export function PropertyButton({
+  size = "row",
+  className,
+  ...props
+}: Omit<React.ComponentProps<typeof Button>, "size" | "variant"> & {
+  size?: PropertySize;
+}) {
+  return size === "row" ? (
+    <Button
+      className={cn("max-w-full justify-start", className)}
+      size="sm"
+      variant="ghost"
+      {...props}
+    />
+  ) : (
+    <Button className={className} size="xs" variant="outline" {...props} />
+  );
+}
+
+export function propertyButton(size: PropertySize) {
+  return <PropertyButton size={size} />;
+}
+
+export function PropertyText({
   placeholder,
   children,
 }: {
-  size: PropertySize;
   placeholder?: boolean;
   children: React.ReactNode;
 }) {
-  if (size === "chip") return <>{children}</>;
   return (
-    <span className={cn("truncate", placeholder && "text-white/40")}>
+    <span className={cn("truncate", placeholder && "text-muted-foreground")}>
       {children}
     </span>
   );
 }
 
-function PropertyTrigger({
-  size,
-  disabled,
-  children,
+export function LabelSwatch({
+  color,
+  className,
 }: {
-  size: PropertySize;
-  disabled?: boolean;
-  children: React.ReactNode;
+  color: string;
+  className?: string;
 }) {
   return (
-    <DropdownMenuTrigger asChild>
-      <Button
-        className={size === "row" ? "max-w-full" : undefined}
-        disabled={disabled}
-        size={SIZE[size].button}
-        type="button"
-        variant="property"
-      >
-        {children}
-      </Button>
-    </DropdownMenuTrigger>
+    <span
+      aria-hidden="true"
+      className={cn("size-2 shrink-0 rounded-full", className)}
+      style={{ backgroundColor: color }}
+    />
   );
 }
 
-function CheckMark() {
-  return <Check className="ml-auto h-3.5 w-3.5" />;
-}
+const PRIORITY_ITEMS = PRIORITIES.map((p) => ({
+  value: p,
+  label: PRIORITY_META[p].label,
+}));
 
 export function PriorityPicker({
   value,
@@ -109,29 +133,53 @@ export function PriorityPicker({
   disabled?: boolean;
 }) {
   return (
-    <DropdownMenu>
-      <PropertyTrigger disabled={disabled} size={size}>
-        <PriorityIcon className={SIZE[size].priorityIcon} priority={value} />
-        <TriggerLabel placeholder={value === "none"} size={size}>
+    <Select
+      disabled={disabled}
+      items={PRIORITY_ITEMS}
+      onValueChange={(v) => {
+        if (v) onChange(v);
+      }}
+      value={value}
+    >
+      <SelectPrimitive.Trigger
+        aria-label="Priority"
+        render={propertyButton(size)}
+      >
+        <PriorityIcon priority={value} />
+        <PropertyText placeholder={value === "none"}>
           {value === "none"
             ? size === "row"
               ? "None"
               : "Priority"
             : PRIORITY_META[value].label}
-        </TriggerLabel>
-      </PropertyTrigger>
-      <DropdownMenuContent align="start">
-        {PRIORITIES.map((p) => (
-          <DropdownMenuItem key={p} onSelect={() => onChange(p)}>
-            <PriorityIcon className="mr-2 h-3.5 w-3.5" priority={p} />
-            {PRIORITY_META[p].label}
-            {p === value ? <CheckMark /> : null}
-          </DropdownMenuItem>
+        </PropertyText>
+      </SelectPrimitive.Trigger>
+      <SelectPopup alignItemWithTrigger={false}>
+        {PRIORITY_ITEMS.map((p) => (
+          <SelectItem key={p.value} value={p.value}>
+            <span className="flex items-center gap-2">
+              <PriorityIcon className="size-4" priority={p.value} />
+              {p.label}
+            </span>
+          </SelectItem>
         ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </SelectPopup>
+    </Select>
   );
 }
+
+type AssigneeOption = {
+  key: string;
+  id: string | null;
+  label: string;
+  image?: string | null;
+};
+
+const UNASSIGNED: AssigneeOption = {
+  key: "none",
+  id: null,
+  label: "Unassigned",
+};
 
 export function AssigneePicker({
   value,
@@ -150,56 +198,188 @@ export function AssigneePicker({
   selfId?: string | null;
 }) {
   const current = members.find((m) => m.userId === value);
-  const canSelfAssign = !!selfId && value !== selfId;
-  const s = SIZE[size];
+  const options = useMemo<AssigneeOption[]>(() => {
+    const list: AssigneeOption[] = [];
+    if (selfId && value !== selfId) {
+      list.push({ key: "self", id: selfId, label: "Assign to me" });
+    }
+    list.push(UNASSIGNED);
+    for (const m of members) {
+      list.push({ key: m.userId, id: m.userId, label: m.name, image: m.image });
+    }
+    return list;
+  }, [members, selfId, value]);
+  const selected =
+    options.find((o) => o.key !== "self" && o.id === value) ?? null;
+  const anchorRef = useRef<HTMLButtonElement>(null);
+
   return (
-    <DropdownMenu>
-      <PropertyTrigger disabled={disabled} size={size}>
+    <Combobox
+      autoHighlight
+      disabled={disabled}
+      isItemEqualToValue={(a, b) => a.key === b.key}
+      itemToStringLabel={(o) => o.label}
+      items={options}
+      onValueChange={(o) => {
+        if (o) onChange(o.id);
+      }}
+      value={selected}
+    >
+      <ComboboxTrigger
+        aria-label="Assignee"
+        ref={anchorRef}
+        render={propertyButton(size)}
+      >
         {current ? (
           <UserAvatar
             image={current.image}
             name={current.name}
-            size={s.triggerAvatar}
+            size={size === "row" ? 20 : 16}
           />
         ) : (
-          <UserIcon className={s.icon} />
+          <UserIcon aria-hidden="true" />
         )}
-        <TriggerLabel placeholder={!current} size={size}>
+        <PropertyText placeholder={!current}>
           {current ? current.name : size === "row" ? "Unassigned" : "Assignee"}
-        </TriggerLabel>
-      </PropertyTrigger>
-      <DropdownMenuContent align="start">
-        {canSelfAssign ? (
-          <>
-            <DropdownMenuItem onSelect={() => onChange(selfId)}>
-              <UserIcon className="h-3.5 w-3.5" />
-              Assign to me
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        <DropdownMenuItem onSelect={() => onChange(null)}>
-          {size === "chip" ? (
-            <span className="flex h-5 w-5 items-center justify-center">
-              <UserIcon className="h-3.5 w-3.5 text-white/40" />
-            </span>
-          ) : null}
-          Unassigned
-          {value === null ? <CheckMark /> : null}
-        </DropdownMenuItem>
-        {members.map((m) => (
-          <DropdownMenuItem key={m.userId} onSelect={() => onChange(m.userId)}>
-            <UserAvatar image={m.image} name={m.name} size={s.menuAvatar} />
-            {m.name}
-            {value === m.userId ? <CheckMark /> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </PropertyText>
+      </ComboboxTrigger>
+      {/* coss popup defaults anchor to chipsRef (null w/o chips) -> pin to trigger */}
+      <ComboboxPopup anchor={anchorRef} className="w-60">
+        <PopupSearch placeholder="Assign to…" />
+        <ComboboxEmpty>No one found.</ComboboxEmpty>
+        <ComboboxList>
+          {(o: AssigneeOption) => (
+            <ComboboxItem key={o.key} value={o}>
+              <span className="flex items-center gap-2">
+                {o.key === "self" || o.id === null ? (
+                  <UserIcon
+                    aria-hidden="true"
+                    className="text-muted-foreground"
+                  />
+                ) : (
+                  <UserAvatar image={o.image} name={o.label} size={18} />
+                )}
+                <span className="truncate">{o.label}</span>
+              </span>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxPopup>
+    </Combobox>
   );
 }
 
-// multi-select menu; the sheet has its own search/create picker
+function PopupSearch({ placeholder }: { placeholder: string }) {
+  return (
+    <div className="border-b p-1">
+      <ComboboxInput
+        className="rounded-md border-transparent bg-transparent shadow-none ring-0 before:hidden dark:bg-transparent"
+        placeholder={placeholder}
+        showTrigger={false}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+const CREATE_KEY = "__create__";
+
+// multi-select labels; onCreate enables "Create “q”" for unmatched queries
+export function LabelsCombobox({
+  labels,
+  selected,
+  onToggle,
+  onCreate,
+  trigger,
+  footer,
+  disabled,
+  emptyText = "No labels yet.",
+  open,
+  onOpenChange,
+}: {
+  labels: LabelOption[];
+  selected: Set<string>;
+  onToggle: (id: string, on: boolean) => void;
+  onCreate?: (name: string) => void;
+  trigger: React.ReactElement;
+  footer?: React.ReactNode;
+  disabled?: boolean;
+  emptyText?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim();
+  const canCreate =
+    !!onCreate &&
+    q.length > 0 &&
+    !labels.some((l) => l.name.toLowerCase() === q.toLowerCase());
+  const items = useMemo<LabelOption[]>(
+    () =>
+      canCreate
+        ? [...labels, { id: CREATE_KEY, name: `Create “${q}”`, color: "" }]
+        : labels,
+    [labels, canCreate, q],
+  );
+  const value = labels.filter((l) => selected.has(l.id));
+  const anchorRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <Combobox
+      autoHighlight
+      disabled={disabled}
+      inputValue={query}
+      isItemEqualToValue={(a, b) => a.id === b.id}
+      itemToStringLabel={(l) => l.name}
+      items={items}
+      multiple
+      onInputValueChange={setQuery}
+      onOpenChange={onOpenChange}
+      open={open}
+      onValueChange={(next) => {
+        if (next.some((l) => l.id === CREATE_KEY)) {
+          onCreate?.(q);
+          setQuery("");
+          return;
+        }
+        const nextIds = new Set(next.map((l) => l.id));
+        for (const l of labels) {
+          const was = selected.has(l.id);
+          const now = nextIds.has(l.id);
+          if (was !== now) onToggle(l.id, now);
+        }
+      }}
+      value={value}
+    >
+      <ComboboxTrigger aria-label="Labels" ref={anchorRef} render={trigger} />
+      <ComboboxPopup anchor={anchorRef} className="w-60">
+        <PopupSearch
+          placeholder={onCreate ? "Search or create…" : "Search labels…"}
+        />
+        <ComboboxEmpty>{q ? "No matching labels." : emptyText}</ComboboxEmpty>
+        <ComboboxList>
+          {(l: LabelOption) => (
+            <ComboboxItem key={l.id} value={l}>
+              <span className="flex items-center gap-2">
+                {l.id === CREATE_KEY ? (
+                  <PlusIcon
+                    aria-hidden="true"
+                    className="text-muted-foreground"
+                  />
+                ) : (
+                  <LabelSwatch color={l.color} />
+                )}
+                <span className="truncate">{l.name}</span>
+              </span>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+        {footer ? <div className="border-t p-1">{footer}</div> : null}
+      </ComboboxPopup>
+    </Combobox>
+  );
+}
+
 export function LabelsChip({
   labels,
   selected,
@@ -211,35 +391,36 @@ export function LabelsChip({
   onToggle: (id: string, on: boolean) => void;
   emptyText: string;
 }) {
+  const active = labels.filter((l) => selected.has(l.id));
   return (
-    <DropdownMenu>
-      <PropertyTrigger size="chip">
-        <Tag className={SIZE.chip.icon} />
-        Labels
-      </PropertyTrigger>
-      <DropdownMenuContent align="start">
-        {labels.length === 0 ? (
-          <DropdownMenuItem disabled>{emptyText}</DropdownMenuItem>
-        ) : (
-          labels.map((l) => {
-            const on = selected.has(l.id);
-            return (
-              <DropdownMenuItem
-                key={l.id}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  onToggle(l.id, !on);
-                }}
-              >
-                <Dot className="mr-2" color={l.color} size="md" />
-                {l.name}
-                {on ? <CheckMark /> : null}
-              </DropdownMenuItem>
-            );
-          })
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <LabelsCombobox
+      emptyText={emptyText}
+      labels={labels}
+      onToggle={onToggle}
+      selected={selected}
+      trigger={
+        <Button size="xs" variant="outline">
+          {active.length > 0 ? (
+            <span className="flex items-center -space-x-0.5">
+              {active.slice(0, 3).map((l) => (
+                <LabelSwatch
+                  className="ring-2 ring-popover"
+                  color={l.color}
+                  key={l.id}
+                />
+              ))}
+            </span>
+          ) : (
+            <TagIcon aria-hidden="true" />
+          )}
+          {active.length === 1
+            ? active[0]!.name
+            : active.length > 1
+              ? `${active.length} labels`
+              : "Labels"}
+        </Button>
+      }
+    />
   );
 }
 
@@ -250,7 +431,7 @@ export function DueDatePicker({
   size = "chip",
   disabled,
 }: {
-  // YYYY-MM-DD, the native date input value
+  // YYYY-MM-DD
   value: string | null;
   // display override when the shown date isn't derived from `value`
   label?: string;
@@ -258,63 +439,51 @@ export function DueDatePicker({
   size?: PropertySize;
   disabled?: boolean;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const selected = parseIsoDate(value);
   const row = size === "row";
 
-  function openPicker() {
-    const el = inputRef.current;
-    if (!el) return;
-    try {
-      el.showPicker();
-    } catch {
-      el.focus();
-    }
-  }
-
   return (
-    <span className="relative inline-flex items-center">
-      <Button
-        className={row ? "max-w-full" : undefined}
-        disabled={disabled}
-        onClick={openPicker}
-        size={SIZE[size].button}
-        type="button"
-        variant="property"
-      >
-        <CalendarDays className={SIZE[size].icon} />
-        <TriggerLabel placeholder={!value} size={size}>
-          {value
-            ? (label ?? formatDueDate(value))
-            : row
-              ? "No date"
-              : "Due date"}
-        </TriggerLabel>
-      </Button>
+    <span className="inline-flex min-w-0 items-center gap-0.5">
+      <Popover onOpenChange={setOpen} open={open}>
+        <PopoverTrigger
+          aria-label="Due date"
+          disabled={disabled}
+          render={propertyButton(size)}
+        >
+          <CalendarDaysIcon aria-hidden="true" />
+          <PropertyText placeholder={!value}>
+            {value
+              ? (label ?? formatDueDate(value))
+              : row
+                ? "No date"
+                : "Due date"}
+          </PropertyText>
+        </PopoverTrigger>
+        <PopoverPopup align="start">
+          <Calendar
+            autoFocus
+            defaultMonth={selected}
+            mode="single"
+            onSelect={(d: Date | undefined) => {
+              onChange(d ? toIsoDate(d) : null);
+              setOpen(false);
+            }}
+            selected={selected}
+          />
+        </PopoverPopup>
+      </Popover>
       {value && !disabled ? (
         <Button
           aria-label="Clear due date"
-          className={row ? "-ml-1" : undefined}
           onClick={() => onChange(null)}
           size="icon-xs"
           type="button"
-          variant="quiet"
+          variant="ghost"
         >
-          <X className="h-3 w-3" />
+          <XIcon aria-hidden="true" />
         </Button>
       ) : null}
-      <input
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute opacity-0",
-          row ? "inset-0" : "bottom-0 left-3 h-0 w-0",
-        )}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value || null)}
-        ref={inputRef}
-        tabIndex={-1}
-        type="date"
-        value={value ?? ""}
-      />
     </span>
   );
 }

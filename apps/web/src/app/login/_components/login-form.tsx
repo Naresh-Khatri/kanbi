@@ -3,23 +3,30 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
+import { AuthShell } from "@/components/auth/auth-shell";
 import { LastUsedBadge, useLastUsedAuth } from "@/components/auth/last-used";
+import { SocialAuth, socialProviderNames } from "@/components/auth/social-auth";
 import {
   AuthInviteBanner,
   InvitedEmailHint,
   inviteReturnPath,
 } from "@/components/invite/auth-invite-banner";
-import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Wordmark } from "@/components/ui/logo";
+import { toastManager } from "@/components/ui/toast";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
-import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export function LoginForm({
   providers,
@@ -36,11 +43,7 @@ export function LoginForm({
   const [pending, setPending] = useState(false);
   const { lastUsed, mark } = useLastUsedAuth();
 
-  const providerNames = [
-    providers.github ? "GitHub" : null,
-    providers.google ? "Google" : null,
-  ].filter((n): n is string => n !== null);
-  const anySocial = providerNames.length > 0;
+  const providerNames = socialProviderNames(providers);
   const afterAuth = invite ? inviteReturnPath(invite) : "/app";
 
   async function onSubmit(e: React.FormEvent) {
@@ -49,7 +52,10 @@ export function LoginForm({
     const res = await authClient.signIn.email({ email, password });
     setPending(false);
     if (res.error) {
-      toast.error(res.error.message ?? "Sign in failed");
+      toastManager.add({
+        type: "error",
+        title: res.error.message ?? "Sign in failed",
+      });
       return;
     }
     mark("email");
@@ -73,121 +79,79 @@ export function LoginForm({
     router.refresh();
   }
 
-  async function onGithub() {
-    mark("github");
-    await authClient.signIn.social({
-      provider: "github",
-      callbackURL: afterAuth,
-    });
-  }
-
-  async function onGoogle() {
-    mark("google");
-    await authClient.signIn.social({
-      provider: "google",
-      callbackURL: afterAuth,
-    });
-  }
-
   return (
     <AuthShell>
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link href="/">
-          <Wordmark />
-        </Link>
-        {invite ? <AuthInviteBanner invite={invite} /> : null}
-        <div className="flex flex-col gap-1">
-          <PageTitle>
-            {invite ? "Sign in to accept" : "Sign in to Kanbi"}
-          </PageTitle>
-          <PageSubtitle>
-            {invite
-              ? "Sign in with the invited account, then confirm joining."
-              : anySocial
-                ? `Welcome back. Use email, or continue with ${providerNames.join(" or ")}.`
-                : "Welcome back. Sign in with your email and password."}
-          </PageSubtitle>
-        </div>
-        <form className="flex flex-col gap-3" onSubmit={onSubmit}>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              autoComplete="email"
-              id="email"
-              onChange={(e) => setEmail(e.target.value)}
-              readOnly={!!invite}
-              required
-              type="email"
-              value={email}
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">
+              {invite ? "Sign in to accept" : "Welcome back"}
+            </CardTitle>
+            <CardDescription>
+              {invite
+                ? "Sign in with the invited account, then confirm joining."
+                : "Sign in to your Kanbi account."}
+            </CardDescription>
+          </CardHeader>
+          <CardPanel className="flex flex-col gap-6">
+            {invite ? <AuthInviteBanner invite={invite} /> : null}
+            <SocialAuth
+              callbackURL={afterAuth}
+              lastUsed={lastUsed}
+              mark={mark}
+              providers={providers}
             />
-            {invite ? <InvitedEmailHint providers={providerNames} /> : null}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Button asChild size="inline" variant="link">
-                <Link href="/forgot-password">Forgot password?</Link>
-              </Button>
-            </div>
-            <Input
-              autoComplete="current-password"
-              id="password"
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-          </div>
-          <div className="relative">
-            {lastUsed === "email" && <LastUsedBadge />}
-            <Button className="w-full" disabled={pending} type="submit">
-              {pending ? "Signing in…" : "Sign in"}
-            </Button>
-          </div>
-        </form>
-        {anySocial && (
-          <>
-            <div className="flex items-center gap-3 text-xs text-white/40">
-              <div className="h-px flex-1 bg-white/10" />
-              or
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
-            <div className="flex gap-3">
-              {providers.github && (
-                <div className="relative flex-1">
-                  {lastUsed === "github" && <LastUsedBadge />}
-                  <Button
-                    className="w-full"
-                    onClick={onGithub}
-                    variant="outline"
+            <Form className="flex flex-col gap-4" onSubmit={onSubmit}>
+              <Field name="email">
+                <FieldLabel>Email</FieldLabel>
+                <Input
+                  autoComplete="email"
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  readOnly={!!invite}
+                  required
+                  size="lg"
+                  type="email"
+                  value={email}
+                />
+                {invite ? (
+                  <FieldDescription>
+                    <InvitedEmailHint providers={providerNames} />
+                  </FieldDescription>
+                ) : null}
+              </Field>
+              <Field name="password">
+                <div className="flex w-full items-center justify-between">
+                  <FieldLabel>Password</FieldLabel>
+                  <Link
+                    className="text-muted-foreground text-xs underline-offset-4 hover:text-foreground hover:underline"
+                    href="/forgot-password"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" className="h-4 w-4" src="/icons/github.svg" />
-                    GitHub
-                  </Button>
+                    Forgot password?
+                  </Link>
                 </div>
-              )}
-              {providers.google && (
-                <div className="relative flex-1">
-                  {lastUsed === "google" && <LastUsedBadge />}
-                  <Button
-                    className="w-full"
-                    onClick={onGoogle}
-                    variant="outline"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" className="h-4 w-4" src="/icons/google.svg" />
-                    Google
-                  </Button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-        <p className="text-center text-sm text-white/70">
+                <Input
+                  autoComplete="current-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  size="lg"
+                  type="password"
+                  value={password}
+                />
+              </Field>
+              <div className="relative mt-2">
+                {lastUsed === "email" && <LastUsedBadge />}
+                <Button className="w-full" loading={pending} size="lg" type="submit">
+                  Sign in
+                </Button>
+              </div>
+            </Form>
+          </CardPanel>
+        </Card>
+        <p className="text-center text-muted-foreground text-sm">
           No account?{" "}
           <Link
-            className="text-white underline"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
             href={preserveOAuthQuery("/signup", currentQuery)}
           >
             Create one

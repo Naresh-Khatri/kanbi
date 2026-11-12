@@ -1,40 +1,65 @@
-import type { ReactNode } from "react";
+import type { FormEventHandler, ReactNode } from "react";
 
-import { Card } from "@/components/ui/surface";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Form } from "@/components/ui/form";
+import { cn } from "@/lib/utils";
 
+// children = CardPanel / CardFooter, kept as direct Card children;
+// onSubmit turns the card itself into the form so slot selectors still match
 export function Section({
   id,
   title,
   description,
+  action,
   children,
   tone = "default",
+  onSubmit,
+  className,
 }: {
   id: string;
   title: string;
-  description?: string;
+  description?: ReactNode;
+  action?: ReactNode;
   children: ReactNode;
   tone?: "default" | "danger";
+  onSubmit?: FormEventHandler<HTMLFormElement>;
+  className?: string;
 }) {
   return (
     <Card
-      as="section"
-      className="scroll-mt-20"
+      className={cn(
+        tone === "danger" && "border-destructive/32",
+        className,
+      )}
       id={id}
-      padding="lg"
-      tone={tone === "danger" ? "danger" : "flat"}
+      render={
+        onSubmit ? (
+          <Form aria-labelledby={`${id}-title`} onSubmit={onSubmit} />
+        ) : (
+          <section aria-labelledby={`${id}-title`} />
+        )
+      }
     >
-      <div className="mb-4">
-        <h2
-          className={`text-base font-semibold ${
-            tone === "danger" ? "text-danger" : "text-white"
-          }`}
+      <CardHeader>
+        <CardTitle
+          className={cn(
+            "text-base",
+            tone === "danger" && "text-destructive-foreground",
+          )}
+          id={`${id}-title`}
+          render={<h2 />}
         >
           {title}
-        </h2>
-        {description ? (
-          <p className="mt-1 text-sm text-white/70">{description}</p>
-        ) : null}
-      </div>
+        </CardTitle>
+        {description ? <CardDescription>{description}</CardDescription> : null}
+        {action ? <CardAction>{action}</CardAction> : null}
+      </CardHeader>
       {children}
     </Card>
   );

@@ -1,11 +1,12 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { SparklesIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
+import { useAppShell } from "@/components/keybinds/shell-store";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { useAppShell } from "@/components/keybinds/shell-store";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/trpc/react";
 
 export function ProjectAiButton() {
@@ -20,20 +21,23 @@ export function ProjectAiButton() {
   if (!board?.access.canWrite) return null;
 
   return (
-    <Button
-      aria-label="Draft tasks with AI"
-      className="gap-1.5"
-      onClick={() => requestAiImport()}
-      size="sm"
-      title="Draft tasks from a message (Shift+V)"
-      type="button"
-      variant="toolbar"
-    >
-      <Sparkles className="h-3.5 w-3.5" />
-      <span className="hidden sm:inline">Draft with AI</span>
-      <Kbd className="hidden lg:inline" variant="hint">
-        ⇧V
-      </Kbd>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label="Draft tasks with AI"
+            onClick={() => requestAiImport()}
+            size="sm"
+            variant="outline"
+          />
+        }
+      >
+        <SparklesIcon aria-hidden="true" className="text-ai-foreground" />
+        <span className="max-sm:hidden">Draft with AI</span>
+      </TooltipTrigger>
+      <TooltipPopup>
+        Draft tasks from a message <Kbd>⇧V</Kbd>
+      </TooltipPopup>
+    </Tooltip>
   );
 }

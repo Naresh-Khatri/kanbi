@@ -1,19 +1,29 @@
 "use client";
 
 import { formatDateTime, formatRelative } from "@kanbi/shared";
-import { Bell, Check } from "lucide-react";
+import { BellIcon, CheckCheckIcon, InboxIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { CountBadge, Dot } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { UserAvatar } from "@/components/ui/user-avatar";
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Popover,
+  PopoverPopup,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { UserAvatar } from "@/components/user-avatar";
+import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 
 type NotificationRow = RouterOutputs["notification"]["list"][number];
@@ -23,7 +33,7 @@ type ActionKind = "accept-invite" | "decline-invite";
 type NotificationAction = {
   label: string;
   kind: ActionKind;
-  variant: "primary" | "ghost";
+  variant: "default" | "ghost";
   token?: string;
 };
 
@@ -96,7 +106,7 @@ function describe(n: NotificationRow): {
               {
                 label: "Accept",
                 kind: "accept-invite",
-                variant: "primary",
+                variant: "default",
                 token,
               },
               {
@@ -121,6 +131,9 @@ function describe(n: NotificationRow): {
 
 export function NotificationBell() {
   const utils = api.useUtils();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
   const unread = api.notification.unreadCount.useQuery(undefined, {
     refetchInterval: POLL_MS,
     refetchOnWindowFocus: true,
@@ -130,39 +143,28 @@ export function NotificationBell() {
     { refetchInterval: POLL_MS, refetchOnWindowFocus: true },
   );
 
-  api.notification.onChange.useSubscription(undefined, {
-    onData: () => {
-      utils.notification.list.invalidate();
-      utils.notification.unreadCount.invalidate();
-    },
-  });
+  const refresh = () => {
+    void utils.notification.list.invalidate();
+    void utils.notification.unreadCount.invalidate();
+  };
+
+  api.notification.onChange.useSubscription(undefined, { onData: refresh });
 
   const markRead = api.notification.markRead.useMutation({
-    onSuccess: () => {
-      utils.notification.list.invalidate();
-      utils.notification.unreadCount.invalidate();
-    },
+    onSuccess: refresh,
   });
   const markAllRead = api.notification.markAllRead.useMutation({
-    onSuccess: () => {
-      utils.notification.list.invalidate();
-      utils.notification.unreadCount.invalidate();
-    },
+    onSuccess: refresh,
   });
-  const router = useRouter();
   const acceptInvite = api.project.acceptInvite.useMutation({
     onSuccess: (res) => {
-      utils.notification.list.invalidate();
-      utils.notification.unreadCount.invalidate();
-      utils.project.list.invalidate();
+      refresh();
+      void utils.project.list.invalidate();
       if (res?.projectSlug) router.push(`/app/p/${res.projectSlug}`);
     },
   });
   const declineInvite = api.project.declineInvite.useMutation({
-    onSuccess: () => {
-      utils.notification.list.invalidate();
-      utils.notification.unreadCount.invalidate();
-    },
+    onSuccess: refresh,
   });
 
   const runAction = (action: NotificationAction, notificationId: string) => {
@@ -176,140 +178,161 @@ export function NotificationBell() {
 
   const items = list.data ?? [];
   const unreadCount = unread.data ?? 0;
+  const hasUnread = items.some((n) => !n.readAt);
+  const countLabel = unreadCount > 99 ? "99+" : String(unreadCount);
 
-  const hasUnread = useMemo(() => items.some((n) => !n.readAt), [items]);
+  const close = () => setOpen(false);
 
   return (
-    <DropdownMenu
-      onOpenChange={(open) => {
-        if (open) {
-          utils.notification.list.invalidate();
-          utils.notification.unreadCount.invalidate();
-        }
+    <Popover
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) refresh();
       }}
+      open={open}
     >
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label="Notifications"
-          className="relative"
-          size="icon-md"
-          variant="quiet"
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <PopoverTrigger
+              aria-label={
+                unreadCount > 0 ? `Inbox, ${countLabel} unread` : "Inbox"
+              }
+              render={
+                <Button className="relative" size="icon-sm" variant="ghost" />
+              }
+            />
+          }
         >
-          <Bell className="h-4 w-4" />
+          <BellIcon aria-hidden="true" />
           {unreadCount > 0 ? (
-            <CountBadge
-              className="absolute top-0 right-0 text-center"
-              tone="info"
-            >
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </CountBadge>
+            <span className="bg-info ring-background absolute top-1.5 right-1.5 size-2 rounded-full ring-2" />
           ) : null}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-          <span className="text-sm font-medium">Notifications</span>
+        </TooltipTrigger>
+        <TooltipPopup>Inbox</TooltipPopup>
+      </Tooltip>
+      <PopoverPopup
+        align="end"
+        className="w-96 *:data-[slot=popover-viewport]:p-0"
+      >
+        <div className="flex h-11 items-center justify-between gap-2 border-b ps-4 pe-2">
+          <PopoverTitle className="text-sm">Inbox</PopoverTitle>
           {hasUnread ? (
             <Button
-              className="gap-1"
+              loading={markAllRead.isPending}
               onClick={() => markAllRead.mutate()}
-              size="inline"
-              type="button"
-              variant="link"
+              size="xs"
+              variant="ghost"
             >
-              <Check className="h-3 w-3" /> Mark all read
+              <CheckCheckIcon aria-hidden="true" />
+              Mark all read
             </Button>
           ) : null}
         </div>
-        <div className="max-h-96 overflow-y-auto">
-          {items.length === 0 ? (
-            <div className="px-3 py-6 text-center text-sm text-white/40">
-              You&apos;re all caught up.
-            </div>
-          ) : (
-            items.map((n) => {
-              const { text, href, actions } = describe(n);
-              const unread = !n.readAt;
-              const createdAt =
-                n.createdAt instanceof Date
-                  ? n.createdAt
-                  : new Date(n.createdAt);
-              const rowClass = `border-white/10 border-b px-3 py-2.5 transition ${
-                unread ? "bg-white/5 hover:bg-white/10" : "hover:bg-white/5"
-              }`;
-              const handleClick = () => {
-                if (unread) markRead.mutate({ ids: [n.id] });
-              };
-              const body = (
-                <>
-                  <div className="flex items-start gap-2">
+        {items.length === 0 ? (
+          <Empty className="py-10 md:py-10">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <InboxIcon aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle className="text-base">
+                You&apos;re all caught up
+              </EmptyTitle>
+              <EmptyDescription>
+                Assignments, mentions and invites land here.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <ScrollArea className="max-h-[min(28rem,var(--available-height))]">
+            <ul className="flex flex-col divide-y">
+              {items.map((n) => {
+                const { text, href, actions } = describe(n);
+                const isUnread = !n.readAt;
+                const createdAt =
+                  n.createdAt instanceof Date
+                    ? n.createdAt
+                    : new Date(n.createdAt);
+                const onOpen = () => {
+                  if (isUnread) markRead.mutate({ ids: [n.id] });
+                  if (href) close();
+                };
+                const rowClass = cn(
+                  "hover:bg-accent focus-visible:bg-accent flex w-full items-start gap-3 px-4 py-3 text-start transition-colors outline-none",
+                  isUnread && "bg-info/8",
+                );
+                const content = (
+                  <>
                     <UserAvatar
                       image={n.actorImage ?? null}
                       name={n.actorName ?? "?"}
                       size={28}
                     />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate-2 text-sm leading-snug text-white">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span
+                        className={cn(
+                          "line-clamp-2 text-sm leading-snug",
+                          isUnread
+                            ? "text-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      >
                         {text}
-                      </p>
-                      <p
-                        className="text-2xs mt-0.5 text-white/40"
+                      </span>
+                      <span
+                        className="text-muted-foreground text-xs"
                         title={formatDateTime(createdAt)}
                       >
                         {formatRelative(createdAt)}
-                      </p>
-                    </div>
-                    {unread ? <Dot className="bg-info mt-1" /> : null}
-                  </div>
-                  {actions && actions.length > 0 ? (
-                    <div className="mt-2 ml-9 flex items-center gap-2">
-                      {actions.map((a) => (
-                        <Button
-                          disabled={
-                            acceptInvite.isPending || declineInvite.isPending
-                          }
-                          key={a.kind}
-                          size="xs"
-                          variant={
-                            a.variant === "primary" ? "default" : "ghost"
-                          }
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            runAction(a, n.id);
-                          }}
-                          type="button"
-                        >
-                          {a.label}
-                        </Button>
-                      ))}
-                    </div>
-                  ) : null}
-                </>
-              );
-              return href ? (
-                <Link
-                  className={`block ${rowClass}`}
-                  href={href}
-                  key={n.id}
-                  onClick={handleClick}
-                >
-                  {body}
-                </Link>
-              ) : (
-                <button
-                  className={`block w-full text-left ${rowClass}`}
-                  key={n.id}
-                  onClick={handleClick}
-                  type="button"
-                >
-                  {body}
-                </button>
-              );
-            })
-          )}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+                      </span>
+                    </span>
+                    {isUnread ? (
+                      <span
+                        aria-label="Unread"
+                        className="bg-info mt-1.5 size-2 shrink-0 rounded-full"
+                      />
+                    ) : null}
+                  </>
+                );
+                return (
+                  <li key={n.id}>
+                    {href ? (
+                      <Link className={rowClass} href={href} onClick={onOpen}>
+                        {content}
+                      </Link>
+                    ) : (
+                      <button
+                        className={rowClass}
+                        onClick={onOpen}
+                        type="button"
+                      >
+                        {content}
+                      </button>
+                    )}
+                    {actions && actions.length > 0 ? (
+                      <div className="flex items-center gap-2 ps-15 pe-4 pb-3">
+                        {actions.map((a) => (
+                          <Button
+                            disabled={
+                              acceptInvite.isPending || declineInvite.isPending
+                            }
+                            key={a.kind}
+                            onClick={() => runAction(a, n.id)}
+                            size="xs"
+                            variant={a.variant}
+                          >
+                            {a.label}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </ScrollArea>
+        )}
+      </PopoverPopup>
+    </Popover>
   );
 }

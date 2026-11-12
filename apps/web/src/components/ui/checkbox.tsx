@@ -1,83 +1,68 @@
-import { cva, type VariantProps } from "class-variance-authority";
-import { Check } from "lucide-react";
-import * as React from "react";
+"use client";
 
+import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
+import type React from "react";
 import { cn } from "@/lib/utils";
 
-const boxVariants = cva(
-  "flex size-4 shrink-0 items-center justify-center rounded-md border transition",
-  {
-    variants: {
-      tone: {
-        neutral: "",
-        // multi-select on board (cards, filters)
-        info: "",
-      },
-      checked: { true: "", false: "border-white/20" },
-      // opaque backing when overlaying content
-      lifted: { true: "bg-raised" },
-    },
-    compoundVariants: [
-      {
-        tone: "neutral",
-        checked: true,
-        class: "border-white bg-white text-black",
-      },
-      {
-        tone: "info",
-        checked: true,
-        class: "border-info bg-info/15 text-info",
-      },
-    ],
-    defaultVariants: { tone: "neutral", checked: false },
-  },
-);
-
-type BoxProps = VariantProps<typeof boxVariants>;
-
-/** visual box only; for use inside menu items / rows that own the interaction */
-export function CheckboxBox({
-  checked,
-  tone,
+export function Checkbox({
   className,
-}: BoxProps & { className?: string }) {
+  ...props
+}: CheckboxPrimitive.Root.Props): React.ReactElement {
   return (
-    <span aria-hidden className={cn(boxVariants({ checked, tone }), className)}>
-      {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
-    </span>
+    <CheckboxPrimitive.Root
+      className={cn(
+        "relative inline-flex size-4.5 shrink-0 items-center justify-center rounded-[.25rem] border border-input bg-background not-dark:bg-clip-padding shadow-xs/5 outline-none ring-ring transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[3px] not-data-disabled:not-data-checked:not-aria-invalid:before:shadow-[0_1px_--theme(--color-black/4%)] focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-background aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 focus-visible:aria-invalid:ring-destructive/48 data-disabled:cursor-not-allowed data-disabled:opacity-64 sm:size-4 dark:not-data-checked:bg-input/32 dark:aria-invalid:ring-destructive/24 dark:not-data-disabled:not-data-checked:not-aria-invalid:before:shadow-[0_-1px_--theme(--color-white/6%)] [[data-disabled],[data-checked],[aria-invalid]]:shadow-none",
+        className,
+      )}
+      data-slot="checkbox"
+      {...props}
+    >
+      <CheckboxPrimitive.Indicator
+        className="absolute -inset-px flex items-center justify-center rounded-[.25rem] text-primary-foreground data-unchecked:hidden data-checked:bg-primary data-indeterminate:text-foreground"
+        data-slot="checkbox-indicator"
+        render={(
+          props: React.ComponentProps<"span">,
+          state: CheckboxPrimitive.Indicator.State,
+        ) => (
+          <span {...props}>
+            {state.indeterminate ? (
+              <svg
+                aria-hidden="true"
+                className="size-3.5 sm:size-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="3"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M5.252 12h13.496" />
+              </svg>
+            ) : (
+              <svg
+                aria-hidden="true"
+                className="size-3.5 sm:size-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="3"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
+              </svg>
+            )}
+          </span>
+        )}
+      />
+    </CheckboxPrimitive.Root>
   );
 }
 
-export const Checkbox = React.forwardRef<
-  HTMLButtonElement,
-  Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> &
-    Omit<BoxProps, "checked"> & {
-      checked: boolean;
-      onCheckedChange: (checked: boolean) => void;
-    }
->(
-  (
-    { checked, onCheckedChange, tone, lifted, className, onClick, ...props },
-    ref,
-  ) => (
-    <button
-      aria-checked={checked}
-      className={cn(
-        boxVariants({ checked, tone, lifted }),
-        "hover:border-white/40 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none disabled:opacity-50",
-        className,
-      )}
-      onClick={(e) => {
-        onClick?.(e);
-        if (!e.defaultPrevented) onCheckedChange(!checked);
-      }}
-      ref={ref}
-      role="checkbox"
-      type="button"
-      {...props}
-    >
-      {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
-    </button>
-  ),
-);
-Checkbox.displayName = "Checkbox";
+export { CheckboxPrimitive };

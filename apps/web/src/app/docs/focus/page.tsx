@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Card } from "@/components/ui/surface";
-
 import { CodeBlock } from "../_components/code-block";
+import { DocsHero, DocsSection } from "../_components/docs-page";
 
 export const metadata: Metadata = {
   title: "Focus companion app · Kanbi",
   description:
     "A landscape companion for your phone or tablet: see your boards, pick an active task, and run a focus timer. Pairs to your account over a QR code.",
 };
+
+const LINK =
+  "font-medium text-foreground underline underline-offset-4 hover:no-underline";
 
 const STEPS = [
   {
@@ -28,10 +30,7 @@ const STEPS = [
     body: (
       <>
         In Kanbi, go to{" "}
-        <Link
-          className="text-white underline underline-offset-4 transition hover:text-white"
-          href="/app/profile"
-        >
+        <Link className={LINK} href="/app/profile">
           Profile → Devices
         </Link>{" "}
         and issue a device. A QR code appears, backed by a per-device token you
@@ -54,44 +53,42 @@ const STEPS = [
 export default function FocusDocsPage() {
   return (
     <article>
-      <p className="text-sm font-medium text-white/40">Focus companion app</p>
-      <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
-        Your boards on a second screen
-      </h1>
-      <p className="mt-3 text-lg text-white/70">
+      <DocsHero eyebrow="Focus companion app" title="Your boards on a second screen">
         A landscape companion for a phone or tablet: see your boards, pick an
         active task, and run a focus timer beside your work. It pairs to your
         account over a QR code — each device gets its own token you can revoke.
-      </p>
+      </DocsHero>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">
-        Get started
-      </h2>
-      <ol className="mt-4 flex flex-col gap-4">
-        {STEPS.map((step, i) => (
-          <li key={step.title}>
-            <Card className="flex gap-4 py-3.5" tone="muted">
-              <span className="font-mono text-sm text-white/40">{i + 1}</span>
-              <div>
-                <p className="font-medium text-white">{step.title}</p>
-                <p className="mt-1 text-sm text-white/70">{step.body}</p>
+      <DocsSection title="Get started">
+        <ol className="flex flex-col">
+          {STEPS.map((step, i) => (
+            <li className="relative flex gap-4 pb-6 last:pb-0" key={step.title}>
+              {i < STEPS.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute start-3 top-8 bottom-1 w-px bg-border"
+                />
+              ) : null}
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border bg-card font-medium text-muted-foreground text-xs tabular-nums">
+                {i + 1}
+              </span>
+              <div className="flex flex-col gap-1 pt-0.5">
+                <p className="font-medium text-sm">{step.title}</p>
+                <p className="text-muted-foreground text-sm/6">{step.body}</p>
               </div>
-            </Card>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">
-        Run it locally
-      </h2>
-      <p className="mt-2 text-sm text-white/70">From the repo root:</p>
-      <div className="mt-3">
-        <CodeBlock code={`pnpm dev:focus`} />
-      </div>
-      <p className="mt-3 text-sm text-white/40">
-        Point the device at the same network as your Kanbi server when pairing
-        in dev — the QR encodes a LAN-reachable host.
-      </p>
+      <DocsSection title="Run it locally">
+        <p>From the repo root:</p>
+        <CodeBlock code="pnpm dev:focus" />
+        <p>
+          Point the device at the same network as your Kanbi server when
+          pairing in dev — the QR encodes a LAN-reachable host.
+        </p>
+      </DocsSection>
     </article>
   );
 }

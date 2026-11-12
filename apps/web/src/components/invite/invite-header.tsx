@@ -1,7 +1,7 @@
-import { Plus } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 
+import { UserAvatar } from "@/components/user-avatar";
 import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
-import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 
 export type InviteSummary = {
@@ -21,8 +21,9 @@ export function ProjectTile({
   size?: number;
 }) {
   return (
+    // project colour is db data -> inline style; text-white sits on it
     <span
-      className="flex shrink-0 items-center justify-center rounded-lg font-semibold text-white ring-1 ring-white/10 ring-inset"
+      className="flex shrink-0 items-center justify-center rounded-lg font-semibold text-white shadow-xs/5 inset-ring inset-ring-black/10"
       style={{
         background: color ?? DEFAULT_PROJECT_COLOR,
         width: size,
@@ -53,12 +54,12 @@ export function InviteHeader({
     >
       <div className="flex items-center gap-2">
         <UserAvatar
-          className="ring-canvas ring-2"
+          className="ring-2 ring-background"
           image={invite.inviterImage}
           name={invite.inviterName}
           size={size}
         />
-        <Plus className="h-3.5 w-3.5 text-white/40" />
+        <PlusIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
         <ProjectTile
           color={invite.projectColor}
           name={invite.projectName}
@@ -67,13 +68,17 @@ export function InviteHeader({
       </div>
       <p
         className={cn(
-          "text-white/70",
-          compact ? "text-sm" : "text-lg leading-snug",
+          "text-muted-foreground",
+          compact ? "text-sm" : "text-balance font-heading text-lg leading-snug",
         )}
       >
-        <span className="font-semibold text-white">{invite.inviterName}</span>{" "}
+        <span className="font-semibold text-foreground">
+          {invite.inviterName}
+        </span>{" "}
         invited you to join{" "}
-        <span className="font-semibold text-white">{invite.projectName}</span>
+        <span className="font-semibold text-foreground">
+          {invite.projectName}
+        </span>
       </p>
     </div>
   );

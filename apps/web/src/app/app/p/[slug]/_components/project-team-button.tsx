@@ -1,19 +1,14 @@
 "use client";
 
-import { ChevronDown, UserPlus } from "lucide-react";
+import { ChevronDownIcon, UserPlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
-import { Badge, Dot } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
 
@@ -21,17 +16,13 @@ type Role = "owner" | "editor" | "viewer";
 
 const ROLE_RANK: Record<Role, number> = { owner: 0, editor: 1, viewer: 2 };
 
-const ROLE_TONE = {
-  owner: "ai",
+const ROLE_BADGE = {
+  owner: "outline",
   editor: "info",
-  viewer: "neutral",
-} as const satisfies Record<Role, "ai" | "info" | "neutral">;
+  viewer: "secondary",
+} as const satisfies Record<Role, "outline" | "info" | "secondary">;
 
-/**
- * Single header control that folds together members, presence, the caller's
- * role, and pending invites — the avatar stack is the trigger, the popover
- * lists everyone with live online dots plus links into settings.
- */
+// avatar stack = trigger; popover lists members w/ live presence + invites
 export function ProjectTeamButton() {
   const { slug } = useParams<{ slug: string }>();
   const pathname = usePathname();
@@ -64,9 +55,8 @@ export function ProjectTeamButton() {
       { enabled: !!project?.boardId },
     ).data ?? [],
   );
-  // The connection that marks this tab present can emit before its own SSE
-  // listener is ready. Being on the board route is itself authoritative for
-  // the current user; settings pages do not count as viewing the board.
+  // own presence event can race this tab's SSE listener; being on the board
+  // route is authoritative for self (settings pages don't count)
   if (me && pathname === `/app/p/${slug}`) online.add(me.id);
 
   if (!project || members.length === 0) return null;
@@ -81,107 +71,120 @@ export function ProjectTeamButton() {
   const onlineCount = sorted.filter((m) => online.has(m.userId)).length;
   const shown = sorted.slice(0, 3);
   const extra = sorted.length - shown.length;
+  const memberLabel = `${members.length} member${members.length === 1 ? "" : "s"}`;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label="Team & presence"
-          className="gap-1.5 px-1.5"
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          <span className="flex -space-x-1.5">
-            {shown.map((m) => (
-              <span
-                className={cn(
-                  "rounded-full ring-2",
-                  online.has(m.userId) ? "ring-success/70" : "ring-canvas",
-                )}
-                key={m.userId}
-              >
-                <UserAvatar image={m.image} name={m.name} size={22} />
-              </span>
-            ))}
-            {extra > 0 ? (
-              <span className="text-2xs ring-canvas flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/70 ring-2">
-                +{extra}
-              </span>
-            ) : null}
-          </span>
-          {pending > 0 ? <Dot className="bg-warning h-1.5 w-1.5" /> : null}
-          <ChevronDown className="h-3.5 w-3.5 text-white/40" />
-        </Button>
-      </DropdownMenuTrigger>
+    <Popover>
+      <PopoverTrigger
+        aria-label="Team & presence"
+        className="gap-1.5 px-1.5"
+        render={<Button size="sm" variant="ghost" />}
+      >
+        <span className="flex -space-x-1.5">
+          {shown.map((m) => (
+            <span
+              className={cn(
+                "rounded-full ring-2",
+                online.has(m.userId) ? "ring-success" : "ring-background",
+              )}
+              key={m.userId}
+            >
+              <UserAvatar image={m.image} name={m.name} size={20} />
+            </span>
+          ))}
+          {extra > 0 ? (
+            <span className="bg-muted text-muted-foreground ring-background flex size-5 items-center justify-center rounded-full text-[10px] font-medium ring-2">
+              +{extra}
+            </span>
+          ) : null}
+        </span>
+        {pending > 0 ? (
+          <span
+            aria-hidden="true"
+            className="bg-warning size-1.5 rounded-full"
+          />
+        ) : null}
+        <ChevronDownIcon aria-hidden="true" className="text-muted-foreground" />
+      </PopoverTrigger>
 
-      <DropdownMenuContent align="end" className="w-72">
-        <div className="flex items-center justify-between px-2 py-1.5">
-          <span className="text-xs text-white/70">
+      <PopoverPopup
+        align="end"
+        className="w-72 *:data-[slot=popover-viewport]:p-0"
+      >
+        <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+          <span className="text-muted-foreground text-xs">
             {onlineCount > 0
-              ? `${onlineCount} online · ${members.length} member${members.length === 1 ? "" : "s"}`
-              : `${members.length} member${members.length === 1 ? "" : "s"}`}
+              ? `${onlineCount} online · ${memberLabel}`
+              : memberLabel}
           </span>
           {role ? (
-            <Badge className="capitalize" tone={ROLE_TONE[role]}>
+            <Badge
+              className={cn(
+                "capitalize",
+                role === "owner" && "border-ai/32 text-ai-foreground",
+              )}
+              size="sm"
+              variant={ROLE_BADGE[role]}
+            >
               {role}
             </Badge>
           ) : null}
         </div>
 
-        <DropdownMenuSeparator />
-
-        <div className="max-h-64 overflow-y-auto py-0.5">
-          {sorted.map((m) => {
-            const isOnline = online.has(m.userId);
-            return (
-              <div
-                className="flex items-center gap-2 px-2 py-1.5"
-                key={m.userId}
-              >
-                <span className="relative shrink-0">
-                  <UserAvatar
-                    className={cn(!isOnline && "opacity-60")}
-                    image={m.image}
-                    name={m.name}
-                    size={24}
-                  />
-                  {isOnline ? (
-                    <Dot
-                      className="bg-success ring-canvas absolute -right-0.5 -bottom-0.5 ring-2"
-                      size="md"
+        <ScrollArea className="max-h-64">
+          <ul className="flex flex-col p-1">
+            {sorted.map((m) => {
+              const isOnline = online.has(m.userId);
+              return (
+                <li
+                  className="flex items-center gap-2.5 rounded-md px-2 py-1.5"
+                  key={m.userId}
+                >
+                  <span className="relative shrink-0">
+                    <UserAvatar
+                      className={cn(!isOnline && "opacity-64")}
+                      image={m.image}
+                      name={m.name}
+                      size={24}
                     />
-                  ) : null}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-white">
-                  {m.name}
-                  {m.userId === me?.id ? (
-                    <span className="text-white/40"> (you)</span>
-                  ) : null}
-                </span>
-                <span className="text-2xs shrink-0 text-white/40 capitalize">
-                  {m.role}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                    {isOnline ? (
+                      <span
+                        aria-label="Online"
+                        className="bg-success ring-popover absolute -end-0.5 -bottom-0.5 size-2 rounded-full ring-2"
+                      />
+                    ) : null}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {m.name}
+                    {m.userId === me?.id ? (
+                      <span className="text-muted-foreground"> (you)</span>
+                    ) : null}
+                  </span>
+                  <span className="text-muted-foreground shrink-0 text-xs capitalize">
+                    {m.role}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </ScrollArea>
 
-        {canAdmin && pending > 0 ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link
-                className="text-warning"
-                href={`/app/p/${slug}/settings#members`}
-              >
-                <UserPlus className="h-4 w-4" />
-                {pending} pending invite{pending === 1 ? "" : "s"}
-              </Link>
-            </DropdownMenuItem>
-          </>
+        {canAdmin ? (
+          <div className="border-t p-1">
+            <Button
+              className="w-full justify-start"
+              render={<Link href={`/app/p/${slug}/settings/access`} />}
+              size="sm"
+              variant="ghost"
+            >
+              <UserPlusIcon aria-hidden="true" />
+              {pending > 0
+                ? `${pending} pending invite${pending === 1 ? "" : "s"}`
+                : "Invite people"}
+            </Button>
+          </div>
         ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverPopup>
+    </Popover>
   );
 }

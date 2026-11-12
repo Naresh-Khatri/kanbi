@@ -1,23 +1,59 @@
 "use client";
 
-import { Command } from "cmdk";
 import {
-  ArrowRight,
-  Bot,
-  FileText,
-  Layers,
-  ListTodo,
-  Plus,
-  Sparkles,
+  ArrowRightIcon,
+  BotIcon,
+  FileTextIcon,
+  ListTodoIcon,
+  PlusIcon,
+  SparklesIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { useRecentProjects } from "@/components/keybinds/recents-store";
-import { dialogSurface, scrimVariants } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import { useAppShell } from "@/components/keybinds/shell-store";
+import { ProjectDot } from "@/components/project-dot";
+import {
+  Command,
+  CommandCollection,
+  CommandDialog,
+  CommandDialogPopup,
+  CommandEmpty,
+  CommandFooter,
+  CommandGroup,
+  CommandGroupLabel,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandPanel,
+  CommandShortcut,
+} from "@/components/ui/command";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
+
+type PaletteEntry = {
+  id: string;
+  label: string;
+  keywords: string;
+  icon: React.ReactNode;
+  run: () => void;
+  // remote search hits already matched server-side -> skip local filter
+  remote?: boolean;
+  prefix?: string;
+  meta?: string;
+  shortcut?: number;
+  muted?: boolean;
+};
+
+type PaletteGroup = { value: string; items: PaletteEntry[] };
+
+function matches(entry: PaletteEntry, tokens: string[]) {
+  if (entry.remote || tokens.length === 0) return true;
+  const hay = `${entry.label} ${entry.keywords}`.toLowerCase();
+  return tokens.every((t) => hay.includes(t));
+}
 
 export function CommandPalette() {
   const router = useRouter();
@@ -37,7 +73,7 @@ export function CommandPalette() {
 
   // recents-first, then rest in server order (active-first, most-recently-active first)
   const orderedProjects = useMemo(() => {
-    const all = projects.data ?? [];
+    const all = (projects.data ?? []).filter((p) => p.status !== "archived");
     const bySlug = new Map(all.map((p) => [p.slug, p]));
     const recent = recentSlugs
       .map((slug) => bySlug.get(slug))
@@ -46,212 +82,217 @@ export function CommandPalette() {
     return [...recent, ...all.filter((p) => !recentSlugSet.has(p.slug))];
   }, [projects.data, recentSlugs]);
 
-  // jump-shortcut numbers, keyed by slug: first 9 active projects in server order
+  // jump-shortcut numbers: first 9 active projects in server order
   const jumpNumberBySlug = useMemo(() => {
     const active = (projects.data ?? []).filter((p) => p.status === "active");
     return new Map(active.slice(0, 9).map((p, i) => [p.slug, i + 1]));
   }, [projects.data]);
 
   const trimmed = query.trim();
+  const searching = paletteOpen && trimmed.length >= 2;
   const taskSearch = api.task.search.useQuery(
     { query: trimmed },
-    { enabled: paletteOpen && trimmed.length >= 2 },
+    { enabled: searching },
   );
   const documentSearch = api.document.search.useQuery(
     { query: trimmed, limit: 8 },
-    { enabled: paletteOpen && trimmed.length >= 2 },
+    { enabled: searching },
   );
 
   useEffect(() => {
     if (!paletteOpen) setQuery("");
   }, [paletteOpen]);
 
-  function go(run: () => void) {
-    setPaletteOpen(false);
-    run();
-  }
+  const groups = useMemo<PaletteGroup[]>(() => {
+    const go = (run: () => void) => () => {
+      setPaletteOpen(false);
+      run();
+    };
+    const push = (href: string) => go(() => router.push(href));
 
-  if (!paletteOpen) return null;
+    const actions: PaletteEntry[] = [
+      {
+        id: "new-project",
+        label: "New project",
+        keywords: "create",
+        icon: <PlusIcon />,
+        run: go(requestCreateProject),
+      },
+      {
+        id: "new-task",
+        label: "New task on current board",
+        keywords: "create",
+        icon: <PlusIcon />,
+        run: go(requestCreateTask),
+      },
+      {
+        id: "ai-import",
+        label: "Draft tasks from a message",
+        keywords: "ai import client message",
+        icon: <SparklesIcon />,
+        run: go(requestAiImport),
+      },
+      {
+        id: "home",
+        label: "Go to Home",
+        keywords: "dashboard projects",
+        icon: <ArrowRightIcon />,
+        run: push("/app"),
+      },
+      {
+        id: "agent",
+        label: "Connect an AI agent",
+        keywords: "mcp integration codex claude grok",
+        icon: <BotIcon />,
+        run: push("/docs/mcp"),
+      },
+    ];
+
+    const projectEntries: PaletteEntry[] = orderedProjects.map((p) => ({
+      id: `project-${p.id}`,
+      label: p.name,
+      keywords: `project ${p.slug}`,
+      icon: (
+        <span className="flex size-4 items-center justify-center">
+          <ProjectDot color={p.color} />
+        </span>
+      ),
+      run: push(`/app/p/${p.slug}`),
+      shortcut: jumpNumberBySlug.get(p.slug),
+      muted: p.status === "on_hold",
+    }));
+
+    const taskEntries: PaletteEntry[] = searching
+      ? (taskSearch.data ?? []).map((t) => ({
+          id: `task-${t.id}`,
+          label: t.title,
+          keywords: "",
+          icon: <ListTodoIcon />,
+          run: push(`/app/p/${t.projectSlug}?task=${t.id}`),
+          remote: true,
+          prefix: `${t.projectKey}-${t.number}`,
+          meta: t.projectName,
+        }))
+      : [];
+
+    const docEntries: PaletteEntry[] = searching
+      ? (documentSearch.data ?? []).map((d) => ({
+          id: `doc-${d.id}`,
+          label: d.title,
+          keywords: "",
+          icon: <FileTextIcon />,
+          run: push(`/app/p/${d.projectSlug}/docs/${d.id}`),
+          remote: true,
+          meta: d.projectName,
+        }))
+      : [];
+
+    return [
+      { value: "Actions", items: actions },
+      { value: "Projects", items: projectEntries },
+      { value: "Tasks", items: taskEntries },
+      { value: "Docs", items: docEntries },
+    ];
+  }, [
+    orderedProjects,
+    jumpNumberBySlug,
+    searching,
+    taskSearch.data,
+    documentSearch.data,
+    router,
+    setPaletteOpen,
+    requestCreateProject,
+    requestCreateTask,
+    requestAiImport,
+  ]);
+
+  const filtered = useMemo(() => {
+    const tokens = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
+    return groups
+      .map((g) => ({ ...g, items: g.items.filter((e) => matches(e, tokens)) }))
+      .filter((g) => g.items.length > 0);
+  }, [groups, trimmed]);
 
   return (
-    <div
-      className={cn(
-        scrimVariants({ tone: "blur" }),
-        "z-60 flex items-start justify-center p-4 pt-32",
-      )}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setPaletteOpen(false);
-      }}
-    >
-      <Command
-        className={cn(dialogSurface, "w-full max-w-xl overflow-hidden")}
-        label="Command palette"
-      >
-        <Command.Input
-          autoFocus
-          className="h-12 w-full bg-transparent px-4 text-sm outline-none placeholder:text-white/40"
+    <CommandDialog onOpenChange={setPaletteOpen} open={paletteOpen}>
+      <CommandDialogPopup aria-label="Command palette">
+        <Command
+          filteredItems={filtered}
+          items={groups}
+          itemToStringValue={(item) => (item as PaletteEntry).label}
+          mode="none"
           onValueChange={setQuery}
-          placeholder="Type a command or search projects, tasks, and docs…"
           value={query}
-        />
-        <Command.List className="max-h-96 overflow-y-auto border-t border-white/10 py-1">
-          <Command.Empty className="px-4 py-6 text-center text-sm text-white/40">
-            No results.
-          </Command.Empty>
-          <Command.Group
-            className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
-            heading="Actions"
-          >
-            <PaletteItem
-              icon={<Plus className="h-4 w-4" />}
-              onSelect={() => go(() => requestCreateProject())}
-              value="new project"
-            >
-              New project
-            </PaletteItem>
-            <PaletteItem
-              icon={<Plus className="h-4 w-4" />}
-              onSelect={() => go(() => requestCreateTask())}
-              value="new task"
-            >
-              New task on current board
-            </PaletteItem>
-            <PaletteItem
-              icon={<Sparkles className="h-4 w-4" />}
-              onSelect={() => go(() => requestAiImport())}
-              value="ai import tasks client message"
-            >
-              AI: Import tasks from a message
-            </PaletteItem>
-            <PaletteItem
-              icon={<ArrowRight className="h-4 w-4" />}
-              onSelect={() => go(() => router.push("/app"))}
-              value="dashboard"
-            >
-              Go to dashboard
-            </PaletteItem>
-            <PaletteItem
-              icon={<Bot className="h-4 w-4" />}
-              onSelect={() => go(() => router.push("/docs/mcp"))}
-              value="connect agent ai mcp integration codex claude grok"
-            >
-              Connect an AI agent
-            </PaletteItem>
-          </Command.Group>
-
-          {orderedProjects.length > 0 ? (
-            <Command.Group
-              className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
-              heading="Projects"
-            >
-              {orderedProjects.map((p) => (
-                <PaletteItem
-                  hint={jumpNumberBySlug.get(p.slug)}
-                  icon={<Layers className="h-4 w-4" />}
-                  key={p.id}
-                  onSelect={() => go(() => router.push(`/app/p/${p.slug}`))}
-                  value={`project ${p.name} ${p.slug}`}
-                >
-                  <span
-                    className={
-                      p.status === "on_hold" ? "text-white/40" : undefined
-                    }
-                  >
-                    {p.name}
-                  </span>
-                </PaletteItem>
-              ))}
-            </Command.Group>
-          ) : null}
-
-          {taskSearch.data && taskSearch.data.length > 0 ? (
-            <Command.Group
-              className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
-              heading="Tasks"
-            >
-              {taskSearch.data.map((t) => (
-                <PaletteItem
-                  icon={<ListTodo className="h-4 w-4" />}
-                  key={t.id}
-                  onSelect={() =>
-                    go(() =>
-                      router.push(`/app/p/${t.projectSlug}?task=${t.id}`),
-                    )
-                  }
-                  value={`task ${t.projectKey}-${t.number} ${t.title} ${t.projectName} ${t.id}`}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="shrink-0 font-mono text-xs text-white/40">
-                      {t.projectKey}-{t.number}
-                    </span>
-                    <span className="truncate">{t.title}</span>
-                    <span className="ml-auto shrink-0 text-xs text-white/40">
-                      {t.projectName}
-                    </span>
-                  </span>
-                </PaletteItem>
-              ))}
-            </Command.Group>
-          ) : null}
-
-          {documentSearch.data && documentSearch.data.length > 0 ? (
-            <Command.Group
-              className="px-2 py-1 text-xs tracking-wide text-white/40 uppercase"
-              heading="Docs"
-            >
-              {documentSearch.data.map((document) => (
-                <PaletteItem
-                  icon={<FileText className="h-4 w-4" />}
-                  key={document.id}
-                  onSelect={() =>
-                    go(() =>
-                      router.push(
-                        `/app/p/${document.projectSlug}/docs/${document.id}`,
-                      ),
-                    )
-                  }
-                  value={`document doc page ${document.title} ${document.projectName}`}
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="truncate">{document.title}</span>
-                    <span className="ml-auto shrink-0 text-xs text-white/40">
-                      {document.projectName}
-                    </span>
-                  </span>
-                </PaletteItem>
-              ))}
-            </Command.Group>
-          ) : null}
-        </Command.List>
-      </Command>
-    </div>
-  );
-}
-
-function PaletteItem({
-  icon,
-  children,
-  value,
-  onSelect,
-  hint,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  value: string;
-  onSelect: () => void;
-  hint?: number;
-}) {
-  return (
-    <Command.Item
-      className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm aria-selected:bg-white/10"
-      onSelect={onSelect}
-      value={value}
-    >
-      <span className="text-white/70">{icon}</span>
-      {children}
-      {hint ? (
-        <span className="ml-auto shrink-0 text-xs text-white/40">{hint}</span>
-      ) : null}
-    </Command.Item>
+        >
+          <CommandInput placeholder="Search projects, tasks, docs or run a command…" />
+          <CommandPanel>
+            <CommandEmpty>
+              {searching && (taskSearch.isFetching || documentSearch.isFetching)
+                ? "Searching…"
+                : "No results."}
+            </CommandEmpty>
+            <CommandList>
+              {(group: PaletteGroup) => (
+                <CommandGroup items={group.items} key={group.value}>
+                  <CommandGroupLabel>{group.value}</CommandGroupLabel>
+                  <CommandCollection>
+                    {(item: PaletteEntry) => (
+                      <CommandItem
+                        className="[&_svg]:text-muted-foreground gap-2.5 [&_svg]:size-4 [&_svg]:shrink-0"
+                        key={item.id}
+                        onClick={item.run}
+                        value={item}
+                      >
+                        {item.icon}
+                        {item.prefix ? (
+                          <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                            {item.prefix}
+                          </span>
+                        ) : null}
+                        <span
+                          className={cn(
+                            "min-w-0 flex-1 truncate",
+                            item.muted && "text-muted-foreground",
+                          )}
+                        >
+                          {item.label}
+                        </span>
+                        {item.meta ? (
+                          <span className="text-muted-foreground max-w-40 shrink-0 truncate text-xs">
+                            {item.meta}
+                          </span>
+                        ) : null}
+                        {item.shortcut ? (
+                          <CommandShortcut>⌥{item.shortcut}</CommandShortcut>
+                        ) : null}
+                      </CommandItem>
+                    )}
+                  </CommandCollection>
+                </CommandGroup>
+              )}
+            </CommandList>
+          </CommandPanel>
+          <CommandFooter>
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <KbdGroup>
+                  <Kbd>↑</Kbd>
+                  <Kbd>↓</Kbd>
+                </KbdGroup>
+                Navigate
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Kbd>↵</Kbd>
+                Open
+              </span>
+            </div>
+            <span className="flex items-center gap-1.5">
+              <Kbd>Esc</Kbd>
+              Close
+            </span>
+          </CommandFooter>
+        </Command>
+      </CommandDialogPopup>
+    </CommandDialog>
   );
 }

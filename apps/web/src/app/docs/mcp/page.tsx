@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, SectionLabel } from "@/components/ui/surface";
+import { Card, CardPanel } from "@/components/ui/card";
+import { Frame, FramePanel } from "@/components/ui/frame";
 import { MCP_RESOURCE_URL } from "@/server/mcp/config";
 
 import { CodeBlock } from "../_components/code-block";
+import { DocsHero, DocsSection } from "../_components/docs-page";
 
 export const metadata: Metadata = {
   title: "Connect an AI agent · Kanbi",
@@ -36,9 +38,16 @@ const TOOLS = [
   },
 ] as const;
 
-function ScopeTag({ scope }: { scope: "read" | "write" }) {
-  return <Badge className="font-mono">{scope}</Badge>;
-}
+const LINK =
+  "font-medium text-foreground underline underline-offset-4 hover:no-underline";
+
+const FLOW = [
+  "User and agent finish a feature decision",
+  "Agent searches for duplicates",
+  "Agent shows the proposed Kanbi task",
+  "User says “put this in Kanbi”",
+  "Agent creates it and returns KAN-42 plus its link",
+];
 
 export default function McpDocsPage() {
   const endpoint = MCP_RESOURCE_URL;
@@ -55,164 +64,170 @@ export default function McpDocsPage() {
 
   return (
     <article>
-      <p className="text-sm font-medium text-white/40">MCP server</p>
-      <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
-        Connect an AI agent
-      </h1>
-      <p className="mt-3 text-lg text-white/70">
+      <DocsHero eyebrow="MCP server" title="Connect an AI agent">
         Kanbi exposes a Model Context Protocol server so coding agents — Codex,
         Claude Code, Grok Build, opencode, or another MCP client — can turn a
         finished discussion into reviewed Kanbi tasks from your editor or
         terminal. Auth is OAuth with a browser consent screen; there are no API
         keys to copy.
-      </p>
+      </DocsHero>
 
-      <Card className="mt-6 py-3" tone="muted">
-        <SectionLabel>Endpoint</SectionLabel>
-        <p className="mt-1 font-mono text-sm text-white">{endpoint}</p>
+      <Card className="mt-8">
+        <CardPanel className="flex flex-col gap-1 px-4 py-3">
+          <span className="font-medium text-muted-foreground text-xs">
+            Endpoint
+          </span>
+          <code className="break-all font-mono text-sm">{endpoint}</code>
+        </CardPanel>
       </Card>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">
-        Claude Code
-      </h2>
-      <p className="mt-2 text-sm text-white/70">
-        Add the server, then run any kanbi tool (or <code>/mcp</code>) — Claude
-        opens the consent screen, and after you approve the tools are live.
-      </p>
-      <div className="mt-3">
+      <DocsSection title="Claude Code">
+        <p>
+          Add the server, then run any kanbi tool (or <code>/mcp</code>) —
+          Claude opens the consent screen, and after you approve the tools are
+          live.
+        </p>
         <CodeBlock code={`claude mcp add --transport http kanbi ${endpoint}`} />
-      </div>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">Codex</h2>
-      <p className="mt-2 text-sm text-white/70">
-        Add the remote server, then start the OAuth login. The same MCP setup is
-        shared by the Codex CLI, desktop app, and IDE extension.
-      </p>
-      <div className="mt-3">
+      <DocsSection title="Codex">
+        <p>
+          Add the remote server, then start the OAuth login. The same MCP setup
+          is shared by the Codex CLI, desktop app, and IDE extension.
+        </p>
         <CodeBlock
           code={`codex mcp add kanbi --url ${endpoint}\ncodex mcp login kanbi`}
         />
-      </div>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">opencode</h2>
-      <p className="mt-2 text-sm text-white/70">
-        Add the server to <code>opencode.json</code> (project) or{" "}
-        <code>~/.config/opencode/opencode.json</code> (global):
-      </p>
-      <div className="mt-3">
-        <CodeBlock code={opencodeConfig} />
-      </div>
-      <p className="mt-3 text-sm text-white/70">
-        Then trigger the login (it also starts automatically the first time it
-        hits the server):
-      </p>
-      <div className="mt-3">
-        <CodeBlock code={`opencode mcp auth kanbi`} />
-      </div>
+      <DocsSection title="opencode">
+        <p>
+          Add the server to <code>opencode.json</code> (project) or{" "}
+          <code>~/.config/opencode/opencode.json</code> (global):
+        </p>
+        <CodeBlock code={opencodeConfig} label="opencode.json" />
+        <p>
+          Then trigger the login (it also starts automatically the first time
+          it hits the server):
+        </p>
+        <CodeBlock code="opencode mcp auth kanbi" />
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">Grok Build</h2>
-      <p className="mt-2 text-sm text-white/70">
-        Add Kanbi as a remote server. Grok opens the OAuth flow when the server
-        is first used.
-      </p>
-      <div className="mt-3">
+      <DocsSection title="Grok Build">
+        <p>
+          Add Kanbi as a remote server. Grok opens the OAuth flow when the
+          server is first used.
+        </p>
         <CodeBlock code={`grok mcp add --transport http kanbi ${endpoint}`} />
-      </div>
-      <p className="mt-3 text-sm text-white/70">
-        For Grok&apos;s hosted custom connector, use a publicly reachable HTTPS
-        deployment, then add it at <code>grok.com/connectors</code>. A local
-        development URL cannot be reached by the hosted service.
-      </p>
+        <p>
+          For Grok&apos;s hosted custom connector, use a publicly reachable
+          HTTPS deployment, then add it at <code>grok.com/connectors</code>. A
+          local development URL cannot be reached by the hosted service.
+        </p>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">
-        What an agent can do
-      </h2>
-      <p className="mt-2 text-sm text-white/70">
-        Each tool wraps the same procedures the web app uses, so permissions,
-        validation, and realtime updates apply identically. The agent acts as
-        you, limited to the projects you can access.
-      </p>
-      <ul className="mt-4 divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10">
-        {TOOLS.map((tool) => (
-          <li
-            key={tool.name}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm"
-          >
-            <code className="text-white">{tool.name}</code>
-            <ScopeTag scope={tool.scope} />
-            <span className="ml-auto text-right text-white/40">
-              {tool.purpose}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <DocsSection title="What an agent can do">
+        <p>
+          Each tool wraps the same procedures the web app uses, so permissions,
+          validation, and realtime updates apply identically. The agent acts as
+          you, limited to the projects you can access.
+        </p>
+        <Frame>
+          <FramePanel className="p-0">
+            <ul className="divide-y">
+              {TOOLS.map((tool) => (
+                <li
+                  className="flex flex-col gap-1 px-4 py-3 text-sm sm:flex-row sm:items-center sm:gap-3"
+                  key={tool.name}
+                >
+                  <span className="flex items-center gap-2">
+                    <code className="font-mono text-[0.8125rem]">
+                      {tool.name}
+                    </code>
+                    <Badge
+                      className="font-mono"
+                      variant={tool.scope === "write" ? "warning" : "secondary"}
+                    >
+                      {tool.scope}
+                    </Badge>
+                  </span>
+                  <span className="text-muted-foreground sm:ms-auto sm:text-end">
+                    {tool.purpose}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </FramePanel>
+        </Frame>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">
-        Capture approved work
-      </h2>
-      <p className="mt-2 text-sm text-white/70">
-        The connected agent writes the task content; Kanbi does not make a
-        second model call. The agent searches for likely duplicates, shows the
-        exact project, column, title, description, checklist, priority, labels,
-        assignee, and due date, then waits for your explicit approval before it
-        creates anything.
-      </p>
-      <Card
-        className="mt-3 py-3 font-mono text-xs leading-6 text-white/70"
-        tone="muted"
-      >
-        User and agent finish a feature decision
-        <br />→ agent searches for duplicates
-        <br />→ agent shows the proposed Kanbi task
-        <br />→ user says “put this in Kanbi”
-        <br />→ agent creates it and returns KAN-42 plus its link
-      </Card>
-      <p className="mt-3 text-sm text-white/70">
-        One useful task with a description and checklist is the default. Work is
-        split only when each item can be delivered independently, and the full
-        split is shown before approval. Task management after creation is not
-        available over MCP.
-      </p>
+      <DocsSection title="Capture approved work">
+        <p>
+          The connected agent writes the task content; Kanbi does not make a
+          second model call. The agent searches for likely duplicates, shows
+          the exact project, column, title, description, checklist, priority,
+          labels, assignee, and due date, then waits for your explicit approval
+          before it creates anything.
+        </p>
+        <Card>
+          <CardPanel className="px-4 py-3">
+            <ol className="flex flex-col gap-1.5 text-sm">
+              {FLOW.map((step, i) => (
+                <li className="flex gap-3" key={step}>
+                  <span className="w-4 shrink-0 text-end text-muted-foreground tabular-nums">
+                    {i + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </CardPanel>
+        </Card>
+        <p>
+          One useful task with a description and checklist is the default. Work
+          is split only when each item can be delivered independently, and the
+          full split is shown before approval. Task management after creation
+          is not available over MCP.
+        </p>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">Scopes</h2>
-      <p className="mt-2 text-sm text-white/70">
-        Two scopes are enforced on every tool call: <code>kanbi:read</code> for
-        the read tools and <code>kanbi:write</code> for the write tools. A
-        read-only grant cannot create anything. Add <code>offline_access</code>{" "}
-        and the agent renews silently instead of reopening the browser.
-      </p>
+      <DocsSection title="Scopes">
+        <p>
+          Two scopes are enforced on every tool call: <code>kanbi:read</code>{" "}
+          for the read tools and <code>kanbi:write</code> for the write tools. A
+          read-only grant cannot create anything. Add{" "}
+          <code>offline_access</code> and the agent renews silently instead of
+          reopening the browser.
+        </p>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">
-        Managing access
-      </h2>
-      <p className="mt-2 text-sm text-white/70">
-        Every agent you authorize is listed under{" "}
-        <Link
-          className="text-white underline underline-offset-4 transition hover:text-white"
-          href="/app/profile"
-        >
-          Profile → Connected apps
-        </Link>{" "}
-        with its scopes and when it was approved. Revoking takes effect
-        immediately; the agent must re-authorize to reconnect.
-      </p>
+      <DocsSection title="Managing access">
+        <p>
+          Every agent you authorize is listed under{" "}
+          <Link className={LINK} href="/app/profile">
+            Profile → Connected apps
+          </Link>{" "}
+          with its scopes and when it was approved. Revoking takes effect
+          immediately; the agent must re-authorize to reconnect.
+        </p>
+      </DocsSection>
 
-      <h2 className="mt-12 text-lg font-semibold tracking-tight">
-        Troubleshooting
-      </h2>
-      <p className="mt-2 text-sm text-white/70">
-        <span className="text-white">
-          Tools 401, or an endless re-auth loop.
-        </span>{" "}
-        The token came back opaque instead of a JWT. Re-authorize with a clean
-        token — for Claude Code, <code>claude mcp remove kanbi</code> then add
-        it again.
-      </p>
-      <p className="mt-2 text-sm text-white/70">
-        <span className="text-white">Host mismatch.</span> Point the agent at
-        the same host this page is served from, so OAuth discovery, the token
-        audience, and your browser session all line up on one origin.
-      </p>
+      <DocsSection title="Troubleshooting">
+        <p>
+          <span className="font-medium text-foreground">
+            Tools 401, or an endless re-auth loop.
+          </span>{" "}
+          The token came back opaque instead of a JWT. Re-authorize with a
+          clean token — for Claude Code, <code>claude mcp remove kanbi</code>{" "}
+          then add it again.
+        </p>
+        <p>
+          <span className="font-medium text-foreground">Host mismatch.</span>{" "}
+          Point the agent at the same host this page is served from, so OAuth
+          discovery, the token audience, and your browser session all line up
+          on one origin.
+        </p>
+      </DocsSection>
     </article>
   );
 }

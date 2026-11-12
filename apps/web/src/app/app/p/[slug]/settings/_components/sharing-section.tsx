@@ -1,21 +1,43 @@
 "use client";
 
 import { formatDate } from "@kanbi/shared";
-import { Copy, Link as LinkIcon, Trash2 } from "lucide-react";
+import { LinkIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toastManager } from "@/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/trpc/react";
+import { CopyButton } from "./copy-button";
 import { Section } from "./section";
 
-const EXPIRY_OPTIONS: { label: string; days: number | null }[] = [
-  { label: "Never expires", days: null },
-  { label: "Expires in 1 day", days: 1 },
-  { label: "Expires in 7 days", days: 7 },
-  { label: "Expires in 30 days", days: 30 },
+const EXPIRY_ITEMS = [
+  { label: "Never expires", value: "never" },
+  { label: "Expires in 1 day", value: "1" },
+  { label: "Expires in 7 days", value: "7" },
+  { label: "Expires in 30 days", value: "30" },
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -30,18 +52,18 @@ export function SharingSection({
   const utils = api.useUtils();
   const shares =
     api.share.list.useQuery({ boardId }, { enabled: isOwner }).data ?? [];
-  const [expiryDays, setExpiryDays] = useState<number | null>(null);
+  const [expiry, setExpiry] = useState("never");
   const [maxUses, setMaxUses] = useState("");
   const create = api.share.create.useMutation({
     onSuccess: () => {
       setMaxUses("");
-      utils.share.list.invalidate({ boardId });
+      void utils.share.list.invalidate({ boardId });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
   const revoke = api.share.revoke.useMutation({
     onSuccess: () => utils.share.list.invalidate({ boardId }),
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toastManager.add({ type: "error", title: e.message }),
   });
 
   function shareUrl(token: string) {
@@ -51,121 +73,156 @@ export function SharingSection({
 
   function generate() {
     const parsed = Number.parseInt(maxUses, 10);
+    const days = expiry === "never" ? null : Number(expiry);
     create.mutate({
       boardId,
-      expiresAt:
-        expiryDays != null ? new Date(Date.now() + expiryDays * DAY_MS) : null,
+      expiresAt: days != null ? new Date(Date.now() + days * DAY_MS) : null,
       maxUses: Number.isFinite(parsed) && parsed > 0 ? parsed : null,
     });
   }
 
   return (
     <Section
-      description="Generate a read-only public link. Anyone with the link can view the board — no sign-in needed."
+      description="Generate a read-only public link. Anyone with the link can view the board, no sign-in needed."
       id="sharing"
       title="Sharing"
     >
-      {!isOwner ? (
-        <p className="text-sm text-white/70">
-          Only owners can manage public share links.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              aria-label="Link expiry"
-              size="sm"
-              onChange={(e) =>
-                setExpiryDays(
-                  e.target.value === "" ? null : Number(e.target.value),
-                )
-              }
-              value={expiryDays ?? ""}
-            >
-              {EXPIRY_OPTIONS.map((o) => (
-                <option key={o.label} value={o.days ?? ""}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
-            <Input
-              aria-label="Max views"
-              className="h-8 w-28"
-              min={1}
-              onChange={(e) => setMaxUses(e.target.value)}
-              placeholder="Max views"
-              type="number"
-              value={maxUses}
-            />
-            <Button
-              disabled={create.isPending}
-              onClick={generate}
-              size="sm"
-              variant="outline"
-            >
-              <LinkIcon className="h-4 w-4" /> Generate link
-            </Button>
+      <CardPanel>
+        {!isOwner ? (
+          <p className="text-muted-foreground text-sm">
+            Only owners can manage public share links.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                items={EXPIRY_ITEMS}
+                onValueChange={(v) => setExpiry(v ?? "never")}
+                value={expiry}
+              >
+                <SelectTrigger
+                  aria-label="Link expiry"
+                  className="w-auto"
+                  size="sm"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectPopup>
+                  {EXPIRY_ITEMS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+              <Input
+                aria-label="Max views"
+                className="w-28"
+                min={1}
+                onChange={(e) => setMaxUses(e.target.value)}
+                placeholder="Max views"
+                size="sm"
+                type="number"
+                value={maxUses}
+              />
+              <Button
+                loading={create.isPending}
+                onClick={generate}
+                size="sm"
+                variant="outline"
+              >
+                <LinkIcon aria-hidden="true" /> Generate link
+              </Button>
+            </div>
+            {shares.length === 0 ? (
+              <Empty className="rounded-xl border border-dashed py-8 md:py-8">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <LinkIcon aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-base">No active links</EmptyTitle>
+                  <EmptyDescription>
+                    Links you generate show up here, ready to copy or revoke.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {shares.map((s) => {
+                  const expired = s.expiresAt
+                    ? new Date(s.expiresAt).getTime() <= Date.now()
+                    : false;
+                  const exhausted =
+                    s.maxUses != null && s.usesCount >= s.maxUses;
+                  const url = shareUrl(s.token);
+                  return (
+                    <li className="flex flex-col gap-1.5" key={s.id}>
+                      <div className="flex items-center gap-2">
+                        <InputGroup>
+                          <InputGroupInput
+                            aria-label="Share link"
+                            className="font-mono text-xs"
+                            onFocus={(e) => e.currentTarget.select()}
+                            readOnly
+                            size="sm"
+                            value={url}
+                          />
+                          <InputGroupAddon align="inline-end">
+                            <CopyButton value={url} />
+                          </InputGroupAddon>
+                        </InputGroup>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                aria-label="Revoke link"
+                                disabled={
+                                  revoke.isPending &&
+                                  revoke.variables?.shareId === s.id
+                                }
+                                onClick={() =>
+                                  revoke.mutate({ boardId, shareId: s.id })
+                                }
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                              />
+                            }
+                          >
+                            <Trash2Icon aria-hidden="true" />
+                          </TooltipTrigger>
+                          <TooltipPopup>Revoke link</TooltipPopup>
+                        </Tooltip>
+                      </div>
+                      <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="tabular-nums">
+                          {s.usesCount}
+                          {s.maxUses != null ? ` / ${s.maxUses}` : ""} views
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {s.expiresAt
+                            ? `expires ${formatDate(s.expiresAt)}`
+                            : "no expiry"}
+                        </span>
+                        {expired ? (
+                          <Badge size="sm" variant="error">
+                            Expired
+                          </Badge>
+                        ) : exhausted ? (
+                          <Badge size="sm" variant="warning">
+                            Limit reached
+                          </Badge>
+                        ) : null}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
-          {shares.length === 0 ? (
-            <p className="text-xs text-white/40">No active share links.</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-white/10 rounded-md border border-white/10">
-              {shares.map((s) => {
-                const expired = s.expiresAt
-                  ? new Date(s.expiresAt).getTime() <= Date.now()
-                  : false;
-                const exhausted = s.maxUses != null && s.usesCount >= s.maxUses;
-                return (
-                  <li className="flex flex-col gap-1 px-3 py-2" key={s.id}>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        className="h-7 flex-1 text-xs"
-                        readOnly
-                        value={shareUrl(s.token)}
-                      />
-                      <Button
-                        aria-label="Copy link"
-                        onClick={() => {
-                          navigator.clipboard.writeText(shareUrl(s.token));
-                          toast.success("Link copied");
-                        }}
-                        size="icon-xs"
-                        type="button"
-                        variant="quiet"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        aria-label="Revoke link"
-                        onClick={() =>
-                          revoke.mutate({ boardId, shareId: s.id })
-                        }
-                        size="icon-xs"
-                        type="button"
-                        variant="quiet-danger"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <p className="text-2xs text-white/40">
-                      {s.usesCount}
-                      {s.maxUses != null ? ` / ${s.maxUses}` : ""} views
-                      {s.expiresAt
-                        ? ` · expires ${formatDate(s.expiresAt)}`
-                        : " · no expiry"}
-                      {expired ? (
-                        <span className="text-danger"> · expired</span>
-                      ) : exhausted ? (
-                        <span className="text-danger"> · limit reached</span>
-                      ) : null}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
+        )}
+      </CardPanel>
     </Section>
   );
 }

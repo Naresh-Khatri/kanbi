@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { toastManager } from "@/components/ui/toast";
 import { api } from "@/trpc/react";
 
 const UNDO_WINDOW_MS = 6000;
@@ -24,14 +24,14 @@ export function useUndoableBoardDelete(boardId: string) {
   const utils = api.useUtils();
   const deleteColumn = api.column.delete.useMutation({
     onError: (e) => {
-      toast.error(e.message);
+      toastManager.add({ type: "error", title: e.message });
       void utils.board.get.invalidate({ boardId });
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
   });
   const deleteTask = api.task.delete.useMutation({
     onError: (e) => {
-      toast.error(e.message);
+      toastManager.add({ type: "error", title: e.message });
       void utils.board.get.invalidate({ boardId });
     },
     onSettled: () => utils.board.get.invalidate({ boardId }),
@@ -73,57 +73,57 @@ export function useUndoableBoardDelete(boardId: string) {
       }
     }, UNDO_WINDOW_MS);
 
-    toast(
-      target.kind === "column"
-        ? `Deleted column "${target.name}"`
-        : `Deleted "${target.name}"`,
-      {
-        duration: UNDO_WINDOW_MS,
-        action: {
-          label: "Undo",
-          onClick: () => {
-            undone = true;
-            clearTimeout(commit);
-            if (!snapshot) return;
-            utils.board.get.setData({ boardId }, (current) => {
-              if (!current) return snapshot;
-              if (target.kind === "column") {
-                const removedColumn = snapshot.columns.find(
-                  (column) => column.id === target.id,
-                );
-                const removedTasks = snapshot.tasks.filter(
-                  (task) => task.columnId === target.id,
-                );
-                return {
-                  ...current,
-                  columns:
-                    removedColumn &&
-                    !current.columns.some(
-                      (column) => column.id === removedColumn.id,
-                    )
-                      ? [...current.columns, removedColumn]
-                      : current.columns,
-                  tasks: current.tasks
-                    .filter(
-                      (task) =>
-                        !removedTasks.some(
-                          (removedTask) => removedTask.id === task.id,
-                        ),
-                    )
-                    .concat(removedTasks),
-                };
-              }
-              const removedTask = snapshot.tasks.find(
-                (task) => task.id === target.id,
+    const toastId = toastManager.add({
+      title:
+        target.kind === "column"
+          ? `Deleted column "${target.name}"`
+          : `Deleted "${target.name}"`,
+      timeout: UNDO_WINDOW_MS,
+      actionProps: {
+        children: "Undo",
+        onClick: () => {
+          undone = true;
+          clearTimeout(commit);
+          toastManager.close(toastId);
+          if (!snapshot) return;
+          utils.board.get.setData({ boardId }, (current) => {
+            if (!current) return snapshot;
+            if (target.kind === "column") {
+              const removedColumn = snapshot.columns.find(
+                (column) => column.id === target.id,
               );
-              return removedTask &&
-                !current.tasks.some((task) => task.id === removedTask.id)
-                ? { ...current, tasks: [...current.tasks, removedTask] }
-                : current;
-            });
-          },
+              const removedTasks = snapshot.tasks.filter(
+                (task) => task.columnId === target.id,
+              );
+              return {
+                ...current,
+                columns:
+                  removedColumn &&
+                  !current.columns.some(
+                    (column) => column.id === removedColumn.id,
+                  )
+                    ? [...current.columns, removedColumn]
+                    : current.columns,
+                tasks: current.tasks
+                  .filter(
+                    (task) =>
+                      !removedTasks.some(
+                        (removedTask) => removedTask.id === task.id,
+                      ),
+                  )
+                  .concat(removedTasks),
+              };
+            }
+            const removedTask = snapshot.tasks.find(
+              (task) => task.id === target.id,
+            );
+            return removedTask &&
+              !current.tasks.some((task) => task.id === removedTask.id)
+              ? { ...current, tasks: [...current.tasks, removedTask] }
+              : current;
+          });
         },
       },
-    );
+    });
   };
 }

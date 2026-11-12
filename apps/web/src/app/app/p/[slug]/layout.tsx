@@ -1,6 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { Settings } from "lucide-react";
 
 import { AppHeader } from "@/app/app/_components/app-header";
 import { ProjectAiButton } from "@/app/app/p/[slug]/_components/project-ai-button";
@@ -9,7 +7,6 @@ import { ProjectInfo } from "@/app/app/p/[slug]/_components/project-info";
 import { ProjectSectionNav } from "@/app/app/p/[slug]/_components/project-section-nav";
 import { ProjectTeamButton } from "@/app/app/p/[slug]/_components/project-team-button";
 import { resolveProject } from "@/app/app/p/[slug]/_lib/resolve-project";
-import { Button } from "@/components/ui/button";
 import { api, HydrateClient } from "@/trpc/server";
 
 export default async function ProjectLayout({
@@ -44,17 +41,6 @@ export default async function ProjectLayout({
             />
             <ProjectAiButton />
             <ProjectTeamButton />
-            <Button
-              aria-label="Project settings"
-              asChild
-              size="icon-md"
-              title="Project settings"
-              variant="quiet"
-            >
-              <Link href={`/app/p/${slug}/settings`}>
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
           </>
         }
         start={
@@ -64,7 +50,8 @@ export default async function ProjectLayout({
           </>
         }
       />
-      {children}
+      {/* bounded column -> board-view flex-1 fills viewport */}
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </HydrateClient>
   );
 }

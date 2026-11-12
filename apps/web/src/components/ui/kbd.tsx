@@ -1,24 +1,31 @@
-import { cva, type VariantProps } from "class-variance-authority";
-import * as React from "react";
-
+import type * as React from "react";
 import { cn } from "@/lib/utils";
-
-const kbdVariants = cva("rounded font-sans", {
-  variants: {
-    variant: {
-      // inline hint inside buttons/inputs
-      hint: "text-2xs border border-white/10 px-1 text-white/40",
-      // cheatsheet / palette rows
-      key: "bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/70",
-    },
-  },
-  defaultVariants: { variant: "hint" },
-});
 
 export function Kbd({
   className,
-  variant,
   ...props
-}: React.HTMLAttributes<HTMLElement> & VariantProps<typeof kbdVariants>) {
-  return <kbd className={cn(kbdVariants({ variant }), className)} {...props} />;
+}: React.ComponentProps<"kbd">): React.ReactElement {
+  return (
+    <kbd
+      className={cn(
+        "pointer-events-none inline-flex h-5 min-w-5 select-none items-center justify-center gap-1 rounded-[.25rem] bg-muted px-1 font-medium font-sans text-muted-foreground text-xs [&_svg:not([class*='size-'])]:size-3",
+        className,
+      )}
+      data-slot="kbd"
+      {...props}
+    />
+  );
+}
+
+export function KbdGroup({
+  className,
+  ...props
+}: React.ComponentProps<"kbd">): React.ReactElement {
+  return (
+    <kbd
+      className={cn("inline-flex items-center gap-1", className)}
+      data-slot="kbd-group"
+      {...props}
+    />
+  );
 }

@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toastManager } from "@/components/ui/toast";
 
 /** Conventional-commit-ish branch type prefixes. */
 export const BRANCH_TYPES = [
@@ -60,8 +60,9 @@ export function buildBranchCommand(args: BranchArgs) {
 
 function copy(text: string, success: string) {
   navigator.clipboard.writeText(text).then(
-    () => toast.success(success),
-    () => toast.error("Couldn't copy to clipboard"),
+    () => toastManager.add({ type: "success", title: success }),
+    () =>
+      toastManager.add({ type: "error", title: "Couldn't copy to clipboard" }),
   );
 }
 

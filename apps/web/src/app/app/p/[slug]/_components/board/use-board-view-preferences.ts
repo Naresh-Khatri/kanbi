@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { toast } from "sonner";
+import { toastManager } from "@/components/ui/toast";
 import type { ColumnSortDir, ColumnSortMode } from "@/lib/task-sort";
 import { api } from "@/trpc/react";
 
@@ -34,7 +34,10 @@ export function useBoardViewPreferences(
       if (context?.previous) {
         utils.board.get.setData({ boardId }, context.previous);
       }
-      toast.error(error.message || "Couldn't save view preferences");
+      toastManager.add({
+        type: "error",
+        title: error.message || "Couldn't save view preferences",
+      });
     },
   });
 

@@ -1,24 +1,31 @@
 "use client";
 
 import Placeholder from "@tiptap/extension-placeholder";
+import type { Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import {
-  Bold,
-  Code,
-  Heading1,
-  Heading2,
-  Italic,
-  Link as LinkIcon,
-  List,
-  ListOrdered,
-  Quote,
-  Strikethrough,
-  Underline as UnderlineIcon,
+  BoldIcon,
+  CodeIcon,
+  Heading1Icon,
+  Heading2Icon,
+  ItalicIcon,
+  LinkIcon,
+  ListIcon,
+  ListOrderedIcon,
+  QuoteIcon,
+  StrikethroughIcon,
+  UnderlineIcon,
 } from "lucide-react";
 import * as React from "react";
-
+import { Toggle } from "@/components/ui/toggle";
+import {
+  Toolbar,
+  ToolbarButton as ToolbarPrimitiveButton,
+  ToolbarGroup,
+  ToolbarSeparator,
+} from "@/components/ui/toolbar";
 import { cn } from "@/lib/utils";
 import {
   createMentionExtension,
@@ -27,15 +34,17 @@ import {
   createTicketRenderExtension,
   type MentionItem,
   type TicketMentionItem,
-} from "./rich-text-mention";
+} from "./mention";
 
 /** Shared prose styling so the editor and the read-only renderer look identical. */
 const RICH_TEXT_PROSE = cn(
-  "prose prose-invert prose-sm max-w-none",
-  "prose-headings:my-2 prose-li:my-0 prose-ol:my-1 prose-p:my-1 prose-ul:my-1",
-  "prose-code:rounded prose-code:bg-white/10 prose-code:px-1 prose-code:py-0.5 prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
-  "prose-blockquote:border-l-white/20 prose-blockquote:text-white/70",
-  "prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline",
+  "prose prose-sm dark:prose-invert max-w-none text-foreground",
+  "prose-headings:my-2 prose-headings:text-foreground prose-strong:text-foreground prose-li:my-0 prose-ol:my-1 prose-p:my-1 prose-ul:my-1 prose-li:marker:text-muted-foreground",
+  "prose-code:rounded-sm prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:text-foreground prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
+  "prose-pre:border prose-pre:bg-muted prose-pre:text-foreground",
+  "prose-blockquote:border-l-border prose-blockquote:font-normal prose-blockquote:text-muted-foreground prose-blockquote:not-italic",
+  "prose-a:text-info-foreground prose-a:underline-offset-2 prose-a:no-underline hover:prose-a:underline",
+  "prose-hr:border-border",
 );
 
 /**
@@ -138,37 +147,47 @@ export function RichTextEditor({
   return (
     <>
       {toolbar === "document" ? (
-        <div className="bg-canvas/70 sticky top-0 z-10 mb-5 flex flex-wrap items-center gap-0.5 border-b border-white/10 py-2 backdrop-blur">
-          <ToolbarButton
-            active={editor.isActive("heading", { level: 1 })}
-            label="Heading 1"
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 1 }).run()
-            }
-          >
-            <Heading1 className="h-3.5 w-3.5" />
-          </ToolbarButton>
-          <ToolbarButton
-            active={editor.isActive("heading", { level: 2 })}
-            label="Heading 2"
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 2 }).run()
-            }
-          >
-            <Heading2 className="h-3.5 w-3.5" />
-          </ToolbarButton>
-          <Divider />
+        <Toolbar
+          aria-label="Formatting"
+          className="sticky top-0 z-10 mb-5 flex-wrap gap-1 rounded-none border-x-0 border-t-0 bg-background/80 px-0 py-2 backdrop-blur"
+        >
+          <ToolbarGroup>
+            <FormatToggle
+              active={editor.isActive("heading", { level: 1 })}
+              label="Heading 1"
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 1 }).run()
+              }
+            >
+              <Heading1Icon aria-hidden="true" />
+            </FormatToggle>
+            <FormatToggle
+              active={editor.isActive("heading", { level: 2 })}
+              label="Heading 2"
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 2 }).run()
+              }
+            >
+              <Heading2Icon aria-hidden="true" />
+            </FormatToggle>
+          </ToolbarGroup>
+          <ToolbarSeparator orientation="vertical" />
           <InlineFormatting editor={editor} />
-        </div>
+        </Toolbar>
       ) : null}
       {toolbar === "bubble" ? (
         <BubbleMenu
-          className="bg-raised z-[100] flex items-center gap-0.5 rounded-lg border border-white/10 p-1 shadow-xl"
+          className="z-50"
           editor={editor}
           options={{ placement: "top", strategy: "fixed", offset: 8 }}
           updateDelay={150}
         >
-          <InlineFormatting editor={editor} />
+          <Toolbar
+            aria-label="Formatting"
+            className="gap-1 rounded-lg bg-popover shadow-lg/5"
+          >
+            <InlineFormatting editor={editor} />
+          </Toolbar>
         </BubbleMenu>
       ) : null}
       <EditorContent editor={editor} />
@@ -176,127 +195,117 @@ export function RichTextEditor({
   );
 }
 
-function InlineFormatting({
-  editor,
-}: {
-  editor: ReturnType<typeof useEditor>;
-}) {
-  if (!editor) return null;
+function InlineFormatting({ editor }: { editor: Editor }) {
+  const setLink = () => {
+    const prev = editor.getAttributes("link").href as string | undefined;
+    const url = window.prompt("URL", prev ?? "https://");
+    if (url === null) return;
+    const chain = editor.chain().focus().extendMarkRange("link");
+    if (url === "") chain.unsetLink().run();
+    else chain.setLink({ href: url }).run();
+  };
   return (
     <>
-      <ToolbarButton
-        active={editor.isActive("bold")}
-        label="Bold"
-        onClick={() => editor.chain().focus().toggleBold().run()}
-      >
-        <Bold className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton
-        active={editor.isActive("italic")}
-        label="Italic"
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-      >
-        <Italic className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton
-        active={editor.isActive("underline")}
-        label="Underline"
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
-      >
-        <UnderlineIcon className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton
-        active={editor.isActive("strike")}
-        label="Strikethrough"
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-      >
-        <Strikethrough className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <Divider />
-      <ToolbarButton
-        active={editor.isActive("code")}
-        label="Code"
-        onClick={() => editor.chain().focus().toggleCode().run()}
-      >
-        <Code className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton
-        active={editor.isActive("link")}
-        label="Link"
-        onClick={() => {
-          const prev = editor.getAttributes("link").href as string | undefined;
-          const url = window.prompt("URL", prev ?? "https://");
-          if (url === null) return;
-          if (url === "") {
-            editor.chain().focus().extendMarkRange("link").unsetLink().run();
-            return;
-          }
-          editor
-            .chain()
-            .focus()
-            .extendMarkRange("link")
-            .setLink({ href: url })
-            .run();
-        }}
-      >
-        <LinkIcon className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <Divider />
-      <ToolbarButton
-        active={editor.isActive("bulletList")}
-        label="Bullet list"
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-      >
-        <List className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton
-        active={editor.isActive("orderedList")}
-        label="Ordered list"
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-      >
-        <ListOrdered className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton
-        active={editor.isActive("blockquote")}
-        label="Quote"
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
-      >
-        <Quote className="h-3.5 w-3.5" />
-      </ToolbarButton>
+      <ToolbarGroup>
+        <FormatToggle
+          active={editor.isActive("bold")}
+          label="Bold"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        >
+          <BoldIcon aria-hidden="true" />
+        </FormatToggle>
+        <FormatToggle
+          active={editor.isActive("italic")}
+          label="Italic"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        >
+          <ItalicIcon aria-hidden="true" />
+        </FormatToggle>
+        <FormatToggle
+          active={editor.isActive("underline")}
+          label="Underline"
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+        >
+          <UnderlineIcon aria-hidden="true" />
+        </FormatToggle>
+        <FormatToggle
+          active={editor.isActive("strike")}
+          label="Strikethrough"
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+        >
+          <StrikethroughIcon aria-hidden="true" />
+        </FormatToggle>
+      </ToolbarGroup>
+      <ToolbarSeparator orientation="vertical" />
+      <ToolbarGroup>
+        <FormatToggle
+          active={editor.isActive("code")}
+          label="Code"
+          onClick={() => editor.chain().focus().toggleCode().run()}
+        >
+          <CodeIcon aria-hidden="true" />
+        </FormatToggle>
+        <FormatToggle
+          active={editor.isActive("link")}
+          label="Link"
+          onClick={setLink}
+        >
+          <LinkIcon aria-hidden="true" />
+        </FormatToggle>
+      </ToolbarGroup>
+      <ToolbarSeparator orientation="vertical" />
+      <ToolbarGroup>
+        <FormatToggle
+          active={editor.isActive("bulletList")}
+          label="Bullet list"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+        >
+          <ListIcon aria-hidden="true" />
+        </FormatToggle>
+        <FormatToggle
+          active={editor.isActive("orderedList")}
+          label="Ordered list"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        >
+          <ListOrderedIcon aria-hidden="true" />
+        </FormatToggle>
+        <FormatToggle
+          active={editor.isActive("blockquote")}
+          label="Quote"
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        >
+          <QuoteIcon aria-hidden="true" />
+        </FormatToggle>
+      </ToolbarGroup>
     </>
   );
 }
 
-function ToolbarButton({
+function FormatToggle({
   active,
   onClick,
   label,
   children,
 }: {
-  active?: boolean;
+  active: boolean;
   onClick: () => void;
   label: string;
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <ToolbarPrimitiveButton
       aria-label={label}
-      className={cn(
-        "flex h-7 w-7 items-center justify-center rounded-md text-white/70 transition-colors hover:bg-white/10 hover:text-white",
-        active && "bg-white/15 text-white",
-      )}
       onClick={onClick}
+      // keep the editor selection
       onMouseDown={(e) => e.preventDefault()}
+      render={
+<Toggle pressed={active} size="sm" />
+      }
       title={label}
-      type="button"
     >
       {children}
-    </button>
+    </ToolbarPrimitiveButton>
   );
-}
-
-function Divider() {
-  return <div className="mx-0.5 h-4 w-px bg-white/10" />;
 }
 
 /**

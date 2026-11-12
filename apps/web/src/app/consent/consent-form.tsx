@@ -1,35 +1,43 @@
 "use client";
 
 import {
-  Eye,
+  CircleAlertIcon,
+  EyeIcon,
   type LucideIcon,
-  PenLine,
-  RefreshCw,
-  ShieldCheck,
+  PenLineIcon,
+  RefreshCwIcon,
+  ShieldCheckIcon,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
-import { Card, IconTile, SectionLabel } from "@/components/ui/surface";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
 import { authClient } from "@/server/better-auth/client";
 
 const SCOPE_META: Record<string, { label: string; Icon: LucideIcon }> = {
-  openid: { label: "Confirm your identity", Icon: ShieldCheck },
-  profile: { label: "Read your basic profile", Icon: ShieldCheck },
-  email: { label: "Read your email address", Icon: ShieldCheck },
+  openid: { label: "Confirm your identity", Icon: ShieldCheckIcon },
+  profile: { label: "Read your basic profile", Icon: ShieldCheckIcon },
+  email: { label: "Read your email address", Icon: ShieldCheckIcon },
   offline_access: {
     label: "Stay connected without re-authorizing",
-    Icon: RefreshCw,
+    Icon: RefreshCwIcon,
   },
   "kanbi:read": {
     label: "Read your projects, boards, and tasks",
-    Icon: Eye,
+    Icon: EyeIcon,
   },
   "kanbi:write": {
     label: "Create and edit tasks, comments, and more",
-    Icon: PenLine,
+    Icon: PenLineIcon,
   },
 };
 
@@ -43,8 +51,7 @@ export function ConsentForm() {
   const [busy, setBusy] = useState<"accept" | "deny" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // The provider only passes client_id + scope; resolve the human name from the
-  // registered client (we're already authenticated on the consent step).
+  // provider only passes client_id + scope -> resolve name from the registered client
   useEffect(() => {
     if (!clientId) return;
     let active = true;
@@ -78,74 +85,77 @@ export function ConsentForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm" padding="lg">
-      <div className="flex items-center gap-2 text-white">
-        <Logo className="h-5 w-5" />
-        <span className="text-sm font-medium">Kanbi</span>
-      </div>
-
-      <h1 className="mt-5 text-lg font-semibold text-white">
-        Authorize {appName}
-      </h1>
-      <p className="mt-1 text-sm text-white/40">
-        {appName} wants to access your Kanbi account.
-        {session?.user?.email ? (
-          <>
-            {" "}
-            Signed in as{" "}
-            <span className="text-white/70">{session.user.email}</span>.
-          </>
+    <Card className="w-full max-w-sm">
+      <CardHeader>
+        <CardTitle className="text-xl">Authorize {appName}</CardTitle>
+        <CardDescription>
+          {appName} wants to access your Kanbi account.
+          {session?.user?.email ? (
+            <>
+              {" "}
+              Signed in as{" "}
+              <span className="text-foreground">{session.user.email}</span>.
+            </>
+          ) : null}
+        </CardDescription>
+      </CardHeader>
+      <CardPanel className="flex flex-col gap-3">
+        <p className="font-medium text-muted-foreground text-xs">
+          It will be able to
+        </p>
+        <ul className="flex flex-col gap-2.5">
+          {scopes.length === 0 ? (
+            <li className="text-muted-foreground text-sm">Basic access.</li>
+          ) : (
+            scopes.map((scope) => {
+              const meta = SCOPE_META[scope];
+              const Icon = meta?.Icon ?? ShieldCheckIcon;
+              return (
+                <li className="flex items-center gap-2.5 text-sm" key={scope}>
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+                    <Icon aria-hidden="true" className="size-3.5" />
+                  </span>
+                  <span>{meta?.label ?? scope}</span>
+                </li>
+              );
+            })
+          )}
+        </ul>
+        {error ? (
+          <Alert className="mt-2" variant="error">
+            <CircleAlertIcon aria-hidden="true" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         ) : null}
-      </p>
-
-      <SectionLabel className="mt-5">It will be able to</SectionLabel>
-      <ul className="mt-2 flex flex-col gap-2.5">
-        {scopes.length === 0 ? (
-          <li className="text-sm text-white/40">Basic access.</li>
-        ) : (
-          scopes.map((scope) => {
-            const meta = SCOPE_META[scope];
-            const Icon = meta?.Icon ?? ShieldCheck;
-            return (
-              <li
-                key={scope}
-                className="flex items-center gap-2.5 text-sm text-white/70"
-              >
-                <IconTile size="sm">
-                  <Icon className="h-3.5 w-3.5" />
-                </IconTile>
-                <span>{meta?.label ?? scope}</span>
-              </li>
-            );
-          })
-        )}
-      </ul>
-
-      {error ? <p className="text-danger mt-4 text-sm">{error}</p> : null}
-
-      <div className="mt-6 flex items-center gap-2">
-        <Button
-          className="flex-1"
-          disabled={busy !== null}
-          onClick={() => decide(false)}
-          type="button"
-          variant="outline"
-        >
-          {busy === "deny" ? "Denying…" : "Deny"}
-        </Button>
-        <Button
-          className="flex-1"
-          disabled={busy !== null}
-          onClick={() => decide(true)}
-          type="button"
-        >
-          {busy === "accept" ? "Authorizing…" : "Authorize"}
-        </Button>
-      </div>
-
-      <p className="text-2xs mt-4 text-center text-white/40">
-        You can revoke access anytime from your Kanbi settings.
-      </p>
+      </CardPanel>
+      <CardFooter className="flex-col gap-4">
+        <div className="flex w-full items-center gap-2">
+          <Button
+            className="flex-1"
+            disabled={busy === "accept"}
+            loading={busy === "deny"}
+            onClick={() => decide(false)}
+            size="lg"
+            type="button"
+            variant="outline"
+          >
+            Deny
+          </Button>
+          <Button
+            className="flex-1"
+            disabled={busy === "deny"}
+            loading={busy === "accept"}
+            onClick={() => decide(true)}
+            size="lg"
+            type="button"
+          >
+            Authorize
+          </Button>
+        </div>
+        <p className="text-center text-muted-foreground text-xs">
+          You can revoke access anytime from your Kanbi settings.
+        </p>
+      </CardFooter>
     </Card>
   );
 }

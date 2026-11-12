@@ -1,29 +1,40 @@
 "use client";
 
 import {
-  Archive,
-  CalendarClock,
-  Search,
-  SlidersHorizontal,
-  Sparkles,
-  Tag,
-  User,
-  X,
+  ArchiveIcon,
+  CalendarClockIcon,
+  ListFilterIcon,
+  SearchIcon,
+  SignalHighIcon,
+  SparklesIcon,
+  TagIcon,
+  UserIcon,
+  UserRoundXIcon,
+  XIcon,
 } from "lucide-react";
 import { forwardRef } from "react";
-import { CountBadge, Dot } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckboxBox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuTrigger,
+} from "@/components/ui/menu";
+import { UserAvatar } from "@/components/user-avatar";
+import { cn } from "@/lib/utils";
+import { Tip } from "./board/tip";
 import {
   PRIORITIES,
   PRIORITY_META,
@@ -155,6 +166,7 @@ export const BoardToolbar = forwardRef<
     archivedCount: number;
     onOpenArchive: () => void;
     onOpenDigest: () => void;
+    /** mobile only: filter row is collapsed behind the filters button */
     expanded: boolean;
     onExpandedChange: (expanded: boolean) => void;
   }
@@ -181,308 +193,267 @@ export const BoardToolbar = forwardRef<
     filters.labelIds.length +
     filters.assigneeIds.length +
     (filters.due === "any" ? 0 : 1);
-  const showControls = expanded || active;
 
-  function toggle<T>(list: T[], value: T): T[] {
-    return list.includes(value)
-      ? list.filter((x) => x !== value)
-      : [...list, value];
-  }
-
-  function openSearch() {
-    onExpandedChange(true);
-    requestAnimationFrame(() => {
-      if (searchRef && typeof searchRef !== "function") {
-        searchRef.current?.focus();
-      }
-    });
+  function toggle<T>(list: T[], value: T, on: boolean): T[] {
+    const rest = list.filter((x) => x !== value);
+    return on ? [...rest, value] : rest;
   }
 
   return (
-    <div className="border-b border-white/10">
-      <div className="flex h-11 items-center gap-1 px-4 sm:px-6">
-        <Button
-          aria-controls="board-search-filters"
-          aria-expanded={showControls}
-          className="gap-1.5"
-          onClick={openSearch}
-          size="xs"
-          variant={filters.query ? "selected" : "property"}
-        >
-          <Search className="h-3.5 w-3.5" />
-          <span>Search</span>
-          <Kbd variant="hint">/</Kbd>
-        </Button>
-        <Button
-          aria-controls="board-search-filters"
-          aria-expanded={showControls}
-          className="gap-1.5"
-          onClick={() => onExpandedChange(!expanded)}
-          size="xs"
-          variant={filterCount > 0 ? "selected" : "property"}
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          <span>Filters</span>
-          {filterCount > 0 ? (
-            <CountBadge tone="info">{filterCount}</CountBadge>
-          ) : null}
-        </Button>
-        {active ? (
-          <span className="ml-1 text-xs text-white/40">
-            {hidden > 0 ? `${hidden} hidden` : "Showing all"}
-          </span>
-        ) : null}
-
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            className="gap-1.5"
-            onClick={onOpenDigest}
-            size="xs"
-            variant="property"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only">Digest</span>
-          </Button>
-          {archivedCount > 0 ? (
+    <div className="flex flex-wrap items-center gap-1.5 border-b px-4 py-2 sm:px-6">
+      <InputGroup className="w-full sm:w-60">
+        <InputGroupInput
+          aria-label="Search tasks"
+          onChange={(e) => onChange({ ...filters, query: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") return;
+            if (filters.query) onChange({ ...filters, query: "" });
+            else e.currentTarget.blur();
+          }}
+          placeholder="Search tasks…"
+          ref={searchRef}
+          size="sm"
+          type="search"
+          value={filters.query}
+        />
+        <InputGroupAddon>
+          <SearchIcon aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupAddon align="inline-end">
+          {filters.query ? (
             <Button
-              className="gap-1.5"
-              onClick={onOpenArchive}
-              size="xs"
-              variant="property"
+              aria-label="Clear search"
+              onClick={() => onChange({ ...filters, query: "" })}
+              size="icon-xs"
+              variant="ghost"
             >
-              <Archive className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only">Archive</span>
-              <CountBadge>{archivedCount}</CountBadge>
+              <XIcon aria-hidden="true" />
             </Button>
-          ) : null}
-        </div>
-      </div>
+          ) : (
+            <Kbd>/</Kbd>
+          )}
+        </InputGroupAddon>
+      </InputGroup>
 
-      {showControls ? (
-        <div
-          className="flex flex-wrap items-center gap-1.5 border-t border-white/10 px-4 py-1.5 sm:px-6"
-          id="board-search-filters"
+      <Button
+        aria-controls="board-filters"
+        aria-expanded={expanded}
+        className="sm:hidden"
+        onClick={() => onExpandedChange(!expanded)}
+        size="sm"
+        variant="outline"
+      >
+        <ListFilterIcon aria-hidden="true" />
+        Filters
+        {filterCount > 0 ? (
+          <Badge size="sm" variant="info">
+            {filterCount}
+          </Badge>
+        ) : null}
+      </Button>
+
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-1.5",
+          !(expanded || active) && "max-sm:hidden",
+        )}
+        id="board-filters"
+      >
+        <FilterMenu
+          count={filters.priorities.length}
+          icon={<SignalHighIcon aria-hidden="true" />}
+          label="Priority"
         >
-          <div className="relative max-w-sm min-w-48 flex-1">
-            <Search
-              aria-hidden
-              className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-white/40"
-            />
-            <Input
-              aria-label="Search tasks"
-              className="pr-8 pl-8"
-              inputSize="sm"
-              onChange={(e) => onChange({ ...filters, query: e.target.value })}
-              placeholder="Search tasks…"
-              ref={searchRef}
-              value={filters.query}
-            />
-            {filters.query ? (
-              <Button
-                aria-label="Clear search"
-                className="absolute top-1/2 right-1 -translate-y-1/2"
-                onClick={() => onChange({ ...filters, query: "" })}
-                size="icon-sm"
-                type="button"
-                variant="quiet"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
-          </div>
-
-          <FilterChip
-            count={filters.priorities.length}
-            icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
-            label="Priority"
-          >
-            {PRIORITIES.map((p) => {
-              const checked = filters.priorities.includes(p);
-              return (
-                <FilterItem
-                  checked={checked}
-                  key={p}
-                  onSelect={() =>
-                    onChange({
-                      ...filters,
-                      priorities: toggle(filters.priorities, p),
-                    })
-                  }
-                >
-                  <PriorityIcon className="h-3.5 w-3.5" priority={p} />
-                  <span>{PRIORITY_META[p].label}</span>
-                </FilterItem>
-              );
-            })}
-          </FilterChip>
-
-          <FilterChip
-            count={filters.labelIds.length}
-            disabled={labels.length === 0}
-            icon={<Tag className="h-3.5 w-3.5" />}
-            label="Labels"
-          >
-            {labels.length === 0 ? (
-              <div className="px-2 py-1.5 text-xs text-white/40">
-                No labels yet
-              </div>
-            ) : (
-              labels.map((l) => {
-                const checked = filters.labelIds.includes(l.id);
-                return (
-                  <FilterItem
-                    checked={checked}
-                    key={l.id}
-                    onSelect={() =>
-                      onChange({
-                        ...filters,
-                        labelIds: toggle(filters.labelIds, l.id),
-                      })
-                    }
-                  >
-                    <Dot color={l.color} size="md" />
-                    <span className="truncate">{l.name}</span>
-                  </FilterItem>
-                );
-              })
-            )}
-          </FilterChip>
-
-          <FilterChip
-            count={filters.assigneeIds.length}
-            icon={<User className="h-3.5 w-3.5" />}
-            label="Assignee"
-          >
-            <FilterItem
-              checked={filters.assigneeIds.includes(UNASSIGNED)}
-              onSelect={() =>
+          {PRIORITIES.map((p) => (
+            <MenuCheckboxItem
+              checked={filters.priorities.includes(p)}
+              key={p}
+              onCheckedChange={(on) =>
                 onChange({
                   ...filters,
-                  assigneeIds: toggle(filters.assigneeIds, UNASSIGNED),
+                  priorities: toggle(filters.priorities, p, on),
                 })
               }
             >
-              <span className="text-2xs flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white/70">
-                ?
-              </span>
-              <span>Unassigned</span>
-            </FilterItem>
-            {members.length > 0 ? <DropdownMenuSeparator /> : null}
-            {members.map((m) => {
-              const checked = filters.assigneeIds.includes(m.userId);
-              return (
-                <FilterItem
-                  checked={checked}
-                  key={m.userId}
-                  onSelect={() =>
-                    onChange({
-                      ...filters,
-                      assigneeIds: toggle(filters.assigneeIds, m.userId),
-                    })
-                  }
-                >
-                  <UserAvatar image={m.image} name={m.name} size={20} />
-                  <span className="truncate">{m.name}</span>
-                </FilterItem>
-              );
-            })}
-          </FilterChip>
+              <PriorityIcon priority={p} />
+              {PRIORITY_META[p].label}
+            </MenuCheckboxItem>
+          ))}
+        </FilterMenu>
 
-          <FilterChip
-            count={filters.due === "any" ? 0 : 1}
-            icon={<CalendarClock className="h-3.5 w-3.5" />}
-            label={filters.due === "any" ? "Due" : DUE_LABEL[filters.due]}
+        <FilterMenu
+          count={filters.labelIds.length}
+          disabled={labels.length === 0}
+          icon={<TagIcon aria-hidden="true" />}
+          label="Labels"
+        >
+          {labels.map((l) => (
+            <MenuCheckboxItem
+              checked={filters.labelIds.includes(l.id)}
+              key={l.id}
+              onCheckedChange={(on) =>
+                onChange({
+                  ...filters,
+                  labelIds: toggle(filters.labelIds, l.id, on),
+                })
+              }
+            >
+              <span
+                aria-hidden="true"
+                className="mx-1 size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: l.color }}
+              />
+              <span className="truncate">{l.name}</span>
+            </MenuCheckboxItem>
+          ))}
+        </FilterMenu>
+
+        <FilterMenu
+          count={filters.assigneeIds.length}
+          icon={<UserIcon aria-hidden="true" />}
+          label="Assignee"
+        >
+          <MenuCheckboxItem
+            checked={filters.assigneeIds.includes(UNASSIGNED)}
+            onCheckedChange={(on) =>
+              onChange({
+                ...filters,
+                assigneeIds: toggle(filters.assigneeIds, UNASSIGNED, on),
+              })
+            }
           >
-            {(Object.keys(DUE_LABEL) as DueFilter[]).map((d) => (
-              <FilterItem
-                checked={filters.due === d}
-                key={d}
-                onSelect={() => onChange({ ...filters, due: d })}
-              >
-                <span>{DUE_LABEL[d]}</span>
-              </FilterItem>
-            ))}
-          </FilterChip>
+            <UserRoundXIcon aria-hidden="true" />
+            Unassigned
+          </MenuCheckboxItem>
+          {members.length > 0 ? <MenuSeparator /> : null}
+          {members.map((m) => (
+            <MenuCheckboxItem
+              checked={filters.assigneeIds.includes(m.userId)}
+              key={m.userId}
+              onCheckedChange={(on) =>
+                onChange({
+                  ...filters,
+                  assigneeIds: toggle(filters.assigneeIds, m.userId, on),
+                })
+              }
+            >
+              <UserAvatar image={m.image} name={m.name} size={18} />
+              <span className="truncate">{m.name}</span>
+            </MenuCheckboxItem>
+          ))}
+        </FilterMenu>
 
-          {active ? (
+        <FilterMenu
+          count={filters.due === "any" ? 0 : 1}
+          hideCount
+          icon={<CalendarClockIcon aria-hidden="true" />}
+          label={filters.due === "any" ? "Due" : DUE_LABEL[filters.due]}
+        >
+          <MenuGroup>
+            <MenuGroupLabel>Due date</MenuGroupLabel>
+            <MenuRadioGroup
+              onValueChange={(due: DueFilter) => onChange({ ...filters, due })}
+              value={filters.due}
+            >
+              {(Object.keys(DUE_LABEL) as DueFilter[]).map((d) => (
+                <MenuRadioItem key={d} value={d}>
+                  {DUE_LABEL[d]}
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </MenuGroup>
+        </FilterMenu>
+
+        {active ? (
+          <>
+            <span className="text-muted-foreground px-1 text-xs tabular-nums">
+              {hidden > 0 ? `${hidden} hidden` : "Showing all"}
+            </span>
             <Button
-              onClick={() => {
-                onChange(EMPTY_FILTERS);
-                onExpandedChange(false);
-              }}
-              size="xs"
-              variant="property"
+              onClick={() => onChange(EMPTY_FILTERS)}
+              size="sm"
+              variant="ghost"
             >
               Clear
             </Button>
-          ) : (
+          </>
+        ) : null}
+      </div>
+
+      <div className="ms-auto flex items-center gap-1">
+        <Tip label="Weekly digest">
+          <Button
+            aria-label="Weekly digest"
+            onClick={onOpenDigest}
+            size="sm"
+            variant="ghost"
+          >
+            <SparklesIcon aria-hidden="true" />
+            <span className="max-md:hidden">Digest</span>
+          </Button>
+        </Tip>
+        {archivedCount > 0 ? (
+          <Tip label="Archived tasks">
             <Button
-              aria-label="Hide search and filters"
-              onClick={() => onExpandedChange(false)}
-              size="icon-sm"
-              variant="quiet"
+              aria-label={`Archived tasks (${archivedCount})`}
+              onClick={onOpenArchive}
+              size="sm"
+              variant="ghost"
             >
-              <X className="h-3.5 w-3.5" />
+              <ArchiveIcon aria-hidden="true" />
+              <span className="max-md:hidden">Archive</span>
+              <Badge className="tabular-nums" size="sm" variant="secondary">
+                {archivedCount}
+              </Badge>
             </Button>
-          )}
-        </div>
-      ) : null}
+          </Tip>
+        ) : null}
+      </div>
     </div>
   );
 });
 
-function FilterChip({
+function FilterMenu({
   icon,
   label,
   count,
+  hideCount,
   disabled,
   children,
 }: {
   icon: React.ReactNode;
   label: string;
   count: number;
+  /** label already names the active value */
+  hideCount?: boolean;
   disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          className="gap-1.5"
-          disabled={disabled}
-          size="xs"
-          variant={count > 0 ? "selected" : "property"}
-        >
-          {icon}
-          <span>{label}</span>
-          {count > 0 ? <CountBadge tone="info">{count}</CountBadge> : null}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-48">
+    <Menu>
+      <MenuTrigger
+        disabled={disabled}
+        render={
+          <Button
+            className={cn(
+              count > 0 && "border-info/32 bg-info/8 dark:bg-info/16",
+            )}
+            size="sm"
+            variant="outline"
+          />
+        }
+      >
+        {icon}
+        {label}
+        {count > 0 && !hideCount ? (
+          <Badge className="tabular-nums" size="sm" variant="info">
+            {count}
+          </Badge>
+        ) : null}
+      </MenuTrigger>
+      <MenuPopup align="start" className="max-h-80 min-w-48">
         {children}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function FilterItem({
-  checked,
-  onSelect,
-  children,
-}: {
-  checked: boolean;
-  onSelect: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <DropdownMenuItem
-      onSelect={(e) => {
-        e.preventDefault();
-        onSelect();
-      }}
-    >
-      <CheckboxBox checked={checked} tone="info" />
-      {children}
-    </DropdownMenuItem>
+      </MenuPopup>
+    </Menu>
   );
 }

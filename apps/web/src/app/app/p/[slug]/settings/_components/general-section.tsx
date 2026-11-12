@@ -1,15 +1,30 @@
 "use client";
 
-import { Swatch } from "@/components/ui/swatch";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
+import { ColorSwatchGroup } from "@/components/color-swatch-group";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CardPanel } from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { toastManager } from "@/components/ui/toast";
 import { DEFAULT_PROJECT_COLOR, PROJECT_COLORS } from "@/lib/palette";
 import { api } from "@/trpc/react";
 import { Section } from "./section";
+import { SectionFooter } from "./section-footer";
+
+const COLOR_OPTIONS = PROJECT_COLORS.map((c) => ({
+  value: c,
+  label: `Color ${c}`,
+  color: c,
+}));
 
 export function GeneralSection({
   projectId,
@@ -38,13 +53,13 @@ export function GeneralSection({
 
   const update = api.project.update.useMutation({
     onSuccess: async () => {
-      toast.success("Project updated");
+      toastManager.add({ type: "success", title: "Project updated" });
       await Promise.all([
         utils.project.bySlug.invalidate({ slug }),
         utils.project.list.invalidate(),
       ]);
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => toastManager.add({ type: "error", title: err.message }),
   });
 
   const keyChanged = !!project && isOwner && key !== project.key;
@@ -57,40 +72,35 @@ export function GeneralSection({
 
   return (
     <Section
-      description="The basics — name, description, and a color to spot it in lists."
+      description="The basics: name, description, and a color to spot it in lists."
       id="general"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!canWrite) return;
+        update.mutate({
+          projectId,
+          name: name.trim() || undefined,
+          key: keyChanged ? key : undefined,
+          description: description.trim() ? description.trim() : null,
+          color,
+        });
+      }}
       title="General"
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!canWrite) return;
-          update.mutate({
-            projectId,
-            name: name.trim() || undefined,
-            key: keyChanged ? key : undefined,
-            description: description.trim() ? description.trim() : null,
-            color,
-          });
-        }}
-      >
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-name">Name</Label>
+      <CardPanel className="flex flex-col gap-5">
+        <Field disabled={!canWrite} name="name">
+          <FieldLabel>Name</FieldLabel>
           <Input
-            disabled={!canWrite}
-            id="settings-name"
             onChange={(e) => setName(e.target.value)}
             required
             value={name}
           />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-key">Ticket key</Label>
+          <FieldError>Give the project a name.</FieldError>
+        </Field>
+        <Field disabled={!isOwner} name="key">
+          <FieldLabel>Ticket key</FieldLabel>
           <Input
-            className="font-mono uppercase"
-            disabled={!isOwner}
-            id="settings-key"
+            className="max-w-40 font-mono uppercase"
             maxLength={10}
             onChange={(e) =>
               setKey(
@@ -102,56 +112,48 @@ export function GeneralSection({
             }
             value={key}
           />
-          <p className="text-xs text-white/40">
+          <FieldDescription>
             Prefix for ticket ids like{" "}
             <span className="font-mono">{key || "KEY"}-123</span>.{" "}
             {isOwner
               ? "Renaming it changes how new mentions read; existing ticket numbers keep their value."
               : "Only the project owner can change this."}
-          </p>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="settings-description">Description</Label>
+          </FieldDescription>
+        </Field>
+        <Field disabled={!canWrite} name="description">
+          <FieldLabel>Description</FieldLabel>
           <Textarea
-            disabled={!canWrite}
-            id="settings-description"
             onChange={(e) => setDescription(e.target.value)}
             value={description}
           />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label>Color</Label>
-          <div className="flex flex-wrap gap-2">
-            {PROJECT_COLORS.map((c) => {
-              const active = (color ?? DEFAULT_PROJECT_COLOR) === c;
-              return (
-                <Swatch
-                  aria-label={`Color ${c}`}
-                  className="size-7"
-                  color={c}
-                  disabled={!canWrite}
-                  key={c}
-                  onClick={() => setColor(c)}
-                  selected={active}
-                />
-              );
-            })}
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <Button
-            disabled={!canWrite || !dirty || update.isPending}
-            type="submit"
-          >
-            {update.isPending ? "Saving…" : "Save changes"}
-          </Button>
-        </div>
-        {!canWrite ? (
-          <p className="text-xs text-white/70">
-            Read-only — viewers can&apos;t edit project details.
-          </p>
-        ) : null}
-      </form>
+        </Field>
+        <Fieldset className="flex flex-col gap-2" disabled={!canWrite}>
+          <FieldsetLegend className="text-sm font-medium">Color</FieldsetLegend>
+          <ColorSwatchGroup
+            aria-label="Project color"
+            disabled={!canWrite}
+            onValueChange={setColor}
+            options={COLOR_OPTIONS}
+            value={color ?? DEFAULT_PROJECT_COLOR}
+          />
+        </Fieldset>
+      </CardPanel>
+      <SectionFooter
+        hint={
+          canWrite
+            ? undefined
+            : "Read-only: viewers can't edit project details."
+        }
+      >
+        <Button
+          disabled={!canWrite || !dirty}
+          loading={update.isPending}
+          size="sm"
+          type="submit"
+        >
+          Save changes
+        </Button>
+      </SectionFooter>
     </Section>
   );
 }

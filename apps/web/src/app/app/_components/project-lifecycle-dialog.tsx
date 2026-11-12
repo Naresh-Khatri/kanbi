@@ -1,18 +1,19 @@
 "use client";
 
-import { Archive, PauseCircle } from "lucide-react";
 import { useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export type ProjectLifecycleAction = "on_hold" | "archived";
 
@@ -56,93 +57,58 @@ export function ProjectLifecycleDialog({
       try {
         window.localStorage.setItem(DISMISS_KEY[currentAction], "1");
       } catch {
-        // The confirmation can still proceed if browser storage is unavailable.
+        // storage unavailable -> still proceed
       }
     }
-
     onConfirm(currentAction);
   }
 
   return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {isArchiving ? (
-              <Archive className="size-4 text-white/40" aria-hidden />
-            ) : (
-              <PauseCircle className="size-4 text-white/40" aria-hidden />
-            )}
+    <AlertDialog onOpenChange={onOpenChange} open>
+      <AlertDialogPopup>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
             {isArchiving ? "Archive project?" : "Move project to On hold?"}
-          </DialogTitle>
-          <DialogDescription className="text-pretty">
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-pretty">
             {isArchiving ? (
               <>
-                <strong className="font-medium text-white">
+                <strong className="text-foreground font-medium">
                   {projectName}
                 </strong>{" "}
-                will leave your Home view, project picker, task search, and
-                Focus app. Nothing is deleted.
+                leaves Home, the project switcher, search and the Focus app. Nothing is
+                deleted; restore it any time from Archived projects.
               </>
             ) : (
               <>
-                <strong className="font-medium text-white">
+                <strong className="text-foreground font-medium">
                   {projectName}
                 </strong>{" "}
-                will move into the collapsed{" "}
-                <strong className="font-medium text-white">On hold</strong>{" "}
-                section on Home. It stays available in the project picker.
+                moves into the collapsed On hold section on Home. Reactivate it
+                from the project menu.
               </>
             )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <p className="text-sm leading-relaxed text-white/70">
-          {isArchiving ? (
-            <>
-              To access it again, open your user menu and choose{" "}
-              <strong className="font-medium text-white/70">
-                Archived projects
-              </strong>
-              , then restore it.
-            </>
-          ) : (
-            <>
-              Expand{" "}
-              <strong className="font-medium text-white/70">On hold</strong> on
-              Home to open it, or reactivate it from the project menu.
-            </>
-          )}
-        </p>
-
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-white/70">
-          <Checkbox
-            checked={dontShowAgain}
-            onCheckedChange={setDontShowAgain}
-          />
-          Don&apos;t show this again
-        </label>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
+          </AlertDialogDescription>
+          <Label className="text-muted-foreground mt-2 font-normal">
+            <Checkbox
+              checked={dontShowAgain}
+              onCheckedChange={(checked) => setDontShowAgain(checked)}
+            />
+            Don&apos;t ask again
+          </Label>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogClose
             disabled={isPending}
-            onClick={() => onOpenChange(false)}
+            render={<Button variant="ghost" />}
           >
             Cancel
+          </AlertDialogClose>
+          <Button loading={isPending} onClick={confirm}>
+            {isArchiving ? "Archive project" : "Move to On hold"}
           </Button>
-          <Button type="button" disabled={isPending} onClick={confirm}>
-            {isPending
-              ? isArchiving
-                ? "Archiving…"
-                : "Moving…"
-              : isArchiving
-                ? "Archive project"
-                : "Move to On hold"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </AlertDialogFooter>
+      </AlertDialogPopup>
+    </AlertDialog>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
+import { CardPanel } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { toastManager } from "@/components/ui/toast";
 import { api } from "@/trpc/react";
 import { Section } from "./section";
 
@@ -19,7 +21,7 @@ export function NotificationsSection({ projectId }: { projectId: string }) {
   const setDigest = api.project.setDigestEmail.useMutation({
     onSuccess: () => utils.project.notificationPrefs.invalidate({ projectId }),
     onError: (e) => {
-      toast.error(e.message);
+      toastManager.add({ type: "error", title: e.message });
       if (prefs.data) setEnabled(prefs.data.digestEmail);
     },
   });
@@ -37,20 +39,17 @@ export function NotificationsSection({ projectId }: { projectId: string }) {
       id="notifications"
       title="Notifications"
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-col">
-          <span className="text-sm text-white">Weekly digest email</span>
-          <span className="text-xs text-white/40">
-            An AI summary of the week&apos;s activity, sent once a week.
+      <CardPanel>
+        <Label className="has-data-checked:bg-accent/50 flex items-center justify-between gap-6 rounded-lg border p-4">
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Weekly digest email</span>
+            <span className="text-muted-foreground text-xs font-normal">
+              An AI summary of the week&apos;s activity, sent once a week.
+            </span>
           </span>
-        </div>
-        <Switch
-          aria-label="Weekly digest email"
-          checked={enabled}
-          disabled={busy}
-          onCheckedChange={toggle}
-        />
-      </div>
+          <Switch checked={enabled} disabled={busy} onCheckedChange={toggle} />
+        </Label>
+      </CardPanel>
     </Section>
   );
 }

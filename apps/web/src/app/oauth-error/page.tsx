@@ -1,8 +1,16 @@
+import { ShieldAlertIcon } from "lucide-react";
 import Link from "next/link";
 
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
-import { Wordmark } from "@/components/ui/logo";
-import { PageTitle } from "@/components/ui/surface";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 type OAuthErrorPageProps = {
   searchParams: Promise<{
@@ -25,27 +33,27 @@ export default async function OAuthErrorPage({
     "Kanbi could not complete the authorization request.";
 
   return (
-    <main className="bg-marketing flex min-h-screen items-center justify-center px-6 text-white">
-      <div className="flex w-full max-w-sm flex-col gap-5 text-center">
-        <Link className="mx-auto" href="/">
-          <Wordmark />
-        </Link>
-
-        <div className="flex flex-col gap-2">
-          <PageTitle>Authorization failed</PageTitle>
-          <p className="text-sm text-white/70">{description}</p>
-          <code className="text-xs text-white/40">{error}</code>
-        </div>
-
-        <div className="flex justify-center gap-3">
-          <Button asChild shape="pill">
-            <Link href="/docs/mcp">View setup guide</Link>
+    <AuthShell>
+      <Empty className="max-w-md">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <ShieldAlertIcon aria-hidden="true" />
+          </EmptyMedia>
+          <EmptyTitle>Authorization failed</EmptyTitle>
+          <EmptyDescription>{description}</EmptyDescription>
+          <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-muted-foreground text-xs">
+            {error}
+          </code>
+        </EmptyHeader>
+        <EmptyContent className="flex-row justify-center">
+          <Button render={<Link href="/docs/mcp" />} size="lg">
+            View setup guide
           </Button>
-          <Button asChild shape="pill" variant="outline">
-            <Link href="/app">Back to app</Link>
+          <Button render={<Link href="/app" />} size="lg" variant="outline">
+            Back to app
           </Button>
-        </div>
-      </div>
-    </main>
+        </EmptyContent>
+      </Empty>
+    </AuthShell>
   );
 }

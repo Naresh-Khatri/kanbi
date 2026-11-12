@@ -1,16 +1,24 @@
 "use client";
 
+import { MailCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { AuthShell } from "@/components/auth/auth-shell";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Wordmark } from "@/components/ui/logo";
+import { toastManager } from "@/components/ui/toast";
 import { authClient } from "@/server/better-auth/client";
-import { PageSubtitle, PageTitle } from "@/components/ui/surface";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -26,7 +34,10 @@ export default function ForgotPasswordPage() {
     });
     setPending(false);
     if (res.error) {
-      toast.error(res.error.message ?? "Could not send reset email");
+      toastManager.add({
+        type: "error",
+        title: res.error.message ?? "Could not send reset email",
+      });
       return;
     }
     setSent(true);
@@ -35,39 +46,48 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell>
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link href="/">
-          <Wordmark />
-        </Link>
-        <div className="flex flex-col gap-1">
-          <PageTitle>Forgot your password?</PageTitle>
-          <PageSubtitle>
-            Enter your email and we&apos;ll send you a reset link.
-          </PageSubtitle>
-        </div>
-        {sent ? (
-          <p className="rounded-md border border-white/10 bg-white/5 p-3 text-sm text-white">
-            If an account exists for {email}, a reset link is on its way.
-          </p>
-        ) : (
-          <form className="flex flex-col gap-3" onSubmit={onSubmit}>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                autoComplete="email"
-                id="email"
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                type="email"
-                value={email}
-              />
-            </div>
-            <Button disabled={pending} type="submit">
-              {pending ? "Sending…" : "Send reset link"}
-            </Button>
-          </form>
-        )}
-        <p className="text-center text-sm text-white/70">
-          <Link className="text-white underline" href="/login">
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">Forgot your password?</CardTitle>
+            <CardDescription>
+              Enter your email and we&apos;ll send you a reset link.
+            </CardDescription>
+          </CardHeader>
+          <CardPanel>
+            {sent ? (
+              <Alert variant="success">
+                <MailCheckIcon aria-hidden="true" />
+                <AlertTitle>Check your inbox</AlertTitle>
+                <AlertDescription>
+                  If an account exists for {email}, a reset link is on its way.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Form className="flex flex-col gap-4" onSubmit={onSubmit}>
+                <Field name="email">
+                  <FieldLabel>Email</FieldLabel>
+                  <Input
+                    autoComplete="email"
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    required
+                    size="lg"
+                    type="email"
+                    value={email}
+                  />
+                </Field>
+                <Button className="mt-2 w-full" loading={pending} size="lg" type="submit">
+                  Send reset link
+                </Button>
+              </Form>
+            )}
+          </CardPanel>
+        </Card>
+        <p className="text-center text-muted-foreground text-sm">
+          <Link
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+            href="/login"
+          >
             Back to sign in
           </Link>
         </p>

@@ -1,81 +1,119 @@
 "use client";
 
-import * as TabsPrimitive from "@radix-ui/react-tabs";
-import { cva, type VariantProps } from "class-variance-authority";
+import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import * as React from "react";
-
 import { cn } from "@/lib/utils";
+import {
+  type SegmentedControlSize,
+  segmentedControlIndicatorSurfaceClassName,
+  segmentedControlItemLayoutClassName,
+  segmentedControlItemSizeClassNames,
+} from "@/components/ui/segmented-control";
 
-const segmentBase = cva(
-  "inline-flex items-center justify-center gap-1.5 rounded-md whitespace-nowrap text-white/40 transition hover:bg-white/5 hover:text-white/70 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      size: {
-        "2xs": "text-2xs h-auto px-1.5 py-0.5",
-        xs: "h-7 px-2 text-xs",
-        sm: "h-8 px-2.5 text-xs",
-      },
-      tone: {
-        quiet: "",
-        nav: "text-white/70 hover:text-white",
-      },
-      active: {
-        true: "bg-white/10 text-white hover:bg-white/10 hover:text-white",
-      },
-    },
-    defaultVariants: { size: "sm" },
-  },
-);
+type TabsVariant = "default" | "underline";
+type TabsSize = SegmentedControlSize;
 
-// shared by Radix tabs, segmented buttons and route nav links; merged so active text beats base
-export const segmentVariants = ({
+const TabsListContext: React.Context<TabsSize> =
+  React.createContext<TabsSize>("default");
+
+export function Tabs({
   className,
   ...props
-}: VariantProps<typeof segmentBase> & { className?: string } = {}) =>
-  cn(segmentBase(props), className);
+}: TabsPrimitive.Root.Props): React.ReactElement {
+  return (
+    <TabsPrimitive.Root
+      className={cn(
+        "flex flex-col gap-2 data-[orientation=vertical]:flex-row",
+        className,
+      )}
+      data-slot="tabs"
+      {...props}
+    />
+  );
+}
 
-// tray behind segmented buttons
-export const segmentGroup =
-  "inline-flex w-fit items-center gap-0.5 rounded-lg bg-white/5 p-0.5";
+export function TabsList({
+  variant = "default",
+  size = "default",
+  className,
+  children,
+  ...props
+}: TabsPrimitive.List.Props & {
+  size?: TabsSize;
+  variant?: TabsVariant;
+}): React.ReactElement {
+  return (
+    <TabsPrimitive.List
+      className={cn(
+        "relative z-0 flex w-fit items-center justify-center gap-x-0.5 text-muted-foreground",
+        "data-[orientation=vertical]:flex-col",
+        variant === "default"
+          ? "rounded-lg bg-muted p-0.5 text-muted-foreground/72"
+          : "data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:hover:bg-accent",
+        className,
+      )}
+      data-size={size}
+      data-slot="tabs-list"
+      {...props}
+    >
+      <TabsListContext.Provider value={size}>
+        {children}
+      </TabsListContext.Provider>
+      <TabsPrimitive.Indicator
+        className={cn(
+          "absolute bottom-0 left-0 h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) -translate-y-(--active-tab-bottom) transition-[width,translate] duration-200 ease-in-out motion-reduce:transition-none",
+          variant === "underline"
+            ? "z-10 bg-primary data-[orientation=horizontal]:h-0.5 data-[orientation=vertical]:w-0.5 data-[orientation=vertical]:-translate-x-px data-[orientation=horizontal]:translate-y-px"
+            : cn("-z-1", segmentedControlIndicatorSurfaceClassName),
+        )}
+        data-slot="tab-indicator"
+      />
+    </TabsPrimitive.List>
+  );
+}
 
-export const Tabs = TabsPrimitive.Root;
+export function TabsTab({
+  className,
+  size,
+  ...props
+}: TabsPrimitive.Tab.Props & {
+  size?: TabsSize;
+}): React.ReactElement {
+  const contextSize: TabsSize = React.useContext(TabsListContext);
+  const resolvedSize: TabsSize = size ?? contextSize;
 
-export const TabsList = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    className={cn("inline-flex items-center justify-start gap-1", className)}
-    ref={ref}
-    {...props}
-  />
-));
-TabsList.displayName = "TabsList";
+  return (
+    <TabsPrimitive.Tab
+      className={cn(
+        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base outline-none transition-[color,background-color,box-shadow] hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64 sm:text-sm",
+        segmentedControlItemLayoutClassName,
+        segmentedControlItemSizeClassNames[resolvedSize],
+        className,
+      )}
+      data-size={resolvedSize}
+      data-slot="tabs-tab"
+      {...props}
+    />
+  );
+}
 
-export const TabsTrigger = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    className={cn(
-      segmentVariants({ size: "sm" }),
-      "data-[state=active]:bg-white/10 data-[state=active]:text-white",
-      className,
-    )}
-    ref={ref}
-    {...props}
-  />
-));
-TabsTrigger.displayName = "TabsTrigger";
+export function TabsPanel({
+  className,
+  ...props
+}: TabsPrimitive.Panel.Props): React.ReactElement {
+  return (
+    <TabsPrimitive.Panel
+      className={cn("flex-1 outline-none", className)}
+      data-slot="tabs-content"
+      {...props}
+    />
+  );
+}
 
-export const TabsContent = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content
-    className={cn("mt-3", className)}
-    ref={ref}
-    {...props}
-  />
-));
-TabsContent.displayName = "TabsContent";
+export {
+  TabsPrimitive,
+  TabsTab as TabsTrigger,
+  TabsPanel as TabsContent,
+  type TabsSize,
+  type TabsVariant,
+};

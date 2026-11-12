@@ -1,16 +1,25 @@
 "use client";
 
 import { formatRelative } from "@kanbi/shared";
-import { ArchiveRestore, Trash2 } from "lucide-react";
+import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Drawer,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerPanel,
+  DrawerPopup,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/trpc/react";
 import { type Priority, PriorityIcon } from "../priority";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
@@ -56,75 +65,94 @@ export function ArchivePanel({
   });
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Archived tasks</DialogTitle>
-          <DialogDescription>
+    <Drawer onOpenChange={onOpenChange} open={open} position="right">
+      <DrawerPopup showCloseButton variant="inset">
+        <DrawerHeader>
+          <DrawerTitle>Archived tasks</DrawerTitle>
+          <DrawerDescription>
             {tasks.length === 0
               ? "Nothing archived."
               : `${tasks.length} archived ${
                   tasks.length === 1 ? "task" : "tasks"
                 }. Restore puts a task back in its column.`}
-          </DialogDescription>
-        </DialogHeader>
-        {tasks.length > 0 ? (
-          <ul className="-mr-2 flex max-h-96 flex-col gap-1 overflow-y-auto pr-2">
-            {tasks.map((t) => (
-              <li
-                className="flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2"
-                key={t.id}
-              >
-                <PriorityIcon
-                  className="h-3.5 w-3.5 shrink-0"
-                  priority={t.priority as Priority}
-                />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm text-white">{t.title}</span>
-                  <span className="truncate text-xs text-white/40">
-                    {columnNameById.get(t.columnId) ?? "—"}
-                    {t.archivedAt
-                      ? ` · archived ${formatRelative(t.archivedAt)}`
-                      : ""}
-                  </span>
-                </div>
-                {canWrite ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      onClick={() =>
-                        restore.mutate({
-                          boardId,
-                          taskId: t.id,
-                          archived: false,
-                        })
-                      }
-                      size="sm"
-                      variant="outline"
-                    >
-                      <ArchiveRestore className="h-3.5 w-3.5" /> Restore
-                    </Button>
-                    <Button
-                      aria-label="Delete permanently"
-                      onClick={() =>
-                        void removeTask({
-                          kind: "task",
-                          id: t.id,
-                          name: t.title,
-                        })
-                      }
-                      size="icon-sm"
-                      type="button"
-                      variant="quiet"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+          </DrawerDescription>
+        </DrawerHeader>
+        <DrawerPanel>
+          {tasks.length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ArchiveIcon aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No archived tasks</EmptyTitle>
+                <EmptyDescription>
+                  Archived tasks land here instead of being deleted.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <ul className="bg-card flex flex-col divide-y rounded-xl border">
+              {tasks.map((t) => (
+                <li className="flex items-center gap-3 px-3 py-2" key={t.id}>
+                  <PriorityIcon
+                    className="size-3.5 shrink-0"
+                    priority={t.priority as Priority}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm">{t.title}</span>
+                    <span className="text-muted-foreground truncate text-xs">
+                      {columnNameById.get(t.columnId) ?? "—"}
+                      {t.archivedAt
+                        ? ` · archived ${formatRelative(t.archivedAt)}`
+                        : ""}
+                    </span>
                   </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+                  {canWrite ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        onClick={() =>
+                          restore.mutate({
+                            boardId,
+                            taskId: t.id,
+                            archived: false,
+                          })
+                        }
+                        size="xs"
+                        variant="outline"
+                      >
+                        <ArchiveRestoreIcon aria-hidden="true" /> Restore
+                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              aria-label="Delete permanently"
+                              className="text-muted-foreground hover:text-destructive-foreground"
+                              onClick={() =>
+                                void removeTask({
+                                  kind: "task",
+                                  id: t.id,
+                                  name: t.title,
+                                })
+                              }
+                              size="icon-xs"
+                              type="button"
+                              variant="ghost"
+                            />
+                          }
+                        >
+                          <Trash2Icon aria-hidden="true" />
+                        </TooltipTrigger>
+                        <TooltipPopup>Delete permanently</TooltipPopup>
+                      </Tooltip>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </DrawerPanel>
+      </DrawerPopup>
+    </Drawer>
   );
 }
