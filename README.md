@@ -98,7 +98,7 @@ pnpm format:write   # prettier
 
 pnpm db:push        # push the Drizzle schema (the dev workflow)
 pnpm db:generate    # generate a migration
-pnpm db:migrate     # run migrations
+pnpm db:migrate     # run migrations (production applies them automatically on boot)
 pnpm db:studio      # Drizzle Studio
 ```
 

@@ -19,7 +19,7 @@ pnpm format:write     # prettier (has tailwind class sorting plugin)
 
 pnpm db:push          # push Drizzle schema to Postgres (dev workflow)
 pnpm db:generate      # generate migration files
-pnpm db:migrate       # run migrations
+pnpm db:migrate       # run migrations (prod applies them on boot via src/instrumentation.ts)
 pnpm db:studio        # Drizzle Studio
 ```
 
