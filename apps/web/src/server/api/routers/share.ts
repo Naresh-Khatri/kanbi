@@ -13,12 +13,13 @@ import {
   board,
   boardColumn,
   boardShare,
+  checklistItem,
   label,
   project,
   task,
   taskLabel,
+  user,
 } from "@/server/db/schema";
-import { taskReadColumns } from "@/server/tasks/columns";
 
 export const shareRouter = createTRPCRouter({
   list: boardProcedure.query(({ ctx, input }) =>
@@ -85,8 +86,10 @@ export const shareRouter = createTRPCRouter({
       const boardRow = await ctx.db
         .select({
           id: board.id,
-          projectId: board.projectId,
           projectName: project.name,
+          projectDescription: project.description,
+          projectKey: project.key,
+          projectColor: project.color,
         })
         .from(board)
         .innerJoin(project, eq(project.id, board.projectId))
@@ -94,32 +97,84 @@ export const shareRouter = createTRPCRouter({
         .limit(1);
       if (!boardRow[0]) return { status: "not_found" as const };
 
-      const [columns, tasks, labels, taskLabels] = await Promise.all([
-        ctx.db
-          .select()
-          .from(boardColumn)
-          .where(eq(boardColumn.boardId, hit.boardId))
-          .orderBy(asc(boardColumn.position)),
-        ctx.db
-          .select(taskReadColumns)
-          .from(task)
-          .where(eq(task.boardId, hit.boardId))
-          .orderBy(asc(task.position)),
-        ctx.db.select().from(label).where(eq(label.boardId, hit.boardId)),
-        ctx.db
-          .select({ taskId: taskLabel.taskId, labelId: taskLabel.labelId })
-          .from(taskLabel)
-          .innerJoin(task, eq(task.id, taskLabel.taskId))
-          .where(eq(task.boardId, hit.boardId)),
-      ]);
+      // explicit public allowlist: no emails, reporter, estimates or archived work
+      const [columns, tasks, labels, taskLabels, checklist, assignees] =
+        await Promise.all([
+          ctx.db
+            .select({
+              id: boardColumn.id,
+              name: boardColumn.name,
+              color: boardColumn.color,
+              category: boardColumn.category,
+            })
+            .from(boardColumn)
+            .where(eq(boardColumn.boardId, hit.boardId))
+            .orderBy(asc(boardColumn.position)),
+          ctx.db
+            .select({
+              id: task.id,
+              columnId: task.columnId,
+              number: task.number,
+              title: task.title,
+              description: task.description,
+              priority: task.priority,
+              assigneeId: task.assigneeId,
+              dueAt: task.dueAt,
+              createdAt: task.createdAt,
+              updatedAt: task.updatedAt,
+            })
+            .from(task)
+            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
+            .orderBy(asc(task.position)),
+          ctx.db
+            .select({ id: label.id, name: label.name, color: label.color })
+            .from(label)
+            .where(eq(label.boardId, hit.boardId)),
+          ctx.db
+            .select({ taskId: taskLabel.taskId, labelId: taskLabel.labelId })
+            .from(taskLabel)
+            .innerJoin(task, eq(task.id, taskLabel.taskId))
+            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt))),
+          ctx.db
+            .select({
+              id: checklistItem.id,
+              taskId: checklistItem.taskId,
+              text: checklistItem.text,
+              done: checklistItem.done,
+            })
+            .from(checklistItem)
+            .innerJoin(task, eq(task.id, checklistItem.taskId))
+            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
+            .orderBy(asc(checklistItem.position)),
+          ctx.db
+            .selectDistinct({ id: user.id, name: user.name, image: user.image })
+            .from(user)
+            .innerJoin(task, eq(task.assigneeId, user.id))
+            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt))),
+        ]);
+
+      const updatedAt = tasks.reduce<Date | null>(
+        (max, t) =>
+          t.updatedAt && (!max || t.updatedAt > max) ? t.updatedAt : max,
+        null,
+      );
 
       return {
         status: "ok" as const,
         board: boardRow[0],
+        expiresAt: hit.expiresAt,
+        updatedAt,
         columns,
         tasks,
         labels,
         taskLabels,
+        checklist,
+        // first name only - public page shouldn't publish full names
+        assignees: assignees.map((a) => ({
+          id: a.id,
+          name: a.name.trim().split(/\s+/)[0] ?? "",
+          image: a.image,
+        })),
       };
     }),
 

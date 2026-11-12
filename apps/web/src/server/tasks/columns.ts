@@ -4,5 +4,5 @@ import { task } from "@/server/db/schema";
 
 const { sourceText: _sourceText, ...taskReadColumns } = getTableColumns(task);
 
-/** Task columns safe for board and public-share payloads. */
+/** Task columns safe for board payloads (public share uses its own allowlist). */
 export { taskReadColumns };
