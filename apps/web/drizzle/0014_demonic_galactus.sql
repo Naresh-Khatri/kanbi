@@ -1,0 +1,1 @@
+ALTER TABLE "kanbi_board_share" ADD COLUMN "include_images" boolean DEFAULT false NOT NULL;

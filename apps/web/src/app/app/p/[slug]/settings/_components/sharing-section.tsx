@@ -20,6 +20,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectItem,
@@ -27,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toastManager } from "@/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/trpc/react";
@@ -54,6 +56,7 @@ export function SharingSection({
     api.share.list.useQuery({ boardId }, { enabled: isOwner }).data ?? [];
   const [expiry, setExpiry] = useState("never");
   const [maxUses, setMaxUses] = useState("");
+  const [includeImages, setIncludeImages] = useState(true);
   const create = api.share.create.useMutation({
     onSuccess: () => {
       setMaxUses("");
@@ -78,12 +81,13 @@ export function SharingSection({
       boardId,
       expiresAt: days != null ? new Date(Date.now() + days * DAY_MS) : null,
       maxUses: Number.isFinite(parsed) && parsed > 0 ? parsed : null,
+      includeImages,
     });
   }
 
   return (
     <Section
-      description="Generate a read-only public link. Anyone with the link can view the board, no sign-in needed."
+      description="Generate a read-only public link. Anyone with the link can view the board, no sign-in needed. Image attachments can be included; other files never are."
       id="sharing"
       title="Sharing"
     >
@@ -125,6 +129,13 @@ export function SharingSection({
                 type="number"
                 value={maxUses}
               />
+              <Label className="text-muted-foreground font-normal">
+                <Switch
+                  checked={includeImages}
+                  onCheckedChange={setIncludeImages}
+                />
+                Include images
+              </Label>
               <Button
                 loading={create.isPending}
                 onClick={generate}
@@ -204,6 +215,10 @@ export function SharingSection({
                           {s.expiresAt
                             ? `expires ${formatDate(s.expiresAt)}`
                             : "no expiry"}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {s.includeImages ? "images shared" : "no images"}
                         </span>
                         {expired ? (
                           <Badge size="sm" variant="error">

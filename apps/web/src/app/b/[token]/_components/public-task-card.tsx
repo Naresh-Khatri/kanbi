@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import {
   CalendarClockIcon,
   ChevronRightIcon,
+  ImageIcon,
   SquareCheckIcon,
 } from "lucide-react";
 
@@ -28,7 +29,7 @@ export function PublicTaskCard({
   /** position in its column -> entrance stagger */
   index?: number;
 }) {
-  const { task, labels, assignee, checklist, done, overdue } = view;
+  const { task, labels, assignee, checklist, images, done, overdue } = view;
   const checked = checklist.filter((c) => c.done).length;
 
   return (
@@ -120,6 +121,15 @@ export function PublicTaskCard({
           >
             <SquareCheckIcon aria-hidden="true" className="size-3" />
             {checked}/{checklist.length}
+          </span>
+        ) : null}
+        {images.length > 0 ? (
+          <span className="inline-flex items-center gap-1 tabular-nums">
+            <ImageIcon aria-hidden="true" className="size-3" />
+            {images.length}
+            <span className="sr-only">
+              {images.length === 1 ? "image" : "images"}
+            </span>
           </span>
         ) : null}
         {assignee ? (

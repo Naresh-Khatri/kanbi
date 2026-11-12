@@ -50,6 +50,7 @@ import {
   DONE_CATEGORIES,
   type PublicBoard,
   type PublicChecklistItem,
+  type PublicImage,
   type PublicLabel,
   type TaskView,
 } from "./public-types";
@@ -622,6 +623,15 @@ function useTaskViews(data: PublicBoard): TaskView[] {
       checklistByTask.set(c.taskId, list);
     }
 
+    const imagesByTask = new Map<string, PublicImage[]>();
+    for (const img of data.images) {
+      const list = imagesByTask.get(img.taskId) ?? [];
+      list.push(img);
+      imagesByTask.set(img.taskId, list);
+    }
+    const hiddenByTask = new Map(
+      data.hiddenFiles.map((h) => [h.taskId, h.count]),
+    );
 
     const out: TaskView[] = [];
     for (const task of data.tasks) {
@@ -637,6 +647,8 @@ function useTaskViews(data: PublicBoard): TaskView[] {
           ? (assigneeById.get(task.assigneeId) ?? null)
           : null,
         checklist: checklistByTask.get(task.id) ?? [],
+        images: imagesByTask.get(task.id) ?? [],
+        hiddenFiles: hiddenByTask.get(task.id) ?? 0,
         done,
         overdue: !done && task.dueAt != null && task.dueAt.getTime() < now,
       });

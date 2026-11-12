@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { shareToken } from "@/lib/ids";
+import { presignDownload } from "@/lib/r2";
 import {
   assertCanAdmin,
   boardProcedure,
@@ -17,9 +18,13 @@ import {
   label,
   project,
   task,
+  taskAttachment,
   taskLabel,
   user,
 } from "@/server/db/schema";
+
+// page never refetches -> outlive a normal visit
+const PUBLIC_IMAGE_TTL_S = 60 * 60;
 
 export const shareRouter = createTRPCRouter({
   list: boardProcedure.query(({ ctx, input }) =>
@@ -40,6 +45,7 @@ export const shareRouter = createTRPCRouter({
       z.object({
         expiresAt: z.date().nullable().optional(),
         maxUses: z.number().int().positive().nullable().optional(),
+        includeImages: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -52,6 +58,7 @@ export const shareRouter = createTRPCRouter({
           createdById: ctx.session.user.id,
           expiresAt: input.expiresAt ?? null,
           maxUses: input.maxUses ?? null,
+          includeImages: input.includeImages ?? true,
         })
         .returning();
       return row;
@@ -69,6 +76,7 @@ export const shareRouter = createTRPCRouter({
           revokedAt: boardShare.revokedAt,
           maxUses: boardShare.maxUses,
           usesCount: boardShare.usesCount,
+          includeImages: boardShare.includeImages,
         })
         .from(boardShare)
         .where(eq(boardShare.token, input.token))
@@ -98,60 +106,101 @@ export const shareRouter = createTRPCRouter({
       if (!boardRow[0]) return { status: "not_found" as const };
 
       // explicit public allowlist: no emails, reporter, estimates or archived work
-      const [columns, tasks, labels, taskLabels, checklist, assignees] =
-        await Promise.all([
-          ctx.db
-            .select({
-              id: boardColumn.id,
-              name: boardColumn.name,
-              color: boardColumn.color,
-              category: boardColumn.category,
-            })
-            .from(boardColumn)
-            .where(eq(boardColumn.boardId, hit.boardId))
-            .orderBy(asc(boardColumn.position)),
-          ctx.db
-            .select({
-              id: task.id,
-              columnId: task.columnId,
-              number: task.number,
-              title: task.title,
-              description: task.description,
-              priority: task.priority,
-              assigneeId: task.assigneeId,
-              dueAt: task.dueAt,
-              createdAt: task.createdAt,
-              updatedAt: task.updatedAt,
-            })
-            .from(task)
-            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
-            .orderBy(asc(task.position)),
-          ctx.db
-            .select({ id: label.id, name: label.name, color: label.color })
-            .from(label)
-            .where(eq(label.boardId, hit.boardId)),
-          ctx.db
-            .select({ taskId: taskLabel.taskId, labelId: taskLabel.labelId })
-            .from(taskLabel)
-            .innerJoin(task, eq(task.id, taskLabel.taskId))
-            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt))),
-          ctx.db
-            .select({
-              id: checklistItem.id,
-              taskId: checklistItem.taskId,
-              text: checklistItem.text,
-              done: checklistItem.done,
-            })
-            .from(checklistItem)
-            .innerJoin(task, eq(task.id, checklistItem.taskId))
-            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
-            .orderBy(asc(checklistItem.position)),
-          ctx.db
-            .selectDistinct({ id: user.id, name: user.name, image: user.image })
-            .from(user)
-            .innerJoin(task, eq(task.assigneeId, user.id))
-            .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt))),
-        ]);
+      const [
+        columns,
+        tasks,
+        labels,
+        taskLabels,
+        checklist,
+        assignees,
+        attachments,
+      ] = await Promise.all([
+        ctx.db
+          .select({
+            id: boardColumn.id,
+            name: boardColumn.name,
+            color: boardColumn.color,
+            category: boardColumn.category,
+          })
+          .from(boardColumn)
+          .where(eq(boardColumn.boardId, hit.boardId))
+          .orderBy(asc(boardColumn.position)),
+        ctx.db
+          .select({
+            id: task.id,
+            columnId: task.columnId,
+            number: task.number,
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            assigneeId: task.assigneeId,
+            dueAt: task.dueAt,
+            createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
+          })
+          .from(task)
+          .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
+          .orderBy(asc(task.position)),
+        ctx.db
+          .select({ id: label.id, name: label.name, color: label.color })
+          .from(label)
+          .where(eq(label.boardId, hit.boardId)),
+        ctx.db
+          .select({ taskId: taskLabel.taskId, labelId: taskLabel.labelId })
+          .from(taskLabel)
+          .innerJoin(task, eq(task.id, taskLabel.taskId))
+          .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt))),
+        ctx.db
+          .select({
+            id: checklistItem.id,
+            taskId: checklistItem.taskId,
+            text: checklistItem.text,
+            done: checklistItem.done,
+          })
+          .from(checklistItem)
+          .innerJoin(task, eq(task.id, checklistItem.taskId))
+          .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
+          .orderBy(asc(checklistItem.position)),
+        ctx.db
+          .selectDistinct({ id: user.id, name: user.name, image: user.image })
+          .from(user)
+          .innerJoin(task, eq(task.assigneeId, user.id))
+          .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt))),
+        ctx.db
+          .select({
+            id: taskAttachment.id,
+            taskId: taskAttachment.taskId,
+            key: taskAttachment.key,
+            filename: taskAttachment.filename,
+            mime: taskAttachment.mime,
+          })
+          .from(taskAttachment)
+          .innerJoin(task, eq(task.id, taskAttachment.taskId))
+          .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
+          .orderBy(asc(taskAttachment.createdAt)),
+      ]);
+
+      // non-images never leave the server; only a per-task count does
+      const shareable: typeof attachments = [];
+      const hiddenFiles = new Map<string, number>();
+      for (const a of attachments) {
+        if (hit.includeImages && a.mime.startsWith("image/")) shareable.push(a);
+        else hiddenFiles.set(a.taskId, (hiddenFiles.get(a.taskId) ?? 0) + 1);
+      }
+      // R2 down/unconfigured shouldn't take the whole board with it
+      const images = await Promise.all(
+        shareable.map(async (a) => ({
+          id: a.id,
+          taskId: a.taskId,
+          filename: a.filename,
+          url: await presignDownload({
+            key: a.key,
+            expiresIn: PUBLIC_IMAGE_TTL_S,
+          }).catch(() => null),
+        })),
+      ).then((rows) =>
+        rows.flatMap((r) => (r.url ? [{ ...r, url: r.url }] : [])),
+      );
 
       const updatedAt = tasks.reduce<Date | null>(
         (max, t) =>
@@ -169,6 +218,11 @@ export const shareRouter = createTRPCRouter({
         labels,
         taskLabels,
         checklist,
+        images,
+        hiddenFiles: [...hiddenFiles].map(([taskId, count]) => ({
+          taskId,
+          count,
+        })),
         // first name only - public page shouldn't publish full names
         assignees: assignees.map((a) => ({
           id: a.id,

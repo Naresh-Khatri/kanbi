@@ -28,6 +28,7 @@ import { toastManager } from "@/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
+import { PublicImageGallery } from "./public-image-gallery";
 import type { TaskView } from "./public-types";
 
 export function PublicTaskSheet({
@@ -155,6 +156,11 @@ function SheetBody({ view }: { view: TaskView }) {
             <RichTextContent className="text-sm" value={task.description} />
           </section>
         ) : null}
+
+        <PublicImageGallery
+          hiddenFiles={view.hiddenFiles}
+          images={view.images}
+        />
 
         {checklist.length > 0 ? (
           <section className="flex flex-col gap-2 border-t pt-4">

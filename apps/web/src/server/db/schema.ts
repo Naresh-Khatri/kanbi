@@ -763,6 +763,8 @@ export const boardShare = createTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     maxUses: integer("max_uses"),
     usesCount: integer("uses_count").notNull().default(0),
+    // false default -> links made before this column never widen exposure
+    includeImages: boolean("include_images").notNull().default(false),
     createdById: text("created_by_id")
       .notNull()
       .references(() => user.id),
