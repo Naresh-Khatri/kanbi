@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -97,4 +98,10 @@ export async function headObject(
     if (status === 404) return null;
     throw err;
   }
+}
+
+export async function deleteObject(key: string) {
+  await getR2().send(
+    new DeleteObjectCommand({ Bucket: env.R2_BUCKET!, Key: key }),
+  );
 }

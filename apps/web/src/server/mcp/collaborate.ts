@@ -5,7 +5,12 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { buildAttachmentKey, headObject, presignUpload } from "@/lib/r2";
+import {
+  buildAttachmentKey,
+  deleteObject,
+  headObject,
+  presignUpload,
+} from "@/lib/r2";
 import { db } from "@/server/db";
 import {
   checklistItem,
@@ -433,6 +438,8 @@ export function registerCollaborationTools(
           );
         }
         if (head.sizeBytes > MAX_ATTACHMENT_BYTES) {
+          // presigned PUT can't cap size; drop it so it doesn't linger
+          await deleteObject(key).catch(() => undefined);
           throw new McpUserError("File is larger than the 25 MB limit.");
         }
 
