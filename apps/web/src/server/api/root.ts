@@ -9,6 +9,7 @@ import { digestRouter } from "@/server/api/routers/digest";
 import { documentRouter } from "@/server/api/routers/document";
 import { focusRouter } from "@/server/api/routers/focus";
 import { labelRouter } from "@/server/api/routers/label";
+import { linkRouter } from "@/server/api/routers/link";
 import { notificationRouter } from "@/server/api/routers/notification";
 import { projectRouter } from "@/server/api/routers/project";
 import { realtimeRouter } from "@/server/api/routers/realtime";
@@ -42,6 +43,7 @@ export const appRouter = createTRPCRouter({
   notification: notificationRouter,
   device: deviceRouter,
   focus: focusRouter,
+  link: linkRouter,
 });
 
 export type AppRouter = typeof appRouter;

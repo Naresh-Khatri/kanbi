@@ -217,6 +217,9 @@ importers:
       drizzle-orm:
         specifier: ^0.41.0
         version: 0.41.0(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)
+      htmlparser2:
+        specifier: 10.1.0
+        version: 10.1.0
       lucide-react:
         specifier: ^1.8.0
         version: 1.14.0(react@19.2.7)
