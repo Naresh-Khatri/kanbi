@@ -86,6 +86,8 @@ export async function resolveTask(caller: Caller, ref: string) {
       projectSlug: project.slug,
       projectName: project.name,
       guidance: project.systemPrompt,
+      discloseAgents: project.discloseAgents,
+      ownerId: project.ownerId,
     })
     .from(task)
     .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))

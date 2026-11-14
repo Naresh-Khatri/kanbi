@@ -18,6 +18,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 import { getObjectBytes, presignDownload } from "@/lib/r2";
+import { discloseComment, seesAgent } from "@/server/activity/disclosure";
 import { db } from "@/server/db";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
 import {
@@ -483,6 +484,7 @@ export function registerWorkTools(
               db
                 .select({
                   id: comment.id,
+                  authorId: comment.authorId,
                   author: userTable.name,
                   createdAt: comment.createdAt,
                   body: comment.body,
@@ -502,6 +504,7 @@ export function registerWorkTools(
                   commentId: taskAttachment.commentId,
                   viaAgent: taskAttachment.viaAgent,
                   createdAt: taskAttachment.createdAt,
+                  uploaderId: taskAttachment.uploaderId,
                   uploader: userTable.name,
                 })
                 .from(taskAttachment)
@@ -551,6 +554,11 @@ export function registerWorkTools(
               truncated,
             };
           });
+          const viewer = {
+            userId: auth.userId,
+            canAdmin: t.ownerId === auth.userId,
+            discloseAgents: t.discloseAgents,
+          };
           const {
             images,
             imageNames,
@@ -558,18 +566,25 @@ export function registerWorkTools(
             labels: imageLabels,
           } = await loadImages(
             inlineOrder(
-              attachments.map((a) => ({
-                ...a,
-                isImage: IMAGE_MIMES.has(a.mime),
-                source: a.viaAgent
-                  ? `uploaded by ${a.viaAgent} (agent)`
-                  : a.commentId
-                    ? `in a comment by ${a.uploader}`
-                    : `attached by ${a.uploader}`,
-              })),
+              attachments.map((a) => {
+                const viaAgent = seesAgent(viewer, a.uploaderId)
+                  ? a.viaAgent
+                  : null;
+                return {
+                  ...a,
+                  viaAgent,
+                  isImage: IMAGE_MIMES.has(a.mime),
+                  source: viaAgent
+                    ? `uploaded by ${viaAgent} (agent)`
+                    : a.commentId
+                      ? `in a comment by ${a.uploader}`
+                      : `attached by ${a.uploader}`,
+                };
+              }),
             ),
           );
-          const ordered = comments.reverse().map((c) => {
+          const ordered = comments.reverse().map((raw) => {
+            const c = discloseComment(viewer, raw);
             const via = agentClientOf(c.body);
             const body = labelInlineImages(c.body, imageLabels);
             return {

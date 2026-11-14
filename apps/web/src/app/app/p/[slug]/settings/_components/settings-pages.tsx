@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { api } from "@/trpc/react";
+import { AgentDisclosureSection } from "./agent-disclosure-section";
 import { AiContextSection } from "./ai-context-section";
 import { DangerZoneSection } from "./danger-zone-section";
 import { GeneralSection } from "./general-section";
@@ -27,6 +28,9 @@ export function GeneralSettings({ slug }: { slug: string }) {
         projectId={project.id}
         slug={slug}
       />
+      {project.role === "owner" ? (
+        <AgentDisclosureSection projectId={project.id} slug={slug} />
+      ) : null}
       <DangerZoneSection
         isOwner={project.role === "owner"}
         projectId={project.id}

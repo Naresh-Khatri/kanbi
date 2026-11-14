@@ -1,6 +1,7 @@
 import { and, asc, eq, gt, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { discloseActivity } from "@/server/activity/disclosure";
 import { summarizeUpdates } from "@/server/activity/updates";
 import { boardProcedure, createTRPCRouter } from "@/server/api/trpc";
 import {
@@ -134,6 +135,7 @@ export const boardRouter = createTRPCRouter({
         taskId: sql<string>`${activity.taskId}`,
         verb: activity.verb,
         payload: activity.payload,
+        actorId: activity.actorId,
         createdAt: activity.createdAt,
       })
       .from(activity)
@@ -159,7 +161,7 @@ export const boardRouter = createTRPCRouter({
       .orderBy(sql`${activity.createdAt} desc`)
       .limit(UPDATES_ROW_LIMIT);
 
-    return summarizeUpdates(rows);
+    return summarizeUpdates(rows.map((r) => discloseActivity(ctx.access, r)));
   }),
 
   markSeen: boardProcedure

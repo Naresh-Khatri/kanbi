@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { extractFileIds } from "@/lib/file-url";
+import { discloseComment } from "@/server/activity/disclosure";
 import { recordActivity } from "@/server/activity/record";
 import {
   assertCanWrite,
@@ -79,7 +80,7 @@ export const commentRouter = createTRPCRouter({
     .input(z.object({ taskId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       await assertTaskOnBoard(ctx.db, input.taskId, input.boardId);
-      return ctx.db
+      const rows = await ctx.db
         .select({
           id: comment.id,
           taskId: comment.taskId,
@@ -94,6 +95,7 @@ export const commentRouter = createTRPCRouter({
         .innerJoin(userTable, eq(userTable.id, comment.authorId))
         .where(eq(comment.taskId, input.taskId))
         .orderBy(asc(comment.createdAt));
+      return rows.map((r) => discloseComment(ctx.access, r));
     }),
 
   create: boardProcedure

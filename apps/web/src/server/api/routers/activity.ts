@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { discloseActivity } from "@/server/activity/disclosure";
 import { boardProcedure, createTRPCRouter } from "@/server/api/trpc";
 import { activity, user as userTable } from "@/server/db/schema";
 
@@ -12,14 +13,15 @@ export const activityRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).default(100),
       }),
     )
-    .query(({ ctx, input }) =>
-      ctx.db
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db
         .select({
           id: activity.id,
           boardId: activity.boardId,
           taskId: activity.taskId,
           verb: activity.verb,
           payload: activity.payload,
+          actorId: activity.actorId,
           createdAt: activity.createdAt,
           actorName: userTable.name,
           actorImage: userTable.image,
@@ -35,6 +37,7 @@ export const activityRouter = createTRPCRouter({
             : eq(activity.boardId, input.boardId),
         )
         .orderBy(desc(activity.createdAt))
-        .limit(input.limit),
-    ),
+        .limit(input.limit);
+      return rows.map((r) => discloseActivity(ctx.access, r));
+    }),
 });

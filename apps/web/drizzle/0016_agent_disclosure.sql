@@ -1,0 +1,1 @@
+ALTER TABLE "kanbi_project" ADD COLUMN "disclose_agents" boolean DEFAULT false NOT NULL;

@@ -21,6 +21,7 @@ export type BoardAccess = {
   canRead: true;
   canWrite: boolean;
   canAdmin: boolean;
+  discloseAgents: boolean;
 };
 
 const ROLE_RANK: Record<ProjectRole, number> = {
@@ -43,6 +44,7 @@ export async function resolveBoardAccess(args: {
       projectId: board.projectId,
       ownerId: project.ownerId,
       projectStatus: project.status,
+      discloseAgents: project.discloseAgents,
       role: projectMember.role,
     })
     .from(board)
@@ -73,6 +75,7 @@ export async function resolveBoardAccess(args: {
     canRead: true,
     canWrite: hit.projectStatus !== "archived" && roleCan(role, "editor"),
     canAdmin: roleCan(role, "owner"),
+    discloseAgents: hit.discloseAgents,
   };
 }
 
@@ -89,9 +92,11 @@ export async function resolvePublicBoardAccess(args: {
       projectId: board.projectId,
       maxUses: boardShare.maxUses,
       usesCount: boardShare.usesCount,
+      discloseAgents: project.discloseAgents,
     })
     .from(boardShare)
     .innerJoin(board, eq(board.id, boardShare.boardId))
+    .innerJoin(project, eq(project.id, board.projectId))
     .where(
       and(
         eq(boardShare.token, args.shareToken),
@@ -118,6 +123,7 @@ export async function resolvePublicBoardAccess(args: {
     canRead: true,
     canWrite: false,
     canAdmin: false,
+    discloseAgents: hit.discloseAgents,
   };
 }
 

@@ -276,6 +276,8 @@ export const project = createTable(
     systemPrompt: text("system_prompt"),
     icon: text("icon"),
     color: text("color"),
+    // agent attribution is always stored; this only decides if teammates see it
+    discloseAgents: boolean("disclose_agents").notNull().default(false),
     status: projectStatus("status").notNull().default("active"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

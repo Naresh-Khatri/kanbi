@@ -231,6 +231,7 @@ export const projectRouter = createTRPCRouter({
           color: project.color,
           icon: project.icon,
           status: project.status,
+          discloseAgents: project.discloseAgents,
           ownerId: project.ownerId,
           boardId: board.id,
           role: sql<ProjectRole | null>`case when ${project.ownerId} = ${userId} then 'owner'::kanbi_project_role else ${projectMember.role} end`,
@@ -406,11 +407,18 @@ export const projectRouter = createTRPCRouter({
         color: z.string().nullable().optional(),
         icon: z.string().nullable().optional(),
         key: z.string().min(2).max(10).optional(),
+        discloseAgents: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.access.canWrite) throw new TRPCError({ code: "FORBIDDEN" });
       const { projectId, key, ...rest } = input;
+      if (rest.discloseAgents !== undefined && !ctx.access.canAdmin) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the project owner can change agent disclosure",
+        });
+      }
 
       let normalizedKey: string | undefined;
       if (key !== undefined) {
