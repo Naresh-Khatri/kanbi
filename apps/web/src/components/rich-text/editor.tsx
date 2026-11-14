@@ -38,8 +38,8 @@ import { cn } from "@/lib/utils";
 import {
   createImageExtension,
   IMAGE_MIME_TYPES,
-  imageFiles,
   insertImages,
+  pickImages,
 } from "./image";
 import { createLinkExtension } from "./link";
 import {
@@ -50,6 +50,7 @@ import {
   type MentionItem,
   type TicketMentionItem,
 } from "./mention";
+import { createSlashExtension } from "./slash";
 
 /** Shared prose styling so the editor and the read-only renderer look identical. */
 const RICH_TEXT_PROSE = cn(
@@ -144,6 +145,10 @@ export function RichTextEditor({
     [track],
   );
 
+  const headings = variant === "document" ? ALL_HEADINGS : SECTION_HEADING;
+  // set by the toolbar's link control; lets `/link` open it at the caret
+  const requestLink = React.useRef<(() => void) | null>(null);
+
   const extensions = React.useMemo(
     () => [
       StarterKit.configure({ link: false }),
@@ -169,8 +174,24 @@ export function RichTextEditor({
       ...(enableTickets
         ? [createTicketMentionExtension(() => ticketsRef.current)]
         : []),
+      createSlashExtension({
+        headings,
+        mentions: enableMentions,
+        tickets: enableTickets,
+        onLink: () => requestLink.current?.(),
+        onImage: enableUploads
+          ? (editor) => pickImages((files) => upload(editor, files))
+          : undefined,
+      }),
     ],
-    [placeholder, enableMentions, enableTickets, enableUploads, upload],
+    [
+      placeholder,
+      enableMentions,
+      enableTickets,
+      enableUploads,
+      upload,
+      headings,
+    ],
   );
 
   const editorRef = React.useRef<Editor | null>(null);
@@ -240,14 +261,15 @@ export function RichTextEditor({
   const toolbar = (
     <EditorToolbar
       editor={editor}
-      headings={variant === "document" ? [1, 2, 3] : [3]}
+      headings={headings}
       onLinkOpenChange={setLinkOpen}
+      requestLink={requestLink}
       onPickImages={
         enableUploads ? (files) => upload(editor, files) : undefined
       }
     />
   );
-  // hidden, not unmounted: file input + popover anchor must survive blur
+  // hidden, not unmounted: link popover must survive blur
   const revealed = cn("mt-1 px-1 pb-1", !editing && "hidden");
 
   if (variant === "document")
@@ -283,6 +305,9 @@ export function RichTextEditor({
 }
 
 type Level = 1 | 2 | 3;
+const ALL_HEADINGS: Level[] = [1, 2, 3];
+// comments/descriptions only get one heading size
+const SECTION_HEADING: Level[] = [3];
 const HEADING_ICON = {
   1: Heading1Icon,
   2: Heading2Icon,
@@ -294,11 +319,13 @@ function EditorToolbar({
   headings,
   onLinkOpenChange,
   onPickImages,
+  requestLink,
 }: {
   editor: Editor;
   headings: Level[];
   onLinkOpenChange?: (open: boolean) => void;
   onPickImages?: (files: File[]) => void;
+  requestLink?: React.RefObject<(() => void) | null>;
 }) {
   const active = useEditorState({
     editor,
@@ -321,7 +348,6 @@ function EditorToolbar({
       blockquote: e.isActive("blockquote"),
     }),
   });
-  const fileInput = React.useRef<HTMLInputElement>(null);
   const chain = () => editor.chain().focus();
 
   return (
@@ -392,6 +418,7 @@ function EditorToolbar({
           active={active.link}
           editor={editor}
           onOpenChange={onLinkOpenChange}
+          requestRef={requestLink}
         />
       </ToolbarGroup>
       <ToolbarSeparator orientation="vertical" />
@@ -425,37 +452,29 @@ function EditorToolbar({
             <FormatToggle
               active={false}
               label="Image (or paste / drop one)"
-              onClick={() => fileInput.current?.click()}
+              onClick={() => pickImages(onPickImages)}
             >
               <ImageIcon aria-hidden="true" />
             </FormatToggle>
           </ToolbarGroup>
-          <input
-            accept={IMAGE_MIME_TYPES.join(",")}
-            className="hidden"
-            multiple
-            onChange={(e) => {
-              const files = imageFiles(e.currentTarget.files);
-              e.currentTarget.value = "";
-              if (files.length > 0) onPickImages(files);
-            }}
-            ref={fileInput}
-            type="file"
-          />
         </>
       ) : null}
     </Toolbar>
   );
 }
 
+type VirtualAnchor = { getBoundingClientRect: () => DOMRect };
+
 function LinkControl({
   editor,
   active,
   onOpenChange,
+  requestRef,
 }: {
   editor: Editor;
   active: boolean;
   onOpenChange?: (open: boolean) => void;
+  requestRef?: React.RefObject<(() => void) | null>;
 }) {
   const [open, setOpenState] = React.useState(false);
   const setOpen = (next: boolean) => {
@@ -464,6 +483,25 @@ function LinkControl({
   };
   const [href, setHref] = React.useState("");
   const anchor = React.useRef<HTMLButtonElement>(null);
+  const [caret, setCaret] = React.useState<VirtualAnchor | null>(null);
+
+  const show = (at: VirtualAnchor | null) => {
+    setHref((editor.getAttributes("link").href as string | undefined) ?? "");
+    setCaret(at);
+    setOpen(true);
+  };
+
+  React.useEffect(() => {
+    if (!requestRef) return;
+    requestRef.current = () => {
+      const c = editor.view.coordsAtPos(editor.state.selection.from);
+      const rect = new DOMRect(c.left, c.top, 0, c.bottom - c.top);
+      show({ getBoundingClientRect: () => rect });
+    };
+    return () => {
+      requestRef.current = null;
+    };
+  });
 
   const apply = () => {
     const url = href.trim();
@@ -486,17 +524,12 @@ function LinkControl({
       <FormatToggle
         active={active}
         label="Link"
-        onClick={() => {
-          setHref(
-            (editor.getAttributes("link").href as string | undefined) ?? "",
-          );
-          setOpen(true);
-        }}
+        onClick={() => show(null)}
         ref={anchor}
       >
         <LinkIcon aria-hidden="true" />
       </FormatToggle>
-      <PopoverPopup align="start" anchor={anchor} className="w-72">
+      <PopoverPopup align="start" anchor={caret ?? anchor} className="w-72">
         <form
           className="flex gap-2"
           onSubmit={(e) => {

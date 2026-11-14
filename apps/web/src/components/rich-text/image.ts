@@ -44,6 +44,19 @@ export const IMAGE_MIME_TYPES = [
 export const imageFiles = (list: FileList | null | undefined) =>
   [...(list ?? [])].filter((f) => IMAGE_MIME_TYPES.includes(f.type));
 
+/** Opens the native image picker; detached input so it survives editor chrome hiding. */
+export function pickImages(onFiles: (files: File[]) => void) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = IMAGE_MIME_TYPES.join(",");
+  input.multiple = true;
+  input.onchange = () => {
+    const files = imageFiles(input.files);
+    if (files.length > 0) onFiles(files);
+  };
+  input.click();
+}
+
 function patchImage(editor: Editor, src: string, next: string | null) {
   if (editor.isDestroyed) return;
   const { tr } = editor.state;
