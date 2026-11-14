@@ -1,25 +1,32 @@
 "use client";
 
-import Placeholder from "@tiptap/extension-placeholder";
 import type { Editor } from "@tiptap/core";
-import { EditorContent, useEditor } from "@tiptap/react";
-import { BubbleMenu } from "@tiptap/react/menus";
+import FileHandler from "@tiptap/extension-file-handler";
+import Placeholder from "@tiptap/extension-placeholder";
+import { Markdown } from "@tiptap/markdown";
+import { Fragment, Slice } from "@tiptap/pm/model";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
   BoldIcon,
   CodeIcon,
   Heading1Icon,
   Heading2Icon,
+  Heading3Icon,
   ImageIcon,
   ItalicIcon,
   LinkIcon,
   ListIcon,
   ListOrderedIcon,
   QuoteIcon,
+  SquareCodeIcon,
   StrikethroughIcon,
   UnderlineIcon,
 } from "lucide-react";
 import * as React from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverPopup } from "@/components/ui/popover";
 import { Toggle } from "@/components/ui/toggle";
 import {
   Toolbar,
@@ -28,7 +35,12 @@ import {
   ToolbarSeparator,
 } from "@/components/ui/toolbar";
 import { cn } from "@/lib/utils";
-import { createImageExtension, imageFiles, insertImages } from "./image";
+import {
+  createImageExtension,
+  IMAGE_MIME_TYPES,
+  imageFiles,
+  insertImages,
+} from "./image";
 import {
   createMentionExtension,
   createMentionRenderExtension,
@@ -40,7 +52,7 @@ import {
 
 /** Shared prose styling so the editor and the read-only renderer look identical. */
 const RICH_TEXT_PROSE = cn(
-  "prose prose-sm dark:prose-invert max-w-none text-foreground",
+  "prose prose-sm dark:prose-invert text-foreground max-w-none",
   "prose-headings:my-2 prose-headings:text-foreground prose-strong:text-foreground prose-li:my-0 prose-ol:my-1 prose-p:my-1 prose-ul:my-1 prose-li:marker:text-muted-foreground",
   "prose-code:rounded-sm prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:text-foreground prose-code:text-xs prose-code:before:content-none prose-code:after:content-none",
   "prose-pre:border prose-pre:bg-muted prose-pre:text-foreground",
@@ -74,17 +86,21 @@ interface RichTextEditorProps {
   mentions?: MentionItem[];
   /** When provided, enables #-mention autocomplete against these tickets. */
   tickets?: TicketMentionItem[];
-  /** Long-form documents get a persistent toolbar; compact fields use a bubble menu. */
-  toolbar?: "bubble" | "document";
+  /**
+   * `box` = bordered field; `inline` = reads as plain text until focused;
+   * `document` = borderless page with a sticky toolbar.
+   */
+  variant?: "box" | "inline" | "document";
   /** Enables image paste/drop/pick; resolves to the stored image url. */
   uploadImage?: (file: File) => Promise<string>;
   /** Uploads in flight; block submit while > 0 (body still has blob: srcs). */
   onUploadingChange?: (count: number) => void;
-  ref?: React.Ref<RichTextEditorHandle>;
 }
 
-export type RichTextEditorHandle = { pickImages: () => void };
-
+/**
+ * The one rich-text editor: lean toolbar, markdown shortcuts and markdown
+ * paste, image drop/paste/pick. Stores sanitized HTML.
+ */
 export function RichTextEditor({
   value,
   onChange,
@@ -95,34 +111,21 @@ export function RichTextEditor({
   minHeight = "72px",
   mentions,
   tickets,
-  toolbar = "bubble",
+  variant = "box",
   uploadImage,
   onUploadingChange,
-  ref,
 }: RichTextEditorProps) {
   // Keep mention/ticket items fresh (they load async) without re-creating the
   // editor: each extension reads through its ref on every query.
   const enableMentions = mentions !== undefined;
   const mentionsRef = React.useRef<MentionItem[]>(mentions ?? []);
   mentionsRef.current = mentions ?? [];
-  const mentionExtension = React.useMemo(
-    () =>
-      enableMentions ? createMentionExtension(() => mentionsRef.current) : null,
-    [enableMentions],
-  );
-
   const enableTickets = tickets !== undefined;
   const ticketsRef = React.useRef<TicketMentionItem[]>(tickets ?? []);
   ticketsRef.current = tickets ?? [];
-  const ticketExtension = React.useMemo(
-    () =>
-      enableTickets
-        ? createTicketMentionExtension(() => ticketsRef.current)
-        : null,
-    [enableTickets],
-  );
 
-  // editorProps are captured once; read the latest callbacks through refs
+  // extensions are fixed at mount; read the latest callbacks through refs
+  const enableUploads = uploadImage !== undefined;
   const uploadRef = React.useRef(uploadImage);
   uploadRef.current = uploadImage;
   const uploadingRef = React.useRef(onUploadingChange);
@@ -132,49 +135,77 @@ export function RichTextEditor({
     pending.current += delta;
     uploadingRef.current?.(pending.current);
   }, []);
-  const fileInput = React.useRef<HTMLInputElement>(null);
-  const editorRef = React.useRef<Editor | null>(null);
-  const imageExtension = React.useMemo(
-    () => createImageExtension({ allowBlob: true }),
-    [],
+  const upload = React.useCallback(
+    (editor: Editor, files: File[], pos?: number) => {
+      const fn = uploadRef.current;
+      if (fn) insertImages(editor, files, fn, track, pos);
+    },
+    [track],
   );
 
-  const editor = useEditor({
-    extensions: [
+  const extensions = React.useMemo(
+    () => [
       StarterKit.configure({
         link: { openOnClick: false, autolink: true },
       }),
       Placeholder.configure({ placeholder }),
-      imageExtension,
-      ...(mentionExtension ? [mentionExtension] : []),
-      ...(ticketExtension ? [ticketExtension] : []),
+      Markdown,
+      createImageExtension({ allowBlob: true }),
+      ...(enableUploads
+        ? [
+            FileHandler.configure({
+              allowedMimeTypes: IMAGE_MIME_TYPES,
+              onDrop: (editor, files, pos) => upload(editor, files, pos),
+              onPaste: (editor, files) => upload(editor, files),
+            }),
+          ]
+        : []),
+      ...(enableMentions
+        ? [createMentionExtension(() => mentionsRef.current)]
+        : []),
+      ...(enableTickets
+        ? [createTicketMentionExtension(() => ticketsRef.current)]
+        : []),
     ],
+    [placeholder, enableMentions, enableTickets, enableUploads, upload],
+  );
+
+  const editorRef = React.useRef<Editor | null>(null);
+  const editor = useEditor({
+    extensions,
     content: value,
     editable: !disabled,
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: cn(RICH_TEXT_PROSE, "focus:outline-none", className),
+        class: cn(
+          RICH_TEXT_PROSE,
+          "focus:outline-none",
+          variant === "box" && "px-3 py-2",
+          className,
+        ),
         style: `min-height: ${minHeight};`,
       },
-      handlePaste: (_view, event) => {
-        const upload = uploadRef.current;
-        const files = imageFiles(event.clipboardData?.files);
-        if (!upload || files.length === 0 || !editorRef.current) return false;
-        insertImages(editorRef.current, files, upload, track);
-        return true;
-      },
-      handleDrop: (view, event, _slice, moved) => {
-        const upload = uploadRef.current;
-        const files = imageFiles(event.dataTransfer?.files);
-        if (moved || !upload || files.length === 0 || !editorRef.current)
-          return false;
-        const pos = view.posAtCoords({
-          left: event.clientX,
-          top: event.clientY,
-        })?.pos;
-        insertImages(editorRef.current, files, upload, track, pos);
-        return true;
+      // text-only clipboard (editors, terminals, READMEs) = markdown, like GitHub; shift-paste stays plain
+      clipboardTextParser: (text, $context, plain, view) => {
+        const { schema } = view.state;
+        const markdown = editorRef.current?.markdown;
+        if (!plain && markdown)
+          return Slice.maxOpen(
+            schema.nodeFromJSON(markdown.parse(text)).content,
+          );
+        return Slice.maxOpen(
+          Fragment.fromArray(
+            text
+              .split(/\r\n?|\n/)
+              .map((line) =>
+                schema.nodes.paragraph!.create(
+                  null,
+                  line ? schema.text(line, $context.marks()) : null,
+                ),
+              ),
+          ),
+        );
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -182,11 +213,13 @@ export function RichTextEditor({
   });
   editorRef.current = editor;
 
-  React.useImperativeHandle(
-    ref,
-    () => ({ pickImages: () => fileInput.current?.click() }),
-    [],
-  );
+  // link popover steals focus; keep chrome up while it's open
+  const [linkOpen, setLinkOpen] = React.useState(false);
+  const focused = useEditorState({
+    editor,
+    selector: ({ editor: e }) => e?.isFocused ?? false,
+  });
+  const editing = focused || linkOpen;
 
   React.useEffect(() => {
     if (!editor) return;
@@ -199,121 +232,139 @@ export function RichTextEditor({
   }, [editor, disabled]);
 
   if (!editor) return null;
+  if (disabled) return <EditorContent editor={editor} />;
+
+  const toolbar = (
+    <EditorToolbar
+      editor={editor}
+      headings={variant === "document" ? [1, 2, 3] : [3]}
+      onLinkOpenChange={setLinkOpen}
+      onPickImages={
+        enableUploads ? (files) => upload(editor, files) : undefined
+      }
+    />
+  );
+  // hidden, not unmounted: file input + popover anchor must survive blur
+  const revealed = cn("mt-1 px-1 pb-1", !editing && "hidden");
+
+  if (variant === "document")
+    return (
+      <>
+        <div className="bg-background/80 sticky top-0 z-10 mb-5 border-b py-2 backdrop-blur">
+          {toolbar}
+        </div>
+        <EditorContent editor={editor} />
+      </>
+    );
+
+  // toolbar sits below the text so revealing it never moves the caret
+  if (variant === "inline")
+    return (
+      <div
+        className={cn(
+          "-mx-2 cursor-text rounded-lg px-2 py-1 transition-colors",
+          editing ? "bg-muted/40" : "hover:bg-accent/50",
+        )}
+      >
+        <EditorContent editor={editor} />
+        <div className={revealed}>{toolbar}</div>
+      </div>
+    );
 
   return (
-    <>
-      {toolbar === "document" ? (
-        <Toolbar
-          aria-label="Formatting"
-          className="sticky top-0 z-10 mb-5 flex-wrap gap-1 rounded-none border-x-0 border-t-0 bg-background/80 px-0 py-2 backdrop-blur"
-        >
-          <ToolbarGroup>
-            <FormatToggle
-              active={editor.isActive("heading", { level: 1 })}
-              label="Heading 1"
-              onClick={() =>
-                editor.chain().focus().toggleHeading({ level: 1 }).run()
-              }
-            >
-              <Heading1Icon aria-hidden="true" />
-            </FormatToggle>
-            <FormatToggle
-              active={editor.isActive("heading", { level: 2 })}
-              label="Heading 2"
-              onClick={() =>
-                editor.chain().focus().toggleHeading({ level: 2 }).run()
-              }
-            >
-              <Heading2Icon aria-hidden="true" />
-            </FormatToggle>
-          </ToolbarGroup>
-          <ToolbarSeparator orientation="vertical" />
-          <InlineFormatting editor={editor} />
-          {uploadImage ? (
-            <>
-              <ToolbarSeparator orientation="vertical" />
-              <FormatToggle
-                active={false}
-                label="Image"
-                onClick={() => fileInput.current?.click()}
-              >
-                <ImageIcon aria-hidden="true" />
-              </FormatToggle>
-            </>
-          ) : null}
-        </Toolbar>
-      ) : null}
-      {toolbar === "bubble" ? (
-        <BubbleMenu
-          className="z-50"
-          editor={editor}
-          options={{ placement: "top", strategy: "fixed", offset: 8 }}
-          updateDelay={150}
-        >
-          <Toolbar
-            aria-label="Formatting"
-            className="gap-1 rounded-lg bg-popover shadow-lg/5"
-          >
-            <InlineFormatting editor={editor} />
-          </Toolbar>
-        </BubbleMenu>
-      ) : null}
+    <div className="border-input bg-background ring-ring/24 focus-within:border-ring dark:bg-input/32 rounded-lg border shadow-xs/5 transition-shadow focus-within:ring-[3px]">
       <EditorContent editor={editor} />
-      {uploadImage ? (
-        <input
-          accept="image/*"
-          className="hidden"
-          multiple
-          onChange={(e) => {
-            const files = imageFiles(e.currentTarget.files);
-            e.currentTarget.value = "";
-            if (files.length > 0) insertImages(editor, files, uploadImage, track);
-          }}
-          ref={fileInput}
-          type="file"
-        />
-      ) : null}
-    </>
+      <div className={revealed}>{toolbar}</div>
+    </div>
   );
 }
 
-function InlineFormatting({ editor }: { editor: Editor }) {
-  const setLink = () => {
-    const prev = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("URL", prev ?? "https://");
-    if (url === null) return;
-    const chain = editor.chain().focus().extendMarkRange("link");
-    if (url === "") chain.unsetLink().run();
-    else chain.setLink({ href: url }).run();
-  };
+type Level = 1 | 2 | 3;
+const HEADING_ICON = {
+  1: Heading1Icon,
+  2: Heading2Icon,
+  3: Heading3Icon,
+} as const;
+
+function EditorToolbar({
+  editor,
+  headings,
+  onLinkOpenChange,
+  onPickImages,
+}: {
+  editor: Editor;
+  headings: Level[];
+  onLinkOpenChange?: (open: boolean) => void;
+  onPickImages?: (files: File[]) => void;
+}) {
+  const active = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      heading: Object.fromEntries(
+        ([1, 2, 3] as const).map((level) => [
+          level,
+          e.isActive("heading", { level }),
+        ]),
+      ) as Record<Level, boolean>,
+      bold: e.isActive("bold"),
+      italic: e.isActive("italic"),
+      underline: e.isActive("underline"),
+      strike: e.isActive("strike"),
+      code: e.isActive("code"),
+      codeBlock: e.isActive("codeBlock"),
+      link: e.isActive("link"),
+      bulletList: e.isActive("bulletList"),
+      orderedList: e.isActive("orderedList"),
+      blockquote: e.isActive("blockquote"),
+    }),
+  });
+  const fileInput = React.useRef<HTMLInputElement>(null);
+  const chain = () => editor.chain().focus();
+
   return (
-    <>
+    <Toolbar
+      aria-label="Formatting"
+      className="flex-wrap gap-0.5 rounded-none border-0 bg-transparent p-0"
+    >
       <ToolbarGroup>
+        {headings.map((level) => {
+          const Icon = HEADING_ICON[level];
+          return (
+            <FormatToggle
+              active={active.heading[level]}
+              key={level}
+              label={headings.length > 1 ? `Heading ${level}` : "Heading"}
+              onClick={() => chain().toggleHeading({ level }).run()}
+            >
+              <Icon aria-hidden="true" />
+            </FormatToggle>
+          );
+        })}
         <FormatToggle
-          active={editor.isActive("bold")}
+          active={active.bold}
           label="Bold"
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onClick={() => chain().toggleBold().run()}
         >
           <BoldIcon aria-hidden="true" />
         </FormatToggle>
         <FormatToggle
-          active={editor.isActive("italic")}
+          active={active.italic}
           label="Italic"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onClick={() => chain().toggleItalic().run()}
         >
           <ItalicIcon aria-hidden="true" />
         </FormatToggle>
         <FormatToggle
-          active={editor.isActive("underline")}
+          active={active.underline}
           label="Underline"
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          onClick={() => chain().toggleUnderline().run()}
         >
           <UnderlineIcon aria-hidden="true" />
         </FormatToggle>
         <FormatToggle
-          active={editor.isActive("strike")}
+          active={active.strike}
           label="Strikethrough"
-          onClick={() => editor.chain().focus().toggleStrike().run()}
+          onClick={() => chain().toggleStrike().run()}
         >
           <StrikethroughIcon aria-hidden="true" />
         </FormatToggle>
@@ -321,45 +372,150 @@ function InlineFormatting({ editor }: { editor: Editor }) {
       <ToolbarSeparator orientation="vertical" />
       <ToolbarGroup>
         <FormatToggle
-          active={editor.isActive("code")}
+          active={active.code}
           label="Code"
-          onClick={() => editor.chain().focus().toggleCode().run()}
+          onClick={() => chain().toggleCode().run()}
         >
           <CodeIcon aria-hidden="true" />
         </FormatToggle>
         <FormatToggle
-          active={editor.isActive("link")}
-          label="Link"
-          onClick={setLink}
+          active={active.codeBlock}
+          label="Code block"
+          onClick={() => chain().toggleCodeBlock().run()}
         >
-          <LinkIcon aria-hidden="true" />
+          <SquareCodeIcon aria-hidden="true" />
         </FormatToggle>
+        <LinkControl
+          active={active.link}
+          editor={editor}
+          onOpenChange={onLinkOpenChange}
+        />
       </ToolbarGroup>
       <ToolbarSeparator orientation="vertical" />
       <ToolbarGroup>
         <FormatToggle
-          active={editor.isActive("bulletList")}
-          label="Bullet list"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          active={active.bulletList}
+          label="Bulleted list"
+          onClick={() => chain().toggleBulletList().run()}
         >
           <ListIcon aria-hidden="true" />
         </FormatToggle>
         <FormatToggle
-          active={editor.isActive("orderedList")}
-          label="Ordered list"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          active={active.orderedList}
+          label="Numbered list"
+          onClick={() => chain().toggleOrderedList().run()}
         >
           <ListOrderedIcon aria-hidden="true" />
         </FormatToggle>
         <FormatToggle
-          active={editor.isActive("blockquote")}
+          active={active.blockquote}
           label="Quote"
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          onClick={() => chain().toggleBlockquote().run()}
         >
           <QuoteIcon aria-hidden="true" />
         </FormatToggle>
       </ToolbarGroup>
-    </>
+      {onPickImages ? (
+        <>
+          <ToolbarSeparator orientation="vertical" />
+          <ToolbarGroup>
+            <FormatToggle
+              active={false}
+              label="Image (or paste / drop one)"
+              onClick={() => fileInput.current?.click()}
+            >
+              <ImageIcon aria-hidden="true" />
+            </FormatToggle>
+          </ToolbarGroup>
+          <input
+            accept={IMAGE_MIME_TYPES.join(",")}
+            className="hidden"
+            multiple
+            onChange={(e) => {
+              const files = imageFiles(e.currentTarget.files);
+              e.currentTarget.value = "";
+              if (files.length > 0) onPickImages(files);
+            }}
+            ref={fileInput}
+            type="file"
+          />
+        </>
+      ) : null}
+    </Toolbar>
+  );
+}
+
+function LinkControl({
+  editor,
+  active,
+  onOpenChange,
+}: {
+  editor: Editor;
+  active: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [open, setOpenState] = React.useState(false);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    onOpenChange?.(next);
+  };
+  const [href, setHref] = React.useState("");
+  const anchor = React.useRef<HTMLButtonElement>(null);
+
+  const apply = () => {
+    const url = href.trim();
+    const chain = editor.chain().focus().extendMarkRange("link");
+    if (!url) chain.unsetLink().run();
+    else if (editor.state.selection.empty && !active)
+      chain
+        .insertContent({
+          type: "text",
+          text: url,
+          marks: [{ type: "link", attrs: { href: url } }],
+        })
+        .run();
+    else chain.setLink({ href: url }).run();
+    setOpen(false);
+  };
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <FormatToggle
+        active={active}
+        label="Link"
+        onClick={() => {
+          setHref(
+            (editor.getAttributes("link").href as string | undefined) ?? "",
+          );
+          setOpen(true);
+        }}
+        ref={anchor}
+      >
+        <LinkIcon aria-hidden="true" />
+      </FormatToggle>
+      <PopoverPopup align="start" anchor={anchor} className="w-72">
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            apply();
+          }}
+        >
+          <Input
+            aria-label="Link URL"
+            autoFocus
+            onChange={(e) => setHref(e.target.value)}
+            placeholder="https://"
+            size="sm"
+            type="url"
+            value={href}
+          />
+          <Button size="sm" type="submit">
+            {href.trim() || !active ? "Save" : "Remove"}
+          </Button>
+        </form>
+      </PopoverPopup>
+    </Popover>
   );
 }
 
@@ -368,11 +524,13 @@ function FormatToggle({
   onClick,
   label,
   children,
+  ref,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   children: React.ReactNode;
+  ref?: React.Ref<HTMLButtonElement>;
 }) {
   return (
     <ToolbarPrimitiveButton
@@ -380,9 +538,8 @@ function FormatToggle({
       onClick={onClick}
       // keep the editor selection
       onMouseDown={(e) => e.preventDefault()}
-      render={
-<Toggle pressed={active} size="sm" />
-      }
+      ref={ref}
+      render={<Toggle pressed={active} size="sm" />}
       title={label}
     >
       {children}

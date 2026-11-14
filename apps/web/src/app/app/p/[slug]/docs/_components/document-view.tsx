@@ -316,7 +316,7 @@ export function DocumentView({
               onChange={setBody}
               placeholder="Write the context that should outlive the task…"
               tickets={tickets}
-              toolbar="document"
+              variant="document"
               value={body}
             />
           </div>

@@ -5,6 +5,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { markdownToHtml } from "@/lib/markdown-to-html";
 import { resolveProjectAccess } from "@/server/api/permissions";
 import { db } from "@/server/db";
 import {
@@ -324,7 +325,11 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
               z.object({
                 columnId: z.string().min(1),
                 title: z.string().min(1).max(200),
-                description: z.string().max(10_000).optional(),
+                description: z
+                  .string()
+                  .max(10_000)
+                  .optional()
+                  .describe("Markdown (GFM). Raw HTML is shown as text."),
                 priority: priorityEnum.optional(),
                 labelIds: z.array(z.string()).optional(),
                 assigneeId: z.string().nullable().optional(),
@@ -371,7 +376,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
                 taskInput.description === undefined && !parentLink
                   ? undefined
                   : sanitizeRichText(
-                      `${parentLink}${taskInput.description ?? ""}`,
+                      `${parentLink}${markdownToHtml(taskInput.description ?? "")}`,
                     ),
               priority: taskInput.priority,
               labelIds: taskInput.labelIds,

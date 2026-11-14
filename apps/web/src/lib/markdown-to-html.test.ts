@@ -10,7 +10,7 @@ describe("markdownToHtml", () => {
         "Fixed **login** in `auth.ts`, see [PR](https://x.dev/1).\n\nDone.",
       ),
     ).toBe(
-      '<p>Fixed <strong>login</strong> in <code>auth.ts</code>, see <a href="https://x.dev/1">PR</a>.</p><p>Done.</p>',
+      '<p>Fixed <strong>login</strong> in <code>auth.ts</code>, see <a href="https://x.dev/1">PR</a>.</p>\n<p>Done.</p>',
     );
   });
 
@@ -24,16 +24,19 @@ describe("markdownToHtml", () => {
     expect(
       markdownToHtml("## Changes\n- one\n- [x] two\n\n```\na < b\n```"),
     ).toBe(
-      "<h2>Changes</h2><ul><li><p>one</p></li><li><p>two</p></li></ul><pre><code>a &lt; b</code></pre>",
+      "<h2>Changes</h2>\n<ul>\n<li>one</li>\n<li>two</li>\n</ul>\n<pre><code>a &lt; b\n</code></pre>",
     );
     expect(markdownToHtml("1. a\n2. b")).toBe(
-      "<ol><li><p>a</p></li><li><p>b</p></li></ol>",
+      "<ol>\n<li>a</li>\n<li>b</li>\n</ol>",
     );
   });
 
   it("escapes raw html instead of passing it through", () => {
-    expect(markdownToHtml("<script>x</script> & `<b>`")).toBe(
-      "<p>&lt;script&gt;x&lt;/script&gt; &amp; <code>&lt;b&gt;</code></p>",
+    expect(markdownToHtml("<script>x</script>")).toBe(
+      "<p>&lt;script&gt;x&lt;/script&gt;</p>",
+    );
+    expect(markdownToHtml("a <b>x</b> & `<i>`")).toBe(
+      "<p>a &lt;b&gt;x&lt;/b&gt; &amp; <code>&lt;i&gt;</code></p>",
     );
   });
 
@@ -41,6 +44,10 @@ describe("markdownToHtml", () => {
     expect(markdownToHtml("set_task_labels in src/foo_bar.ts")).toBe(
       "<p>set_task_labels in src/foo_bar.ts</p>",
     );
+  });
+
+  it("keeps single newlines as line breaks", () => {
+    expect(markdownToHtml("one\ntwo")).toBe("<p>one<br>two</p>");
   });
 
   it("round-trips through htmlToMarkdown", () => {

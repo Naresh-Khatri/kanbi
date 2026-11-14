@@ -21,11 +21,28 @@ export function createImageExtension(opts: { allowBlob: boolean }) {
         },
       ];
     },
+    // markdown paste skips parseHTML, so filter here too
+    parseMarkdown: (token, helpers) =>
+      ok(token.href ?? null)
+        ? helpers.createNode("image", {
+            src: token.href,
+            title: token.title,
+            alt: token.text,
+          })
+        : [],
   });
 }
 
+export const IMAGE_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+];
+
 export const imageFiles = (list: FileList | null | undefined) =>
-  [...(list ?? [])].filter((f) => f.type.startsWith("image/"));
+  [...(list ?? [])].filter((f) => IMAGE_MIME_TYPES.includes(f.type));
 
 function patchImage(editor: Editor, src: string, next: string | null) {
   if (editor.isDestroyed) return;

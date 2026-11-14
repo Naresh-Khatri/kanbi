@@ -7,7 +7,6 @@ import {
   EllipsisIcon,
   FileTextIcon,
   GitBranchIcon,
-  ImageIcon,
   Link2Icon,
   MinusIcon,
   PaperclipIcon,
@@ -27,7 +26,6 @@ import {
   isRichTextEmpty,
   RichTextContent,
   RichTextEditor,
-  type RichTextEditorHandle,
 } from "@/components/rich-text/editor";
 import type {
   MentionItem,
@@ -395,32 +393,25 @@ function TaskDetail({
         </dl>
 
         <Section title="Description">
-          <div
-            className={cn(
-              "-mx-3 rounded-lg border border-transparent px-3 py-2 transition-colors",
-              canWrite &&
-                "hover:bg-accent/50 focus-within:border-input focus-within:bg-transparent",
-            )}
-          >
-            <RichTextEditor
-              disabled={!canWrite}
-              mentions={mentionItems}
-              minHeight="120px"
-              onBlur={saveDescription}
-              onChange={(html) => {
-                latestDescription.current = html;
-                setDescription(html);
-              }}
-              // blur may have saved without the in-flight image
-              onUploadingChange={(n) => {
-                if (n === 0) saveDescription();
-              }}
-              placeholder="Add a description…"
-              tickets={tickets}
-              uploadImage={canWrite ? uploadImage : undefined}
-              value={description}
-            />
-          </div>
+          <RichTextEditor
+            disabled={!canWrite}
+            mentions={mentionItems}
+            minHeight="40px"
+            onBlur={saveDescription}
+            onChange={(html) => {
+              latestDescription.current = html;
+              setDescription(html);
+            }}
+            // blur may have saved without the in-flight image
+            onUploadingChange={(n) => {
+              if (n === 0) saveDescription();
+            }}
+            placeholder="Add a description…"
+            tickets={tickets}
+            uploadImage={canWrite ? uploadImage : undefined}
+            value={description}
+            variant="inline"
+          />
         </Section>
 
         <LinkedDocsPanel boardId={boardId} taskId={task.id} />
@@ -1459,9 +1450,6 @@ function formatBytes(n: number) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const EDITOR_FRAME =
-  "rounded-lg border border-input bg-background px-3 py-2 shadow-xs/5 ring-ring/24 transition-shadow focus-within:border-ring focus-within:ring-[3px] dark:bg-input/32";
-
 function CommentsPanel({
   boardId,
   taskId,
@@ -1480,7 +1468,6 @@ function CommentsPanel({
   const list = api.comment.list.useQuery({ boardId, taskId });
   const [body, setBody] = useState("");
   const [uploading, setUploading] = useState(0);
-  const composer = useRef<RichTextEditorHandle>(null);
   const uploadImage = useInlineImageUpload(boardId, taskId);
   const create = api.comment.create.useMutation({
     onSuccess: async () => {
@@ -1520,30 +1507,17 @@ function CommentsPanel({
             create.mutate({ boardId, taskId, body });
           }}
         >
-          <div className={EDITOR_FRAME}>
-            <RichTextEditor
-              mentions={mentions}
-              minHeight="44px"
-              onChange={setBody}
-              onUploadingChange={setUploading}
-              placeholder="Leave a comment…"
-              ref={composer}
-              tickets={tickets}
-              uploadImage={uploadImage}
-              value={body}
-            />
-          </div>
+          <RichTextEditor
+            mentions={mentions}
+            minHeight="44px"
+            onChange={setBody}
+            onUploadingChange={setUploading}
+            placeholder="Leave a comment…"
+            tickets={tickets}
+            uploadImage={uploadImage}
+            value={body}
+          />
           <div className="flex justify-end gap-2">
-            <Button
-              aria-label="Add image"
-              onClick={() => composer.current?.pickImages()}
-              size="icon-sm"
-              title="Add image (or paste one)"
-              type="button"
-              variant="ghost"
-            >
-              <ImageIcon aria-hidden="true" />
-            </Button>
             <Button
               disabled={isRichTextEmpty(body) || uploading > 0}
               loading={create.isPending}
@@ -1653,18 +1627,16 @@ function CommentItem({
               edit.mutate({ boardId, commentId: c.id, body: draft });
             }}
           >
-            <div className={EDITOR_FRAME}>
-              <RichTextEditor
-                mentions={mentions}
-                minHeight="44px"
-                onChange={setDraft}
-                onUploadingChange={setUploading}
-                placeholder="Edit comment…"
-                tickets={tickets}
-                uploadImage={uploadImage}
-                value={draft}
-              />
-            </div>
+            <RichTextEditor
+              mentions={mentions}
+              minHeight="44px"
+              onChange={setDraft}
+              onUploadingChange={setUploading}
+              placeholder="Edit comment…"
+              tickets={tickets}
+              uploadImage={uploadImage}
+              value={draft}
+            />
             <div className="flex justify-end gap-2">
               <Button
                 onClick={() => setEditing(false)}
