@@ -7,6 +7,7 @@
  * need to use are documented accordingly near the end.
  */
 
+import type { AgentId } from "@/lib/agents";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError, z } from "zod";
@@ -33,7 +34,7 @@ import { resolveBearerSession } from "@/server/device-tokens";
  * @see https://trpc.io/docs/server/context
  */
 /** Set when an MCP client acts on the user's behalf; null for browser/device calls. */
-export type AgentIdentity = { clientId: string; name: string };
+export type AgentIdentity = { clientId: string; name: string; kind: AgentId };
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const cookieSession = await auth.api.getSession({ headers: opts.headers });

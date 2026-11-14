@@ -9,13 +9,14 @@ import {
   replaceUploadRefs,
   uploadRefKeys,
 } from "@/lib/file-url";
+import { AGENT_IDS } from "@/lib/agents";
 import { markdownToHtml } from "@/lib/markdown-to-html";
 import { db } from "@/server/db";
 import { board, boardColumn, comment, project, task } from "@/server/db/schema";
 import { sanitizeRichText } from "@/server/rich-text/sanitize";
 
-import { agentFooter } from "./agent-note";
-import { clientName, type createMcpCaller } from "./caller";
+import type { McpAuthorization } from "./authorization";
+import type { createMcpCaller } from "./caller";
 import { MCP_ORIGIN } from "./config";
 import { McpUserError, userFacing } from "./result";
 import { parseIdentifier } from "./work-queue";
@@ -186,7 +187,11 @@ export async function moveToEnd(
   }
 }
 
-export { clientName } from "./caller";
+export const agentInput = z
+  .enum(AGENT_IDS)
+  .describe(
+    'Which coding agent you are, e.g. "claude-code" or "codex"; "other" if yours is not listed. Shown as a badge on what you post.',
+  );
 
 export const commentBodyInput = z
   .string()
@@ -198,12 +203,11 @@ export const commentBodyInput = z
   );
 
 /**
- * Html body with the agent footer. `kanbi-upload:` image refs are registered as
+ * Markdown -> stored html. `kanbi-upload:` image refs are registered as
  * attachments and swapped for file urls, so one call posts text + screenshots.
  */
 export async function agentCommentBody(
   markdown: string,
-  clientId: string,
   caller: Caller,
   t: { id: string; boardId: string },
 ) {
@@ -225,8 +229,7 @@ export async function agentCommentBody(
     }
     html = replaceUploadRefs(html, ids);
   }
-  // sanitized whole (footer too) so the stored body matches for dedupe
-  return sanitizeRichText(`${html}${agentFooter(await clientName(clientId))}`);
+  return sanitizeRichText(html);
 }
 
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
@@ -235,7 +238,7 @@ const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
 export async function postAgentComment(
   caller: Caller,
   t: ResolvedTask,
-  userId: string,
+  auth: McpAuthorization,
   body: string,
 ): Promise<string> {
   const [dupe] = await db
@@ -244,7 +247,9 @@ export async function postAgentComment(
     .where(
       and(
         eq(comment.taskId, t.id),
-        eq(comment.authorId, userId),
+        eq(comment.authorId, auth.userId),
+        // same client only; never collapse into a comment a person typed
+        eq(comment.agentClientId, auth.clientId),
         eq(comment.body, body),
         gt(comment.createdAt, new Date(Date.now() - DEDUPE_WINDOW_MS)),
       ),

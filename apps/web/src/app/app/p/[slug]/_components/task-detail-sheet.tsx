@@ -89,6 +89,8 @@ import {
   TooltipPopup,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AgentBadge } from "@/components/agent-badge";
+import { agentFromClientName } from "@/lib/agents";
 import { UserAvatar } from "@/components/user-avatar";
 import { ColorSwatchGroup } from "@/components/color-swatch-group";
 import { extractFileIds } from "@/lib/file-url";
@@ -1578,6 +1580,12 @@ function CommentItem({
           <span className="font-medium text-foreground text-sm">
             {c.authorName}
           </span>
+          {c.agent ? (
+            <AgentBadge
+              agent={c.agent}
+              tooltip={`Posted by an agent on ${c.authorName}'s behalf`}
+            />
+          ) : null}
           <span title={formatDateTime(c.createdAt)}>
             {formatRelative(c.createdAt)}
           </span>
@@ -1711,10 +1719,18 @@ function ActivityPanel({
             <span className="font-medium text-foreground">{a.actorName}</span>
             <span className="min-w-0 truncate">
               {formatVerb(a.verb, a.payload)}
-              {typeof a.payload?.agent === "string"
-                ? ` via ${a.payload.agent}`
-                : ""}
             </span>
+            {typeof a.payload?.agent === "string" ? (
+              <AgentBadge
+                // older rows have only the client name
+                agent={
+                  typeof a.payload.agentKind === "string"
+                    ? a.payload.agentKind
+                    : agentFromClientName(a.payload.agent)
+                }
+                tooltip={`Done via ${a.payload.agent} on ${a.actorName}'s behalf`}
+              />
+            ) : null}
             <span className="ms-auto shrink-0" title={formatDateTime(a.createdAt)}>
               {formatRelative(a.createdAt)}
             </span>

@@ -145,11 +145,13 @@ report_blocker(KAN-42, reason)
   matches nothing, the agent gets candidates and asks; it never guesses.
 - **Acts as you, visibly:** every change goes through the normal tRPC
   procedures as you, so activity, notifications, and realtime updates are the
-  same as in the app. Comments an agent posts end with a
-  `— via <client name> (agent)` footer (`agent-note.ts`); `get_task` labels
-  them as agent-posted. An agent can edit or delete only comments that carry
-  its own client's footer, never ones you typed. Identical comments retried
-  within 10 minutes are deduplicated.
+  same as in the app. Write tools take an `agent` id (`lib/agents.ts`; guessed
+  from the OAuth client name when omitted) that is stored on the comment
+  (`comment.agent`) and shown as a badge, subject to the project's agent
+  disclosure setting; `get_task` labels these comments as agent-posted. An
+  agent can edit or delete only comments its own OAuth client posted
+  (`comment.agent_client_id`), never ones you typed. Identical comments
+  retried within 10 minutes are deduplicated.
 - **Write scope:** every write tool except `create_tasks` acts only on tasks
   assigned to you. Agents never edit a task's title or description, archive,
   delete, or reassign.
@@ -276,7 +278,7 @@ but the discovery metadata and login cookie live on the configured origin.
 - `find.ts` - `find_tasks`, read-only ad-hoc task lookup.
 - `collaborate.ts` - comments, blockers, checklist, labels, attachments on the
   user's assigned tasks; `task-ref.ts` holds the shared task resolution, column
-  moves, and agent comment posting; `agent-note.ts` the comment footer.
+  moves, and agent comment posting.
 - `docs.ts` - read-only doc tools.
 - `result.ts` - shared tool results; `McpUserError` messages reach the agent
   verbatim, everything else is logged and genericized.

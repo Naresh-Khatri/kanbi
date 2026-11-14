@@ -2,6 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 
+import { type AgentId, agentFromClientName } from "@/lib/agents";
 import { createCaller } from "@/server/api/root";
 import { type createTRPCContext } from "@/server/api/trpc";
 import { db } from "@/server/db";
@@ -20,7 +21,10 @@ type Ctx = Awaited<ReturnType<typeof createTRPCContext>>;
  * still emit on the realtime bus, so agent-driven changes show up live in the
  * web UI. `ctx.agent` tags activity and uploads as agent-made.
  */
-export async function createMcpCaller(auth: McpAuthorization) {
+export async function createMcpCaller(
+  auth: McpAuthorization,
+  declared?: AgentId,
+) {
   const userId = auth.userId;
   const [u] = await db
     .select({
@@ -53,10 +57,16 @@ export async function createMcpCaller(auth: McpAuthorization) {
     db,
     session,
     device: null,
-    agent: { clientId: auth.clientId, name: await clientName(auth.clientId) },
+    agent: await agentIdentity(auth.clientId, declared),
     headers: new Headers(),
   };
   return createCaller(ctx);
+}
+
+/** Declared agent wins; otherwise guessed from the OAuth client name. */
+export async function agentIdentity(clientId: string, declared?: AgentId) {
+  const name = await clientName(clientId);
+  return { clientId, name, kind: declared ?? agentFromClientName(name) };
 }
 
 export async function clientName(clientId: string): Promise<string> {

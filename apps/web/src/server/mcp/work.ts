@@ -17,6 +17,7 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
+import { type AgentId, agentMeta } from "@/lib/agents";
 import { getObjectBytes, presignDownload } from "@/lib/r2";
 import { discloseComment, seesAgent } from "@/server/activity/disclosure";
 import { db } from "@/server/db";
@@ -37,12 +38,12 @@ import {
   user as userTable,
 } from "@/server/db/schema";
 
-import { agentClientOf, stripAgentFooter } from "./agent-note";
 import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
 import { McpUserError, ok, toFailure } from "./result";
 import {
   agentCommentBody,
+  agentInput,
   assertMine,
   type Caller,
   moveToEnd,
@@ -165,7 +166,7 @@ Work through my Kanbi tasks for this repository.
 2. ${only ? `Only work on ${only}.` : "Resume tasks in inProgress first, then take ready tasks in the order given."}
 3. For each task, call get_task and read it in this order of trust: the original request and every image, then comments from people, then linked docs, then the title, and last the description and checklist, which are often AI-drafted and can be wrong. If the task depends on product decisions you cannot see, use search_docs / get_doc.
 4. Before starting, state the real problem in one line and find it in the code. If the sources conflict or the task is too vague to act on, skip it: do not call start_task, and tell me why at the end.
-5. Call start_task, then fix it, following this repository's AGENTS.md / CLAUDE.md conventions. Tick checklist items with update_checklist as you complete them.
+5. Call start_task, then fix it, following this repository's AGENTS.md / CLAUDE.md conventions. Tick checklist items with update_checklist as you complete them. On every write tool that takes agent, pass your own agent id (e.g. "claude-code", "codex"); it is shown as a badge on what you post.
 6. Verify with the repository's non-interactive checks (typecheck, lint, tests). For visible UI changes, if you can take a screenshot: add_attachment, PUT the file, then put the returned markdown field in the finish_task summary so it shows inline.
 7. Only when the problem itself is fixed and checks pass, call finish_task with a short summary of what changed, the PR url if there is one, the checklist ids you completed, and what you ran.
 8. If you cannot finish (missing decision, missing access, the request conflicts with the code), call report_blocker with the specific question instead of leaving the task in progress silently.
@@ -182,9 +183,10 @@ export function registerWorkTools(
 ) {
   async function run(
     fn: (caller: Caller) => Promise<CallToolResult>,
+    agent?: AgentId,
   ): Promise<CallToolResult> {
     try {
-      return await fn(await createMcpCaller(auth));
+      return await fn(await createMcpCaller(auth, agent));
     } catch (err) {
       return toFailure(err);
     }
@@ -488,6 +490,8 @@ export function registerWorkTools(
                   author: userTable.name,
                   createdAt: comment.createdAt,
                   body: comment.body,
+                  agent: comment.agent,
+                  agentClientId: comment.agentClientId,
                 })
                 .from(comment)
                 .innerJoin(userTable, eq(userTable.id, comment.authorId))
@@ -583,17 +587,18 @@ export function registerWorkTools(
               }),
             ),
           );
-          const ordered = comments.reverse().map((raw) => {
-            const c = discloseComment(viewer, raw);
-            const via = agentClientOf(c.body);
-            const body = labelInlineImages(c.body, imageLabels);
-            return {
-              ...c,
-              via,
-              author: via ? `${c.author} via ${via} (agent)` : c.author,
-              body: via ? stripAgentFooter(body) : body,
-            };
-          });
+          const ordered = comments
+            .reverse()
+            .map(({ agentClientId, ...raw }) => {
+              const c = discloseComment(viewer, raw);
+              const via = c.agent ? agentMeta(c.agent).label : null;
+              return {
+                ...c,
+                mine: agentClientId === auth.clientId,
+                author: via ? `${c.author} via ${via} (agent)` : c.author,
+                body: labelInlineImages(c.body, imageLabels),
+              };
+            });
 
           const url = taskUrl(t.projectSlug, t.id);
           const brief = buildBrief({
@@ -635,7 +640,8 @@ export function registerWorkTools(
               truncated: d.truncated,
             })),
             agentComments: ordered
-              .filter((c) => c.via)
+              // only these are editable by this client
+              .filter((c) => c.mine)
               .map((c) => ({ id: c.id, createdAt: c.createdAt.toISOString() })),
           };
           return {
@@ -728,6 +734,7 @@ export function registerWorkTools(
             .describe(
               'What you ran to verify the fix and the result, e.g. "pnpm typecheck: pass".',
             ),
+          agent: agentInput,
         },
         outputSchema: {
           status: z.literal("done"),
@@ -745,6 +752,7 @@ export function registerWorkTools(
         summary,
         prUrl,
         verifiedBy,
+        agent,
       }) =>
         run(async (caller) => {
           const t = await resolveTask(caller, ref);
@@ -781,7 +789,6 @@ export function registerWorkTools(
             ]
               .filter(Boolean)
               .join("\n\n"),
-            auth.clientId,
             caller,
             t,
           );
@@ -797,15 +804,12 @@ export function registerWorkTools(
           await moveToEnd(caller, t, target.id);
 
           // task is already done; a failed note must not report the finish as failed
-          const commentId = await postAgentComment(
-            caller,
-            t,
-            auth.userId,
-            body,
-          ).catch((err: unknown) => {
-            console.error("[mcp] finish_task comment failed", err);
-            return null;
-          });
+          const commentId = await postAgentComment(caller, t, auth, body).catch(
+            (err: unknown) => {
+              console.error("[mcp] finish_task comment failed", err);
+              return null;
+            },
+          );
 
           return ok({
             status: "done",
@@ -817,7 +821,7 @@ export function registerWorkTools(
               (i) => !i.done && !toTick.has(i.id),
             ).length,
           });
-        }),
+        }, agent),
     );
   }
 

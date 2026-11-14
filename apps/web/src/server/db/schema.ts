@@ -527,6 +527,10 @@ export const comment = createTable(
       .notNull()
       .references(() => user.id),
     body: text("body").notNull(),
+    // set when an mcp agent posted it; AgentId from lib/agents
+    agent: text("agent"),
+    // edit/delete tools may only touch comments from the same client
+    agentClientId: text("agent_client_id"),
     createdAt: createdAt(),
     editedAt: timestamp("edited_at", { withTimezone: true }),
   },

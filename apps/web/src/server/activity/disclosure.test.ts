@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { agentFooter } from "@/server/mcp/agent-note";
 import { discloseActivity, discloseComment } from "./disclosure";
 
 const hidden = { userId: "mate", canAdmin: false, discloseAgents: false };
@@ -11,7 +10,11 @@ const owner = { userId: "owner", canAdmin: true, discloseAgents: false };
 describe("discloseActivity", () => {
   const row = {
     actorId: "actor",
-    payload: { agent: "Claude Code", fields: ["title"] },
+    payload: {
+      agent: "Claude Code",
+      agentKind: "claude-code",
+      fields: ["title"],
+    },
   };
 
   it("drops the agent for teammates when disclosure is off", () => {
@@ -33,13 +36,10 @@ describe("discloseActivity", () => {
 });
 
 describe("discloseComment", () => {
-  const row = {
-    authorId: "actor",
-    body: `<p>done</p>${agentFooter("Claude Code")}`,
-  };
+  const row = { authorId: "actor", body: "<p>done</p>", agent: "claude-code" };
 
-  it("strips the footer for teammates when disclosure is off", () => {
-    expect(discloseComment(hidden, row).body).toBe("<p>done</p>");
+  it("drops the agent for teammates when disclosure is off", () => {
+    expect(discloseComment(hidden, row)).toEqual({ ...row, agent: null });
   });
 
   it("keeps it when disclosure is on, for the author and for the owner", () => {

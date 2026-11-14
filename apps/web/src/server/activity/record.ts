@@ -5,7 +5,7 @@ import { bus } from "@/server/realtime/bus";
 export type ActivityCtx = {
   db: typeof Db;
   session: { user: { id: string } };
-  agent?: { name: string } | null;
+  agent?: { name: string; kind: string } | null;
 };
 
 /**
@@ -28,7 +28,9 @@ export async function recordActivity(
     verb: args.verb,
     payload: {
       ...args.payload,
-      ...(ctx.agent ? { agent: ctx.agent.name } : {}),
+      ...(ctx.agent
+        ? { agent: ctx.agent.name, agentKind: ctx.agent.kind }
+        : {}),
     },
   });
   bus.emitBoard(args.boardId, {

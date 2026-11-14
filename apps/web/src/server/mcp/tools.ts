@@ -5,6 +5,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import type { AgentId } from "@/lib/agents";
 import { markdownToHtml } from "@/lib/markdown-to-html";
 import { resolveProjectAccess } from "@/server/api/permissions";
 import { db } from "@/server/db";
@@ -28,6 +29,7 @@ import { ok, toFailure } from "./result";
 import { sanitizeRichText } from "./sanitize";
 import {
   agentCommentBody,
+  agentInput,
   postAgentComment,
   resolveTask,
   taskUrl,
@@ -130,9 +132,10 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
     fn: (
       caller: Awaited<ReturnType<typeof createMcpCaller>>,
     ) => Promise<Record<string, unknown>>,
+    agent?: AgentId,
   ): Promise<CallToolResult> {
     try {
-      return ok(await fn(await createMcpCaller(auth)));
+      return ok(await fn(await createMcpCaller(auth, agent)));
     } catch (err) {
       return toFailure(err);
     }
@@ -342,6 +345,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
             )
             .min(1)
             .max(20),
+          agent: agentInput.optional(),
         },
         outputSchema: createTasksOutput,
         annotations: {
@@ -351,7 +355,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
           openWorldHint: false,
         },
       },
-      async ({ projectId, tasks, followUpOf }) =>
+      async ({ projectId, tasks, followUpOf, agent }) =>
         run(async (caller) => {
           await resolveProjectAccess({ db, userId: auth.userId, projectId });
           const parent = followUpOf
@@ -395,19 +399,16 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
             // creation already succeeded; the backlink note is best-effort
             await agentCommentBody(
               `Follow-ups split out:\n${created.map((c) => `- [${c.identifier}](${c.url}) ${c.title}`).join("\n")}`,
-              auth.clientId,
               caller,
               parent,
             )
-              .then((body) =>
-                postAgentComment(caller, parent, auth.userId, body),
-              )
+              .then((body) => postAgentComment(caller, parent, auth, body))
               .catch((err: unknown) =>
                 console.error("[mcp] follow-up note failed", err),
               );
           }
           return { count: result.count, tasks: created };
-        }),
+        }, agent),
     );
   }
 

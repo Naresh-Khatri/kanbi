@@ -86,6 +86,7 @@ export const commentRouter = createTRPCRouter({
           taskId: comment.taskId,
           authorId: comment.authorId,
           body: comment.body,
+          agent: comment.agent,
           createdAt: comment.createdAt,
           editedAt: comment.editedAt,
           authorName: userTable.name,
@@ -115,6 +116,8 @@ export const commentRouter = createTRPCRouter({
           taskId: input.taskId,
           authorId: ctx.session.user.id,
           body,
+          agent: ctx.agent?.kind ?? null,
+          agentClientId: ctx.agent?.clientId ?? null,
         })
         .returning();
       if (row) await linkCommentImages(ctx.db, input.taskId, row.id, body);
@@ -187,7 +190,14 @@ export const commentRouter = createTRPCRouter({
       const body = cleanBody(input.body);
       const [row] = await ctx.db
         .update(comment)
-        .set({ body, editedAt: new Date() })
+        // a person editing an agent's note keeps its badge
+        .set({
+          body,
+          editedAt: new Date(),
+          ...(ctx.agent
+            ? { agent: ctx.agent.kind, agentClientId: ctx.agent.clientId }
+            : {}),
+        })
         .where(
           and(
             eq(comment.id, input.commentId),

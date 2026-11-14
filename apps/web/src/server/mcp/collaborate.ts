@@ -5,6 +5,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import type { AgentId } from "@/lib/agents";
 import { fileUrl, UPLOAD_REF_PREFIX } from "@/lib/file-url";
 import {
   buildAttachmentKey,
@@ -15,16 +16,15 @@ import { recordActivity } from "@/server/activity/record";
 import { db } from "@/server/db";
 import { checklistItem, comment, label, taskLabel } from "@/server/db/schema";
 
-import { agentClientOf } from "./agent-note";
 import type { McpAuthorization } from "./authorization";
-import { createMcpCaller } from "./caller";
+import { agentIdentity, createMcpCaller } from "./caller";
 import { McpUserError, ok, toFailure, userFacing } from "./result";
 import {
   agentCommentBody,
+  agentInput,
   assertMine,
   assertOpen,
   type Caller,
-  clientName,
   commentBodyInput,
   firstColumn,
   moveToEnd,
@@ -63,7 +63,7 @@ async function ownAgentComment(
     .select({
       id: comment.id,
       authorId: comment.authorId,
-      body: comment.body,
+      agentClientId: comment.agentClientId,
       taskId: comment.taskId,
     })
     .from(comment)
@@ -72,7 +72,7 @@ async function ownAgentComment(
   if (!row || row.authorId !== auth.userId) {
     throw new McpUserError(`Comment ${commentId} not found.`);
   }
-  if (agentClientOf(row.body) !== (await clientName(auth.clientId))) {
+  if (row.agentClientId !== auth.clientId) {
     throw new McpUserError(
       "Only comments this agent posted can be changed. Leave people's comments alone.",
     );
@@ -89,9 +89,10 @@ export function registerCollaborationTools(
 ) {
   async function run(
     fn: (caller: Caller) => Promise<CallToolResult>,
+    agent?: AgentId,
   ): Promise<CallToolResult> {
     try {
-      return await fn(await createMcpCaller(auth));
+      return await fn(await createMcpCaller(auth, agent));
     } catch (err) {
       return toFailure(err);
     }
@@ -103,7 +104,11 @@ export function registerCollaborationTools(
       title: "Comment on my task",
       description:
         "Post one agent-marked comment on a task assigned to the user, as the user. Use it for findings the reporter needs (root cause, a decision you made, a question). Do not narrate progress; finish_task and report_blocker already post their own notes. Notifies the reporter.",
-      inputSchema: { task: taskRefInput, body: commentBodyInput },
+      inputSchema: {
+        task: taskRefInput,
+        body: commentBodyInput,
+        agent: agentInput,
+      },
       outputSchema: {
         commentId: z.string(),
         identifier: z.string(),
@@ -111,22 +116,22 @@ export function registerCollaborationTools(
       },
       annotations: { ...writeHints, idempotentHint: false },
     },
-    async ({ task: ref, body }) =>
+    async ({ task: ref, body, agent }) =>
       run(async (caller) => {
         const t = await resolveTask(caller, ref);
         assertMine(t, auth.userId);
         const commentId = await postAgentComment(
           caller,
           t,
-          auth.userId,
-          await agentCommentBody(body, auth.clientId, caller, t),
+          auth,
+          await agentCommentBody(body, caller, t),
         );
         return ok({
           commentId,
           identifier: t.identifier,
           url: taskUrl(t.projectSlug, t.id),
         });
-      }),
+      }, agent),
   );
 
   server.registerTool(
@@ -144,6 +149,7 @@ export function registerCollaborationTools(
           .boolean()
           .optional()
           .describe("Default true. False keeps the task in its column."),
+        agent: agentInput,
       },
       outputSchema: {
         status: z.literal("blocked"),
@@ -156,7 +162,7 @@ export function registerCollaborationTools(
       },
       annotations: { ...writeHints, idempotentHint: false },
     },
-    async ({ task: ref, reason, moveBack = true }) =>
+    async ({ task: ref, reason, moveBack = true, agent }) =>
       run(async (caller) => {
         const t = await resolveTask(caller, ref);
         assertMine(t, auth.userId);
@@ -165,13 +171,8 @@ export function registerCollaborationTools(
         const commentId = await postAgentComment(
           caller,
           t,
-          auth.userId,
-          await agentCommentBody(
-            `**Blocked:** ${reason}`,
-            auth.clientId,
-            caller,
-            t,
-          ),
+          auth,
+          await agentCommentBody(`**Blocked:** ${reason}`, caller, t),
         );
 
         const target =
@@ -194,7 +195,7 @@ export function registerCollaborationTools(
           {
             db,
             session: { user: { id: auth.userId } },
-            agent: { name: await clientName(auth.clientId) },
+            agent: await agentIdentity(auth.clientId, agent),
           },
           {
             boardId: t.boardId,
@@ -213,7 +214,7 @@ export function registerCollaborationTools(
           url: taskUrl(t.projectSlug, t.id),
           ...(note ? { note } : {}),
         });
-      }),
+      }, agent),
   );
 
   server.registerTool(
@@ -450,20 +451,24 @@ export function registerCollaborationTools(
       title: "Edit my agent comment",
       description:
         "Correct a comment this agent posted (ids come from get_task agentComments or the tool that posted it). Cannot touch comments people wrote.",
-      inputSchema: { commentId: z.string().min(1), body: commentBodyInput },
+      inputSchema: {
+        commentId: z.string().min(1),
+        body: commentBodyInput,
+        agent: agentInput,
+      },
       outputSchema: { commentId: z.string(), identifier: z.string() },
       annotations: writeHints,
     },
-    async ({ commentId, body }) =>
+    async ({ commentId, body, agent }) =>
       run(async (caller) => {
         const { task: t } = await ownAgentComment(caller, auth, commentId);
         await caller.comment.edit({
           boardId: t.boardId,
           commentId,
-          body: await agentCommentBody(body, auth.clientId, caller, t),
+          body: await agentCommentBody(body, caller, t),
         });
         return ok({ commentId, identifier: t.identifier });
-      }),
+      }, agent),
   );
 
   server.registerTool(

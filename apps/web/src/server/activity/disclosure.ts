@@ -1,5 +1,3 @@
-import { stripAgentFooter } from "@/server/mcp/agent-note";
-
 type Viewer = {
   userId: string | null;
   canAdmin: boolean;
@@ -19,15 +17,14 @@ export function discloseActivity<
     seesAgent(viewer, row.actorId)
   )
     return row;
-  const { agent: _, ...payload } = row.payload;
+  const { agent: _, agentKind: __, ...payload } = row.payload;
   return { ...row, payload };
 }
 
-export function discloseComment<T extends { authorId: string; body: string }>(
-  viewer: Viewer,
-  row: T,
-): T {
-  return seesAgent(viewer, row.authorId)
-    ? row
-    : { ...row, body: stripAgentFooter(row.body) };
+export function discloseComment<
+  T extends { authorId: string; agent: string | null },
+>(viewer: Viewer, row: T): T {
+  return row.agent && !seesAgent(viewer, row.authorId)
+    ? { ...row, agent: null }
+    : row;
 }
