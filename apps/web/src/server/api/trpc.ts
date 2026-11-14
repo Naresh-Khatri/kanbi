@@ -87,8 +87,16 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
+    // non-TRPCError throws get wrapped w/ the raw message (db, ai provider...) -> never show that to users
+    const unexpected =
+      error.code === "INTERNAL_SERVER_ERROR" &&
+      error.cause instanceof Error &&
+      error.message === error.cause.message;
     return {
       ...shape,
+      message: unexpected
+        ? "Something went wrong. Please try again."
+        : shape.message,
       data: {
         ...shape.data,
         zodError:
