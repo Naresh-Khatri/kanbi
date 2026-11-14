@@ -176,7 +176,14 @@ export const shareRouter = createTRPCRouter({
           })
           .from(taskAttachment)
           .innerJoin(task, eq(task.id, taskAttachment.taskId))
-          .where(and(eq(task.boardId, hit.boardId), isNull(task.archivedAt)))
+          .where(
+            and(
+              eq(task.boardId, hit.boardId),
+              isNull(task.archivedAt),
+              // comments aren't shared, so neither are their images
+              isNull(taskAttachment.commentId),
+            ),
+          )
           .orderBy(asc(taskAttachment.createdAt)),
       ]);
 
@@ -214,7 +221,11 @@ export const shareRouter = createTRPCRouter({
         expiresAt: hit.expiresAt,
         updatedAt,
         columns,
-        tasks,
+        // inline /api/files imgs need a session; the gallery below covers them
+        tasks: tasks.map((t) => ({
+          ...t,
+          description: t.description?.replace(/<img\b[^>]*>/gi, "") ?? null,
+        })),
         labels,
         taskLabels,
         checklist,

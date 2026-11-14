@@ -1,23 +1,70 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { z } from "zod";
+
+import { extractFileIds } from "@/lib/file-url";
 import { recordActivity } from "@/server/activity/record";
 import {
   assertCanWrite,
   boardProcedure,
   createTRPCRouter,
 } from "@/server/api/trpc";
-import { comment, task, user as userTable } from "@/server/db/schema";
+import type { db as Db } from "@/server/db";
+import {
+  comment,
+  task,
+  taskAttachment,
+  user as userTable,
+} from "@/server/db/schema";
 import { createNotifications } from "@/server/notifications/create";
 import { resolveMentions } from "@/server/notifications/mentions";
 import { bus } from "@/server/realtime/bus";
+import { sanitizeRichText } from "@/server/rich-text/sanitize";
+
+function cleanBody(body: string) {
+  const html = sanitizeRichText(body);
+  if (!html.replace(/<(?!img\b)[^>]*>/g, "").trim()) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Comment is empty." });
+  }
+  return html;
+}
+
+/** Inline images belong to the comment that shows them; edits that drop one release it. */
+async function linkCommentImages(
+  db: typeof Db,
+  taskId: string,
+  commentId: string,
+  html: string,
+) {
+  const ids = extractFileIds(html);
+  await db
+    .update(taskAttachment)
+    .set({ commentId: null })
+    .where(
+      and(
+        eq(taskAttachment.commentId, commentId),
+        ids.length > 0 ? notInArray(taskAttachment.id, ids) : undefined,
+      ),
+    );
+  if (ids.length === 0) return;
+  await db
+    .update(taskAttachment)
+    .set({ commentId })
+    .where(
+      and(
+        eq(taskAttachment.taskId, taskId),
+        inArray(taskAttachment.id, ids),
+        isNull(taskAttachment.commentId),
+      ),
+    );
+}
 
 async function assertTaskOnBoard(
-  db: { select: (...a: unknown[]) => unknown },
+  db: typeof Db,
   taskId: string,
   boardId: string,
 ) {
-  const row = await (db as typeof import("@/server/db").db)
+  const row = await db
     .select({ boardId: task.boardId })
     .from(task)
     .where(eq(task.id, taskId))
@@ -59,19 +106,20 @@ export const commentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
       await assertTaskOnBoard(ctx.db, input.taskId, input.boardId);
+      const body = cleanBody(input.body);
       const [row] = await ctx.db
         .insert(comment)
         .values({
           taskId: input.taskId,
           authorId: ctx.session.user.id,
-          body: input.body,
+          body,
         })
         .returning();
+      if (row) await linkCommentImages(ctx.db, input.taskId, row.id, body);
       bus.emitBoard(input.boardId, { scope: "comment", ids: [input.taskId] });
-      await recordActivity(ctx.db, {
+      await recordActivity(ctx, {
         boardId: input.boardId,
         taskId: input.taskId,
-        actorId: ctx.session.user.id,
         verb: "comment.created",
       });
 
@@ -87,7 +135,7 @@ export const commentRouter = createTRPCRouter({
       const t = taskRows[0];
       if (t) {
         const mentioned = new Set(
-          await resolveMentions(ctx.db, input.boardId, input.body),
+          await resolveMentions(ctx.db, input.boardId, body),
         );
         mentioned.delete(ctx.session.user.id);
 
@@ -97,7 +145,7 @@ export const commentRouter = createTRPCRouter({
         recipients.delete(ctx.session.user.id);
         for (const id of mentioned) recipients.delete(id);
 
-        const excerpt = input.body.slice(0, 200);
+        const excerpt = body.slice(0, 200);
         const payload: Parameters<typeof createNotifications>[1] = [];
         for (const userId of mentioned) {
           payload.push({
@@ -134,15 +182,19 @@ export const commentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
-      await ctx.db
+      const body = cleanBody(input.body);
+      const [row] = await ctx.db
         .update(comment)
-        .set({ body: input.body, editedAt: new Date() })
+        .set({ body, editedAt: new Date() })
         .where(
           and(
             eq(comment.id, input.commentId),
             eq(comment.authorId, ctx.session.user.id),
           ),
-        );
+        )
+        .returning({ taskId: comment.taskId });
+      if (row)
+        await linkCommentImages(ctx.db, row.taskId, input.commentId, body);
       bus.emitBoard(input.boardId, {
         scope: "comment",
         ids: [input.commentId],

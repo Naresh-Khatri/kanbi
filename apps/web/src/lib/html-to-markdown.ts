@@ -44,6 +44,11 @@ export function htmlToMarkdown(html: string): string {
       (_, href: string, text: string) =>
         text.trim() && text.trim() !== href ? `[${text}](${href})` : href,
     )
+    .replace(/<img\s[^>]*>/gi, (tag) => {
+      const src = /\ssrc="([^"]*)"/i.exec(tag)?.[1] ?? "";
+      const alt = /\salt="([^"]*)"/i.exec(tag)?.[1] ?? "image";
+      return src ? `![${alt}](${src})` : "";
+    })
     .replace(/<[^>]+>/g, "");
 
   return decodeEntities(md)

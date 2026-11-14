@@ -34,4 +34,11 @@ describe("htmlToMarkdown", () => {
       htmlToMarkdown('<a href="https://x.dev">https://x.dev</a>'),
     ).toBe("https://x.dev");
   });
+
+  it("keeps inline images as markdown images", () => {
+    expect(
+      htmlToMarkdown('<p>See</p><img src="/api/files/abc" alt="shot"><img src="/api/files/d">'),
+    ).toContain("![shot](/api/files/abc)");
+    expect(htmlToMarkdown('<img src="/api/files/d">')).toBe("![image](/api/files/d)");
+  });
 });

@@ -2,26 +2,34 @@ import type { db as Db } from "@/server/db";
 import { activity } from "@/server/db/schema";
 import { bus } from "@/server/realtime/bus";
 
+export type ActivityCtx = {
+  db: typeof Db;
+  session: { user: { id: string } };
+  agent?: { name: string } | null;
+};
+
 /**
  * Insert an activity row and fan the event out so subscribers refresh.
- * Fire-and-forget friendly — callers `await` to guarantee ordering when needed.
+ * Actor comes from the session; agent calls are tagged with `payload.agent`.
  */
 export async function recordActivity(
-  db: typeof Db,
+  ctx: ActivityCtx,
   args: {
     boardId: string;
     taskId?: string | null;
-    actorId: string;
     verb: string;
     payload?: Record<string, unknown>;
   },
 ) {
-  await db.insert(activity).values({
+  await ctx.db.insert(activity).values({
     boardId: args.boardId,
     taskId: args.taskId ?? null,
-    actorId: args.actorId,
+    actorId: ctx.session.user.id,
     verb: args.verb,
-    payload: args.payload ?? {},
+    payload: {
+      ...args.payload,
+      ...(ctx.agent ? { agent: ctx.agent.name } : {}),
+    },
   });
   bus.emitBoard(args.boardId, {
     scope: "activity",

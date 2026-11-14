@@ -7,6 +7,7 @@ import {
   EllipsisIcon,
   FileTextIcon,
   GitBranchIcon,
+  ImageIcon,
   Link2Icon,
   MinusIcon,
   PaperclipIcon,
@@ -26,6 +27,7 @@ import {
   isRichTextEmpty,
   RichTextContent,
   RichTextEditor,
+  type RichTextEditorHandle,
 } from "@/components/rich-text/editor";
 import type {
   MentionItem,
@@ -91,6 +93,7 @@ import {
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
 import { ColorSwatchGroup } from "@/components/color-swatch-group";
+import { extractFileIds } from "@/lib/file-url";
 import { LABEL_COLORS } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
@@ -115,6 +118,7 @@ import {
   propertyButton,
 } from "./task-properties";
 import { useUndoableBoardDelete } from "./use-undoable-board-delete";
+import { useInlineImageUpload, useTaskUpload } from "./use-task-upload";
 
 type BoardData = RouterOutputs["board"]["get"];
 type TaskRow = BoardData["tasks"][number];
@@ -209,11 +213,23 @@ function TaskDetail({
   const utils = api.useUtils();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
+  const latestDescription = useRef(description);
+  latestDescription.current = description;
+  const uploadImage = useInlineImageUpload(boardId, task.id);
 
   const update = api.task.update.useMutation({
     onSuccess: () => utils.board.get.invalidate({ boardId }),
     onError: toastError,
   });
+  const savedDescription = useRef(task.description ?? "");
+  savedDescription.current = task.description ?? "";
+  const saveDescription = () => {
+    // blob: srcs = uploads still in flight; saved once they settle
+    const html = latestDescription.current.replace(/<img\b[^>]*src="blob:[^"]*"[^>]*>/g, "");
+    if (html === savedDescription.current) return;
+    savedDescription.current = html;
+    update.mutate({ boardId, taskId: task.id, description: html || null });
+  };
   const move = api.task.move.useMutation({
     onSuccess: () => utils.board.get.invalidate({ boardId }),
     onError: toastError,
@@ -390,18 +406,18 @@ function TaskDetail({
               disabled={!canWrite}
               mentions={mentionItems}
               minHeight="120px"
-              onBlur={() => {
-                if (description !== (task.description ?? "")) {
-                  update.mutate({
-                    boardId,
-                    taskId: task.id,
-                    description: description || null,
-                  });
-                }
+              onBlur={saveDescription}
+              onChange={(html) => {
+                latestDescription.current = html;
+                setDescription(html);
               }}
-              onChange={setDescription}
+              // blur may have saved without the in-flight image
+              onUploadingChange={(n) => {
+                if (n === 0) saveDescription();
+              }}
               placeholder="Add a description…"
               tickets={tickets}
+              uploadImage={canWrite ? uploadImage : undefined}
               value={description}
             />
           </div>
@@ -412,6 +428,7 @@ function TaskDetail({
         <AttachmentsPanel
           boardId={boardId}
           canWrite={canWrite}
+          inlineIds={extractFileIds(task.description ?? "")}
           taskId={task.id}
         />
         <CommentsPanel
@@ -1161,17 +1178,17 @@ function AttachmentsPanel({
   boardId,
   taskId,
   canWrite,
+  inlineIds,
 }: {
   boardId: string;
   taskId: string;
   canWrite: boolean;
+  /** shown in the description already */
+  inlineIds: string[];
 }) {
   const utils = api.useUtils();
   const list = api.attachment.list.useQuery({ boardId, taskId });
-  const createUrl = api.attachment.createUploadUrl.useMutation();
-  const create = api.attachment.create.useMutation({
-    onSuccess: () => utils.attachment.list.invalidate({ boardId, taskId }),
-  });
+  const uploadFile = useTaskUpload(boardId);
   const remove = api.attachment.remove.useMutation({
     onSuccess: () => utils.attachment.list.invalidate({ boardId, taskId }),
     onError: toastError,
@@ -1191,27 +1208,8 @@ function AttachmentsPanel({
       { id: localId, filename: file.name, mime, previewUrl },
     ]);
     try {
-      const { key, uploadUrl } = await createUrl.mutateAsync({
-        boardId,
-        taskId,
-        filename: file.name,
-        mime,
-        sizeBytes: file.size,
-      });
-      const put = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": mime },
-        body: file,
-      });
-      if (!put.ok) throw new Error("Upload failed");
-      await create.mutateAsync({
-        boardId,
-        taskId,
-        key,
-        filename: file.name,
-        mime,
-        sizeBytes: file.size,
-      });
+      await uploadFile(taskId, file);
+      await utils.attachment.list.invalidate({ boardId, taskId });
     } catch (err) {
       toastError(err as Error);
     } finally {
@@ -1221,7 +1219,9 @@ function AttachmentsPanel({
     }
   }
 
-  const items = list.data ?? [];
+  const items = (list.data ?? []).filter(
+    (a) => !a.commentId && !inlineIds.includes(a.id),
+  );
   const images = items.filter((a) => a.mime.startsWith("image/"));
   const files = items.filter((a) => !a.mime.startsWith("image/"));
   const pendingImages = pending.filter((p) => p.mime.startsWith("image/"));
@@ -1479,6 +1479,9 @@ function CommentsPanel({
   const me = api.user.me.useQuery();
   const list = api.comment.list.useQuery({ boardId, taskId });
   const [body, setBody] = useState("");
+  const [uploading, setUploading] = useState(0);
+  const composer = useRef<RichTextEditorHandle>(null);
+  const uploadImage = useInlineImageUpload(boardId, taskId);
   const create = api.comment.create.useMutation({
     onSuccess: async () => {
       setBody("");
@@ -1513,7 +1516,7 @@ function CommentsPanel({
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (isRichTextEmpty(body)) return;
+            if (isRichTextEmpty(body) || uploading > 0) return;
             create.mutate({ boardId, taskId, body });
           }}
         >
@@ -1522,14 +1525,27 @@ function CommentsPanel({
               mentions={mentions}
               minHeight="44px"
               onChange={setBody}
+              onUploadingChange={setUploading}
               placeholder="Leave a comment…"
+              ref={composer}
               tickets={tickets}
+              uploadImage={uploadImage}
               value={body}
             />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <Button
-              disabled={isRichTextEmpty(body)}
+              aria-label="Add image"
+              onClick={() => composer.current?.pickImages()}
+              size="icon-sm"
+              title="Add image (or paste one)"
+              type="button"
+              variant="ghost"
+            >
+              <ImageIcon aria-hidden="true" />
+            </Button>
+            <Button
+              disabled={isRichTextEmpty(body) || uploading > 0}
               loading={create.isPending}
               size="sm"
               type="submit"
@@ -1562,6 +1578,8 @@ function CommentItem({
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState(c.body);
+  const [uploading, setUploading] = useState(0);
+  const uploadImage = useInlineImageUpload(boardId, taskId);
 
   const edit = api.comment.edit.useMutation({
     onSuccess: async () => {
@@ -1631,7 +1649,7 @@ function CommentItem({
             className="flex flex-col gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (isRichTextEmpty(draft)) return;
+              if (isRichTextEmpty(draft) || uploading > 0) return;
               edit.mutate({ boardId, commentId: c.id, body: draft });
             }}
           >
@@ -1640,8 +1658,10 @@ function CommentItem({
                 mentions={mentions}
                 minHeight="44px"
                 onChange={setDraft}
+                onUploadingChange={setUploading}
                 placeholder="Edit comment…"
                 tickets={tickets}
+                uploadImage={uploadImage}
                 value={draft}
               />
             </div>
@@ -1655,7 +1675,7 @@ function CommentItem({
                 Cancel
               </Button>
               <Button
-                disabled={isRichTextEmpty(draft)}
+                disabled={isRichTextEmpty(draft) || uploading > 0}
                 loading={edit.isPending}
                 size="sm"
                 type="submit"
@@ -1717,7 +1737,12 @@ function ActivityPanel({
           >
             <UserAvatar image={a.actorImage} name={a.actorName} size={18} />
             <span className="font-medium text-foreground">{a.actorName}</span>
-            <span>{formatVerb(a.verb)}</span>
+            <span className="min-w-0 truncate">
+              {formatVerb(a.verb, a.payload)}
+              {typeof a.payload?.agent === "string"
+                ? ` via ${a.payload.agent}`
+                : ""}
+            </span>
             <span className="ms-auto shrink-0" title={formatDateTime(a.createdAt)}>
               {formatRelative(a.createdAt)}
             </span>
@@ -1728,7 +1753,7 @@ function ActivityPanel({
   );
 }
 
-function formatVerb(verb: string) {
+function formatVerb(verb: string, payload: Record<string, unknown> | null) {
   switch (verb) {
     case "task.created":
       return "created this task";
@@ -1736,8 +1761,14 @@ function formatVerb(verb: string) {
       return "updated the task";
     case "task.moved":
       return "moved the task";
+    case "task.blocked":
+      return "reported a blocker";
     case "comment.created":
       return "commented";
+    case "attachment.added":
+      return typeof payload?.filename === "string"
+        ? `attached ${payload.filename}`
+        : "added an attachment";
     default:
       return verb;
   }

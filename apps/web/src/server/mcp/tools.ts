@@ -131,7 +131,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
     ) => Promise<Record<string, unknown>>,
   ): Promise<CallToolResult> {
     try {
-      return ok(await fn(await createMcpCaller(auth.userId)));
+      return ok(await fn(await createMcpCaller(auth)));
     } catch (err) {
       return toFailure(err);
     }
@@ -391,6 +391,8 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
             await agentCommentBody(
               `Follow-ups split out:\n${created.map((c) => `- [${c.identifier}](${c.url}) ${c.title}`).join("\n")}`,
               auth.clientId,
+              caller,
+              parent,
             )
               .then((body) =>
                 postAgentComment(caller, parent, auth.userId, body),

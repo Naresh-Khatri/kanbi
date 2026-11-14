@@ -66,6 +66,7 @@ import {
   LabelSwatch,
   PriorityPicker,
 } from "./task-properties";
+import { useTaskUpload } from "./use-task-upload";
 
 type BoardData = RouterOutputs["board"]["get"];
 type ColumnRow = BoardData["columns"][number];
@@ -231,8 +232,7 @@ export function QuickAddTaskDialog({
 
   const create = api.task.create.useMutation();
   const setLabel = api.label.setOnTask.useMutation();
-  const createUploadUrl = api.attachment.createUploadUrl.useMutation();
-  const createAttachment = api.attachment.create.useMutation();
+  const uploadFile = useTaskUpload(boardId);
   const addChecklistItem = api.checklist.add.useMutation();
   const enhance = api.task.enhance.useMutation();
 
@@ -341,30 +341,7 @@ export function QuickAddTaskDialog({
 
       if (staged.length > 0) {
         await Promise.all(
-          staged.map(async (s) => {
-            const mime = s.file.type || "application/octet-stream";
-            const { key, uploadUrl } = await createUploadUrl.mutateAsync({
-              boardId,
-              taskId: row.id,
-              filename: s.file.name,
-              mime,
-              sizeBytes: s.file.size,
-            });
-            const put = await fetch(uploadUrl, {
-              method: "PUT",
-              headers: { "Content-Type": mime },
-              body: s.file,
-            });
-            if (!put.ok) throw new Error(`Upload failed: ${s.file.name}`);
-            await createAttachment.mutateAsync({
-              boardId,
-              taskId: row.id,
-              key,
-              filename: s.file.name,
-              mime,
-              sizeBytes: s.file.size,
-            });
-          }),
+          staged.map((s) => uploadFile(row.id, s.file)),
         );
       }
 

@@ -31,7 +31,7 @@ Stack: Next.js 15 App Router, tRPC v11 + TanStack Query, Drizzle ORM on Postgres
 
 ### Data flow
 
-- **All API traffic goes through tRPC** — no server actions, no REST except the Better Auth catch-all (`/api/auth/[...all]`), the tRPC adapter (`/api/trpc/[trpc]`), and the cron endpoint (`/api/cron/notifications`, guarded by `CRON_SECRET`).
+- **All API traffic goes through tRPC** — no server actions, no REST except the Better Auth catch-all (`/api/auth/[...all]`), the tRPC adapter (`/api/trpc/[trpc]`), the cron endpoint (`/api/cron/notifications`, guarded by `CRON_SECRET`), and `/api/files/[id]` (auth-checked redirect to a presigned R2 URL; inline images in rich text point here).
 - Server components call `api.*` from `src/trpc/server.ts` (React `cache()` + `createCaller`, `server-only`); client components use `src/trpc/react.tsx`.
 - `src/server/api/root.ts` composes ~15 domain routers from `src/server/api/routers/` (board, column, task, label, checklist, attachment, comment, share, activity, realtime, notification, device, focus, project, user).
 - **Procedure types** in `src/server/api/trpc.ts` encode authorization: `protectedProcedure`, `projectProcedure` (membership via project ID), `boardProcedure` (membership via board ID), `publicBoardProcedure` (share token, no auth). Role checks inside handlers use `assertCanWrite` / `assertCanAdmin` from `src/server/api/permissions.ts`. Use the matching procedure type when adding endpoints.

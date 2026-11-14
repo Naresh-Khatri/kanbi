@@ -500,9 +500,18 @@ export const taskAttachment = createTable(
     uploaderId: text("uploader_id")
       .notNull()
       .references(() => user.id),
+    // inline image in a comment body; null = task-level attachment
+    commentId: text("comment_id").references((): AnyPgColumn => comment.id, {
+      onDelete: "set null",
+    }),
+    // mcp client name when an agent uploaded it
+    viaAgent: text("via_agent"),
     createdAt: createdAt(),
   },
-  (t) => [index("attachment_task_idx").on(t.taskId)],
+  (t) => [
+    index("attachment_task_idx").on(t.taskId),
+    uniqueIndex("attachment_key_uq").on(t.key),
+  ],
 );
 
 export const comment = createTable(
@@ -619,7 +628,39 @@ export const activity = createTable(
       .default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
   },
-  (t) => [index("activity_board_created_idx").on(t.boardId, t.createdAt)],
+  (t) => [
+    index("activity_board_created_idx").on(t.boardId, t.createdAt),
+    index("activity_task_created_idx").on(t.taskId, t.createdAt),
+  ],
+);
+
+// last time a user looked at a task / the whole board; drives "new since last visit"
+export const taskSeen = createTable(
+  "task_seen",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.taskId] })],
+);
+
+export const boardSeen = createTable(
+  "board_seen",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.boardId] })],
 );
 
 // ── Digests (AI weekly summaries mined from the activity log) ────────────────

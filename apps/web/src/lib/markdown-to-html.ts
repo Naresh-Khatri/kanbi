@@ -1,13 +1,22 @@
+import { isInlineImageSrc } from "./file-url";
+
 const escape = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const IMAGE_RE = /^!\[([^\]\n]*)\]\(([^\s)]+)\)$/;
+
 function inline(text: string): string {
-  // split on code spans first so their contents stay literal
+  // code spans and images split out first so marks never touch their contents
   return text
-    .split(/(`[^`\n]+`)/g)
+    .split(/(`[^`\n]+`|!\[[^\]\n]*\]\([^\s)]+\))/g)
     .map((part) => {
       if (/^`[^`\n]+`$/.test(part))
         return `<code>${escape(part.slice(1, -1))}</code>`;
+      const image = IMAGE_RE.exec(part);
+      // only kanbi files; anything else stays literal (sanitizer drops foreign imgs anyway)
+      if (image && isInlineImageSrc(image[2]!)) {
+        return `<img src="${image[2]}" alt="${escape(image[1]!).replace(/"/g, "&quot;")}">`;
+      }
       return escape(part)
         .replace(
           /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
@@ -27,7 +36,7 @@ function inline(text: string): string {
 
 /**
  * Small markdown subset (paragraphs, headings, lists, fences, inline marks,
- * links) -> editor-compatible HTML. Output still goes through sanitizeRichText.
+ * links, kanbi images) -> editor-compatible HTML. Output still goes through sanitizeRichText.
  */
 export function markdownToHtml(markdown: string): string {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");

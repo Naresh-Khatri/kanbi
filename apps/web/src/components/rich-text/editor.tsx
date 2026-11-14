@@ -10,6 +10,7 @@ import {
   CodeIcon,
   Heading1Icon,
   Heading2Icon,
+  ImageIcon,
   ItalicIcon,
   LinkIcon,
   ListIcon,
@@ -27,6 +28,7 @@ import {
   ToolbarSeparator,
 } from "@/components/ui/toolbar";
 import { cn } from "@/lib/utils";
+import { createImageExtension, imageFiles, insertImages } from "./image";
 import {
   createMentionExtension,
   createMentionRenderExtension,
@@ -54,7 +56,7 @@ const RICH_TEXT_PROSE = cn(
 export function isRichTextEmpty(html: string): boolean {
   return (
     html
-      .replace(/<[^>]*>/g, "")
+      .replace(/<(?!img\b)[^>]*>/g, "")
       .replace(/&nbsp;|&#160;/g, "")
       .trim().length === 0
   );
@@ -74,7 +76,14 @@ interface RichTextEditorProps {
   tickets?: TicketMentionItem[];
   /** Long-form documents get a persistent toolbar; compact fields use a bubble menu. */
   toolbar?: "bubble" | "document";
+  /** Enables image paste/drop/pick; resolves to the stored image url. */
+  uploadImage?: (file: File) => Promise<string>;
+  /** Uploads in flight; block submit while > 0 (body still has blob: srcs). */
+  onUploadingChange?: (count: number) => void;
+  ref?: React.Ref<RichTextEditorHandle>;
 }
+
+export type RichTextEditorHandle = { pickImages: () => void };
 
 export function RichTextEditor({
   value,
@@ -87,6 +96,9 @@ export function RichTextEditor({
   mentions,
   tickets,
   toolbar = "bubble",
+  uploadImage,
+  onUploadingChange,
+  ref,
 }: RichTextEditorProps) {
   // Keep mention/ticket items fresh (they load async) without re-creating the
   // editor: each extension reads through its ref on every query.
@@ -110,12 +122,30 @@ export function RichTextEditor({
     [enableTickets],
   );
 
+  // editorProps are captured once; read the latest callbacks through refs
+  const uploadRef = React.useRef(uploadImage);
+  uploadRef.current = uploadImage;
+  const uploadingRef = React.useRef(onUploadingChange);
+  uploadingRef.current = onUploadingChange;
+  const pending = React.useRef(0);
+  const track = React.useCallback((delta: number) => {
+    pending.current += delta;
+    uploadingRef.current?.(pending.current);
+  }, []);
+  const fileInput = React.useRef<HTMLInputElement>(null);
+  const editorRef = React.useRef<Editor | null>(null);
+  const imageExtension = React.useMemo(
+    () => createImageExtension({ allowBlob: true }),
+    [],
+  );
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         link: { openOnClick: false, autolink: true },
       }),
       Placeholder.configure({ placeholder }),
+      imageExtension,
       ...(mentionExtension ? [mentionExtension] : []),
       ...(ticketExtension ? [ticketExtension] : []),
     ],
@@ -127,10 +157,36 @@ export function RichTextEditor({
         class: cn(RICH_TEXT_PROSE, "focus:outline-none", className),
         style: `min-height: ${minHeight};`,
       },
+      handlePaste: (_view, event) => {
+        const upload = uploadRef.current;
+        const files = imageFiles(event.clipboardData?.files);
+        if (!upload || files.length === 0 || !editorRef.current) return false;
+        insertImages(editorRef.current, files, upload, track);
+        return true;
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        const upload = uploadRef.current;
+        const files = imageFiles(event.dataTransfer?.files);
+        if (moved || !upload || files.length === 0 || !editorRef.current)
+          return false;
+        const pos = view.posAtCoords({
+          left: event.clientX,
+          top: event.clientY,
+        })?.pos;
+        insertImages(editorRef.current, files, upload, track, pos);
+        return true;
+      },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
     onBlur: () => onBlur?.(),
   });
+  editorRef.current = editor;
+
+  React.useImperativeHandle(
+    ref,
+    () => ({ pickImages: () => fileInput.current?.click() }),
+    [],
+  );
 
   React.useEffect(() => {
     if (!editor) return;
@@ -173,6 +229,18 @@ export function RichTextEditor({
           </ToolbarGroup>
           <ToolbarSeparator orientation="vertical" />
           <InlineFormatting editor={editor} />
+          {uploadImage ? (
+            <>
+              <ToolbarSeparator orientation="vertical" />
+              <FormatToggle
+                active={false}
+                label="Image"
+                onClick={() => fileInput.current?.click()}
+              >
+                <ImageIcon aria-hidden="true" />
+              </FormatToggle>
+            </>
+          ) : null}
         </Toolbar>
       ) : null}
       {toolbar === "bubble" ? (
@@ -191,6 +259,20 @@ export function RichTextEditor({
         </BubbleMenu>
       ) : null}
       <EditorContent editor={editor} />
+      {uploadImage ? (
+        <input
+          accept="image/*"
+          className="hidden"
+          multiple
+          onChange={(e) => {
+            const files = imageFiles(e.currentTarget.files);
+            e.currentTarget.value = "";
+            if (files.length > 0) insertImages(editor, files, uploadImage, track);
+          }}
+          ref={fileInput}
+          type="file"
+        />
+      ) : null}
     </>
   );
 }
@@ -337,6 +419,7 @@ export function RichTextContent({
       StarterKit.configure({
         link: { openOnClick: true, autolink: true },
       }),
+      createImageExtension({ allowBlob: false }),
       createMentionRenderExtension(() => mentionsRef.current),
       createTicketRenderExtension(() => ticketsRef.current),
     ],
@@ -350,6 +433,11 @@ export function RichTextContent({
     immediatelyRender: false,
     editorProps: {
       attributes: { class: cn(RICH_TEXT_PROSE, className) },
+      handleClickOn: (_view, _pos, node) => {
+        if (node.type.name !== "image") return false;
+        window.open(String(node.attrs.src), "_blank", "noopener");
+        return true;
+      },
     },
   });
 

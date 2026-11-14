@@ -119,17 +119,21 @@ work, `/loop 15m /mcp__kanbi__work`.
 
 ```text
 get_work_queue(repo)  -> project matched from the repo name; in-progress first,
-                         then up to 5 ready tasks (priority, due date, age)
+                         then up to 5 ready tasks (priority, due date, age);
+                         blocked tasks listed separately as waitingOnPeople
 get_task(KAN-42)      -> brief + inlined images + up to 3 linked docs
 start_task(KAN-42)    -> moves to the board's first in-progress column
 ... agent fixes the problem, runs the repo's checks, maybe update_checklist /
-    add_attachment + confirm_attachment for a screenshot ...
+    add_attachment + PUT for a screenshot, pasting its `markdown` into the
+    summary ...
 finish_task(KAN-42, summary, prUrl?)
                       -> ticks completed checklist items, moves to first done
                          column, posts the summary as an agent comment
 report_blocker(KAN-42, reason)
-                      -> instead of finishing: posts the blocker, moves the
-                         task back to ready
+                      -> instead of finishing: posts the blocker, records
+                         task.blocked, moves the task back to ready; it stays
+                         out of the ready list until a person comments or
+                         edits it
 ```
 
 - **Scope:** only tasks assigned to you, in `unstarted` or `started` columns.
@@ -159,11 +163,20 @@ report_blocker(KAN-42, reason)
   MCP-only and kept out of board and public share payloads
   (`server/tasks/columns.ts`).
 - **Images:** up to 4 png/jpeg/gif/webp attachments of up to about 3.75 MB each
-  are inlined as image content. Other files are listed with short-lived links.
+  are inlined as image content: the reporter's first task screenshot, then
+  people's images newest first, then agent uploads. Images embedded in the
+  description or comments appear in the text as `[label]` placeholders that
+  match the image list. Other files are listed with short-lived links.
 - **Attachments from the agent:** `add_attachment` returns a presigned R2 PUT
-  URL (and a ready curl command) valid for 10 minutes; after uploading,
-  `confirm_attachment` checks the object exists and records it. Bytes never
-  pass through the model. Requires R2 to be configured.
+  URL (and a ready curl command) valid for 10 minutes, plus a `markdown` field
+  (`![name](kanbi-upload:<key>)`). Pasting that into a `finish_task` summary or
+  comment body embeds the image inline; the server verifies the upload and
+  records the attachment, so no `confirm_attachment` call is needed. To attach
+  without embedding, call `confirm_attachment`, which also returns `markdown`
+  and `url`. Bytes never pass through the model. Requires R2 to be configured.
+- **Seen in the app:** changes made by agents (activity `payload.agent`) and
+  others show up on the board as highlighted cards and an Updates filter until
+  the user opens the task or marks the board as seen.
 - **Docs:** read-only. `get_task` inlines up to 3 docs linked to the task
   (4,000 chars each); `list_docs`, `get_doc`, and `search_docs` (keyword,
   ranked) cover the rest. Docs are presented as possibly outdated reference
@@ -188,10 +201,10 @@ the mutations. The `work` prompt needs both scopes.
 | `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
 | `finish_task`         | write | Tick checklist items, move to done, post the summary (and PR link) as a comment.  |
 | `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.               |
-| `report_blocker`      | write | Post the blocker and move the task back to ready instead of leaving it started.   |
+| `report_blocker`      | write | Post the blocker, move the task back to ready, park it in `waitingOnPeople`.      |
 | `update_checklist`    | write | Complete, reopen, or add checklist items on your task.                            |
 | `set_task_labels`     | write | Add/remove existing board labels by name; never creates labels.                   |
-| `add_attachment`      | write | Get a presigned upload URL for a file (max 25 MB).                                |
+| `add_attachment`      | write | Get a presigned upload URL (max 25 MB) and `markdown` to embed the image inline.  |
 | `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                    |
 | `edit_comment`        | write | Edit a comment this agent client posted.                                          |
 | `delete_comment`      | write | Delete a comment this agent client posted.                                        |

@@ -5,25 +5,20 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { fileUrl, UPLOAD_REF_PREFIX } from "@/lib/file-url";
 import {
   buildAttachmentKey,
-  deleteObject,
-  headObject,
+  MAX_ATTACHMENT_BYTES,
   presignUpload,
 } from "@/lib/r2";
+import { recordActivity } from "@/server/activity/record";
 import { db } from "@/server/db";
-import {
-  checklistItem,
-  comment,
-  label,
-  taskAttachment,
-  taskLabel,
-} from "@/server/db/schema";
+import { checklistItem, comment, label, taskLabel } from "@/server/db/schema";
 
 import { agentClientOf } from "./agent-note";
 import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
-import { McpUserError, ok, toFailure } from "./result";
+import { McpUserError, ok, toFailure, userFacing } from "./result";
 import {
   agentCommentBody,
   assertMine,
@@ -40,7 +35,6 @@ import {
   writeHints,
 } from "./task-ref";
 
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const UPLOAD_TTL_SECONDS = 10 * 60;
 
 const checklistOutput = z.array(
@@ -97,7 +91,7 @@ export function registerCollaborationTools(
     fn: (caller: Caller) => Promise<CallToolResult>,
   ): Promise<CallToolResult> {
     try {
-      return await fn(await createMcpCaller(auth.userId));
+      return await fn(await createMcpCaller(auth));
     } catch (err) {
       return toFailure(err);
     }
@@ -125,7 +119,7 @@ export function registerCollaborationTools(
           caller,
           t,
           auth.userId,
-          await agentCommentBody(body, auth.clientId),
+          await agentCommentBody(body, auth.clientId, caller, t),
         );
         return ok({
           commentId,
@@ -140,7 +134,7 @@ export function registerCollaborationTools(
     {
       title: "Report blocker",
       description:
-        "When you cannot finish one of the user's tasks: post an agent-marked comment with the specific blocker or question, and move an in-progress task back to the board's first to-do column (backlog if none) so it is not stuck in progress. Notifies the reporter.",
+        "When you cannot finish one of the user's tasks: post an agent-marked comment with the specific blocker or question, and move an in-progress task back to the board's first to-do column (backlog if none) so it is not stuck in progress. Notifies the reporter. get_work_queue then lists the task under waitingOnPeople until a person comments or edits it.",
       inputSchema: {
         task: taskRefInput,
         reason: commentBodyInput.describe(
@@ -172,7 +166,12 @@ export function registerCollaborationTools(
           caller,
           t,
           auth.userId,
-          await agentCommentBody(`**Blocked:** ${reason}`, auth.clientId),
+          await agentCommentBody(
+            `**Blocked:** ${reason}`,
+            auth.clientId,
+            caller,
+            t,
+          ),
         );
 
         const target =
@@ -190,6 +189,20 @@ export function registerCollaborationTools(
           }
         }
         const moved = Boolean(target) && !note;
+        // get_work_queue skips the task until a person responds; the board flags it
+        await recordActivity(
+          {
+            db,
+            session: { user: { id: auth.userId } },
+            agent: { name: await clientName(auth.clientId) },
+          },
+          {
+            boardId: t.boardId,
+            taskId: t.id,
+            verb: "task.blocked",
+            payload: { commentId },
+          },
+        );
 
         return ok({
           status: "blocked",
@@ -352,6 +365,11 @@ export function registerCollaborationTools(
         headers: z.record(z.string()),
         expiresInSeconds: z.number().int(),
         curl: z.string(),
+        markdown: z
+          .string()
+          .describe(
+            "After the PUT, put this in a comment_on_task / finish_task / report_blocker body to show the image inline; no confirm_attachment needed.",
+          ),
       },
       annotations: { ...writeHints, openWorldHint: true },
     },
@@ -380,6 +398,7 @@ export function registerCollaborationTools(
           headers: { "Content-Type": mime },
           expiresInSeconds: UPLOAD_TTL_SECONDS,
           curl: `curl -fsS -X PUT -H 'Content-Type: ${mime}' --data-binary @<path-to-file> '${uploadUrl}'`,
+          markdown: `![${filename.replace(/[[\]]/g, "")}](${UPLOAD_REF_PREFIX}${key})`,
         });
       }),
   );
@@ -389,7 +408,7 @@ export function registerCollaborationTools(
     {
       title: "Confirm an attachment upload",
       description:
-        "Step 2 of 2: after the PUT succeeded, register the uploaded file on the task so people see it. Safe to repeat.",
+        "Step 2 of 2: after the PUT succeeded, register the uploaded file on the task so people see it. Safe to repeat. Optional: comment bodies can embed the image directly with the markdown from add_attachment, which confirms it for you.",
       inputSchema: {
         task: taskRefInput,
         key: z.string().min(1).max(400).describe("key from add_attachment."),
@@ -399,6 +418,11 @@ export function registerCollaborationTools(
         attachmentId: z.string(),
         identifier: z.string(),
         sizeBytes: z.number().int(),
+        markdown: z
+          .string()
+          .describe(
+            "Image embed for comment_on_task / finish_task / report_blocker bodies.",
+          ),
         url: z.string().url(),
       },
       annotations: writeHints,
@@ -407,56 +431,15 @@ export function registerCollaborationTools(
       run(async (caller) => {
         const t = await resolveTask(caller, ref);
         assertMine(t, auth.userId);
-        if (!key.startsWith(`attachments/${t.id}/`) || key.includes("..")) {
-          throw new McpUserError(
-            `That key does not belong to ${t.identifier}; call add_attachment for this task.`,
-          );
-        }
-
-        const [existing] = await db
-          .select({
-            id: taskAttachment.id,
-            sizeBytes: taskAttachment.sizeBytes,
-          })
-          .from(taskAttachment)
-          .where(eq(taskAttachment.key, key))
-          .limit(1);
-        const url = taskUrl(t.projectSlug, t.id);
-        if (existing) {
-          return ok({
-            attachmentId: existing.id,
-            identifier: t.identifier,
-            sizeBytes: existing.sizeBytes,
-            url,
-          });
-        }
-
-        const head = await headObject(key);
-        if (!head || head.sizeBytes === 0) {
-          throw new McpUserError(
-            "No uploaded file at that key yet. Run the PUT from add_attachment first (the url expires after 10 minutes).",
-          );
-        }
-        if (head.sizeBytes > MAX_ATTACHMENT_BYTES) {
-          // presigned PUT can't cap size; drop it so it doesn't linger
-          await deleteObject(key).catch(() => undefined);
-          throw new McpUserError("File is larger than the 25 MB limit.");
-        }
-
-        const row = await caller.attachment.create({
-          boardId: t.boardId,
-          taskId: t.id,
-          key,
-          filename,
-          mime: head.contentType ?? "application/octet-stream",
-          sizeBytes: head.sizeBytes,
-        });
-        if (!row) throw new Error("attachment insert returned nothing");
+        const row = await caller.attachment
+          .create({ boardId: t.boardId, taskId: t.id, key, filename })
+          .catch(userFacing);
         return ok({
           attachmentId: row.id,
           identifier: t.identifier,
-          sizeBytes: head.sizeBytes,
-          url,
+          sizeBytes: row.sizeBytes,
+          markdown: `![${row.filename}](${fileUrl(row.id)})`,
+          url: taskUrl(t.projectSlug, t.id),
         });
       }),
   );
@@ -477,7 +460,7 @@ export function registerCollaborationTools(
         await caller.comment.edit({
           boardId: t.boardId,
           commentId,
-          body: await agentCommentBody(body, auth.clientId),
+          body: await agentCommentBody(body, auth.clientId, caller, t),
         });
         return ok({ commentId, identifier: t.identifier });
       }),

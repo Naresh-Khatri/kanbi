@@ -35,6 +35,8 @@ export function getR2() {
   return cached;
 }
 
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
 export function buildAttachmentKey(opts: { taskId: string; filename: string }) {
   const safeName = opts.filename.replace(/[^\w.-]+/g, "_").slice(0, 80);
   return `attachments/${opts.taskId}/${nanoid()}-${safeName}`;

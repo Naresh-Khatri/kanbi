@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildBrief,
   compareQueue,
+  inlineOrder,
+  isWaitingOnPeople,
+  labelInlineImages,
   matchProjects,
   parseIdentifier,
 } from "./work-queue";
@@ -107,5 +110,74 @@ describe("buildBrief", () => {
     });
     expect(brief).toContain("## Description\n\nWritten by hand.");
     expect(brief).not.toContain("AI-drafted");
+  });
+});
+
+describe("isWaitingOnPeople", () => {
+  const t = (iso: string) => new Date(iso);
+
+  it("waits after a block until a person acts", () => {
+    expect(isWaitingOnPeople({ blockedAt: null, humanAt: null })).toBe(false);
+    expect(
+      isWaitingOnPeople({ blockedAt: t("2026-01-02"), humanAt: null }),
+    ).toBe(true);
+    expect(
+      isWaitingOnPeople({
+        blockedAt: t("2026-01-02"),
+        humanAt: t("2026-01-01"),
+      }),
+    ).toBe(true);
+    expect(
+      isWaitingOnPeople({
+        blockedAt: t("2026-01-02"),
+        humanAt: t("2026-01-03"),
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("inlineOrder", () => {
+  const item = (
+    id: string,
+    day: number,
+    extra: Partial<{ commentId: string; viaAgent: string; isImage: boolean }> = {},
+  ) => ({
+    id,
+    commentId: extra.commentId ?? null,
+    viaAgent: extra.viaAgent ?? null,
+    isImage: extra.isImage ?? true,
+    createdAt: new Date(2026, 0, day),
+  });
+
+  it("puts the first task image first, then people newest, then agents", () => {
+    const order = inlineOrder([
+      item("agent-old", 1, { viaAgent: "Claude" }),
+      item("task-first", 2),
+      item("pdf", 3, { isImage: false }),
+      item("comment-new", 6, { commentId: "c2" }),
+      item("task-later", 4),
+      item("agent-new", 7, { viaAgent: "Claude" }),
+    ]).map((i) => i.id);
+    expect(order).toEqual([
+      "task-first",
+      "comment-new",
+      "task-later",
+      "agent-new",
+      "agent-old",
+      "pdf",
+    ]);
+  });
+});
+
+describe("labelInlineImages", () => {
+  it("replaces inline images with escaped labels", () => {
+    expect(
+      labelInlineImages(
+        '<p>See</p><img src="/api/files/a" alt="x"><img src="/api/files/zz">',
+        new Map([["a", "image 1 below: <shot>.png"]]),
+      ),
+    ).toBe(
+      "<p>See</p> [image 1 below: &lt;shot&gt;.png]  [image from another task, not attached] ",
+    );
   });
 });

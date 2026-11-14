@@ -55,12 +55,69 @@ export function compareQueue(
   );
 }
 
+/**
+ * report_blocker parks a task until a person reacts: any activity not made by
+ * an agent after the latest block clears it.
+ */
+export function isWaitingOnPeople(stat: {
+  blockedAt: Date | null;
+  humanAt: Date | null;
+}): boolean {
+  if (!stat.blockedAt) return false;
+  return !stat.humanAt || stat.humanAt <= stat.blockedAt;
+}
+
 export function parseIdentifier(
   ref: string,
 ): { key: string; number: number } | null {
   const match = /^([a-z][a-z0-9]*)-(\d+)$/i.exec(ref.trim());
   if (!match) return null;
   return { key: match[1]!.toUpperCase(), number: Number(match[2]) };
+}
+
+type InlineCandidate = {
+  commentId: string | null;
+  viaAgent: string | null;
+  createdAt: Date;
+  isImage: boolean;
+};
+
+/**
+ * Order in which images compete for the inline slots: the reporter's first
+ * task screenshot, then people's images newest first, then agent uploads.
+ * Non-images keep their order at the end.
+ */
+export function inlineOrder<T extends InlineCandidate>(
+  items: readonly T[],
+): T[] {
+  const time = (i: T) => i.createdAt.getTime();
+  const human = items.filter((i) => i.isImage && !i.viaAgent);
+  const first = human
+    .filter((i) => !i.commentId)
+    .sort((a, b) => time(a) - time(b))[0];
+  return [
+    ...(first ? [first] : []),
+    ...human.filter((i) => i !== first).sort((a, b) => time(b) - time(a)),
+    ...items
+      .filter((i) => i.isImage && i.viaAgent)
+      .sort((a, b) => time(b) - time(a)),
+    ...items.filter((i) => !i.isImage),
+  ];
+}
+
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Inline <img> -> "[label]" text so the brief says where each image sits. */
+export function labelInlineImages(
+  html: string,
+  labels: ReadonlyMap<string, string>,
+): string {
+  return html.replace(
+    /<img\b[^>]*?\bsrc="\/api\/files\/([A-Za-z0-9_-]+)"[^>]*>/g,
+    (_, id: string) =>
+      ` [${escapeHtml(labels.get(id) ?? "image from another task, not attached")}] `,
+  );
 }
 
 export type BriefInput = {

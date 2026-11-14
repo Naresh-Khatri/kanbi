@@ -57,6 +57,7 @@ import { BulkTaskActions } from "./bulk-task-actions";
 import { SortableColumn } from "./sortable-column";
 import { TaskCardPreview } from "./task-card";
 import { HiddenColumns } from "./hidden-columns";
+import { useBoardUpdates, useMarkSeen } from "./use-board-updates";
 import { useBoardViewPreferences } from "./use-board-view-preferences";
 import { TaskDetailSheet } from "../task-detail-sheet";
 
@@ -170,6 +171,17 @@ export function BoardView({
     ? (tasks.find((t) => t.id === openTaskId) ?? null)
     : null;
 
+  const updates = useBoardUpdates(boardId);
+  const markSeen = useMarkSeen(boardId);
+  // seen while the updates filter is on -> keep showing until it's cleared
+  const [keptIds, setKeptIds] = useState<ReadonlySet<string>>(() => new Set());
+  const openHasUpdate = !!openTaskId && updates.has(openTaskId);
+  useEffect(() => {
+    if (!openTaskId || !openHasUpdate) return;
+    setKeptIds((s) => new Set(s).add(openTaskId));
+    markSeen(openTaskId);
+  }, [openTaskId, openHasUpdate, markSeen]);
+
   api.realtime.onBoardChange.useSubscription(
     { boardId },
     {
@@ -198,6 +210,7 @@ export function BoardView({
         }
         if (evt.scope === "activity") {
           utils.activity.list.invalidate();
+          utils.board.updates.invalidate({ boardId });
           return;
         }
         utils.board.get.invalidate({ boardId });
@@ -436,6 +449,10 @@ export function BoardView({
   );
 
   const filtersActive = hasActiveFilters(filters);
+  const updatedIds = useMemo(
+    () => new Set([...updates.keys(), ...keptIds]),
+    [updates, keptIds],
+  );
 
   const taskCountsByColumn = useMemo(() => {
     const counts = new Map(
@@ -461,7 +478,12 @@ export function BoardView({
       total++;
       if (
         filtersActive &&
-        !taskMatchesFilters(t, labelsByTask.get(t.id) ?? empty, filters)
+        !taskMatchesFilters(
+          t,
+          labelsByTask.get(t.id) ?? empty,
+          filters,
+          updatedIds,
+        )
       ) {
         continue;
       }
@@ -490,6 +512,7 @@ export function BoardView({
     labelsByTask,
     membersById,
     preferences.sorts,
+    updatedIds,
   ]);
 
   const [active, setActive] = useState<ActiveDrag>(null);
@@ -1114,8 +1137,13 @@ export function BoardView({
         filters={filters}
         labels={labels}
         members={members}
-        onChange={setFilters}
+        onChange={(next) => {
+          if (next.updated !== filters.updated) setKeptIds(new Set());
+          setFilters(next);
+        }}
         onExpandedChange={setToolbarExpanded}
+        onMarkAllSeen={() => markSeen()}
+        updateCount={updates.size}
         onOpenArchive={() => setArchiveOpen(true)}
         onOpenDigest={() => setDigestOpen(true)}
         ref={searchInputRef}
@@ -1177,6 +1205,7 @@ export function BoardView({
                     sortDir={sort.dir}
                     sortMode={sort.mode}
                     tasks={tasksByColumn.get(col.id) ?? []}
+                    updates={updates}
                     deletionTaskCount={taskCountsByColumn.get(col.id)?.all ?? 0}
                     totalTaskCount={taskCountsByColumn.get(col.id)?.active ?? 0}
                     columns={sortedColumns}

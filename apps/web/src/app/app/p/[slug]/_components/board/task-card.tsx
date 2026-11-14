@@ -32,6 +32,7 @@ import { type Priority, PriorityInline } from "../priority";
 import { useArchiveTask } from "../use-archive-task";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
 import type { LabelInfo, MemberInfo, TaskRow } from "./board-types";
+import { type TaskUpdate, updateLabel } from "./use-board-updates";
 import { CONTEXT_MENU_PARTS, MENU_PARTS, type MenuParts } from "./menu-parts";
 
 const REVEAL =
@@ -56,11 +57,13 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   selected,
   onToggleSelection,
   completed,
+  update,
 }: {
   boardId: string;
   task: TaskRow;
   columnId: string;
   completed?: boolean;
+  update?: TaskUpdate;
   canWrite: boolean;
   onOpenTask: (taskId: string) => void;
   assignee: MemberInfo | null;
@@ -116,6 +119,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
           projectKey={projectKey}
           selected={selected}
           task={task}
+          update={update}
         />
       </div>
     </div>
@@ -277,6 +281,7 @@ export const TaskCard = memo(function TaskCard({
   onToggleSelection,
   canWrite,
   completed = false,
+  update,
 }: {
   boardId: string;
   task: TaskRow;
@@ -289,6 +294,8 @@ export const TaskCard = memo(function TaskCard({
   onToggleSelection?: (extend: boolean) => void;
   canWrite: boolean;
   completed?: boolean;
+  /** unseen activity; done cards stay bright until the reporter looks */
+  update?: TaskUpdate;
 }) {
   const remove = useUndoableBoardDelete(boardId);
   const archiveTask = useArchiveTask(boardId);
@@ -322,6 +329,7 @@ export const TaskCard = memo(function TaskCard({
           "bg-card hover:border-input relative w-full cursor-pointer rounded-lg border p-2.5 shadow-xs/5 transition-colors",
           focused && "border-ring ring-ring/40 ring-2",
           selected && "border-info/64 bg-info/8 dark:bg-info/16",
+          update && !selected && "border-info/40",
         )}
         data-slot="task-card"
         onClick={(event) => {
@@ -355,11 +363,30 @@ export const TaskCard = memo(function TaskCard({
         <p
           className={cn(
             "line-clamp-2 pe-5 text-sm leading-snug",
-            completed && "text-muted-foreground",
+            completed && !update && "text-muted-foreground",
           )}
         >
           {task.title}
         </p>
+        {update ? (
+          <p
+            className={cn(
+              "mt-1 flex items-center gap-1.5 text-xs font-medium",
+              update.reason === "blocked"
+                ? "text-warning-foreground"
+                : "text-info-foreground",
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                update.reason === "blocked" ? "bg-warning" : "bg-info",
+              )}
+            />
+            <span className="truncate">{updateLabel(update)}</span>
+          </p>
+        ) : null}
         <Menu>
           <MenuTrigger
             render={

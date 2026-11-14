@@ -2,7 +2,9 @@
 
 import {
   ArchiveIcon,
+  BellDotIcon,
   CalendarClockIcon,
+  CheckCheckIcon,
   ListFilterIcon,
   SearchIcon,
   SignalHighIcon,
@@ -51,6 +53,8 @@ export type BoardFilters = {
   /** "__unassigned__" is a sentinel meaning "tasks with no assignee". */
   assigneeIds: string[];
   due: DueFilter;
+  /** only tasks with activity since the last visit */
+  updated: boolean;
 };
 
 export const UNASSIGNED = "__unassigned__";
@@ -61,6 +65,7 @@ export const EMPTY_FILTERS: BoardFilters = {
   labelIds: [],
   assigneeIds: [],
   due: "any",
+  updated: false,
 };
 
 export function hasActiveFilters(f: BoardFilters): boolean {
@@ -69,7 +74,8 @@ export function hasActiveFilters(f: BoardFilters): boolean {
     f.priorities.length > 0 ||
     f.labelIds.length > 0 ||
     f.assigneeIds.length > 0 ||
-    f.due !== "any"
+    f.due !== "any" ||
+    f.updated
   );
 }
 
@@ -86,7 +92,9 @@ export function taskMatchesFilters(
   task: FilterTask,
   taskLabelIds: Set<string>,
   filters: BoardFilters,
+  updatedIds?: ReadonlySet<string>,
 ): boolean {
+  if (filters.updated && !updatedIds?.has(task.id)) return false;
   const q = filters.query.trim().toLowerCase();
   if (q) {
     const title = task.title.toLowerCase();
@@ -166,6 +174,8 @@ export const BoardToolbar = forwardRef<
     archivedCount: number;
     onOpenArchive: () => void;
     onOpenDigest: () => void;
+    updateCount: number;
+    onMarkAllSeen: () => void;
     /** mobile only: filter row is collapsed behind the filters button */
     expanded: boolean;
     onExpandedChange: (expanded: boolean) => void;
@@ -181,6 +191,8 @@ export const BoardToolbar = forwardRef<
     archivedCount,
     onOpenArchive,
     onOpenDigest,
+    updateCount,
+    onMarkAllSeen,
     expanded,
     onExpandedChange,
   },
@@ -381,6 +393,41 @@ export const BoardToolbar = forwardRef<
       </div>
 
       <div className="ms-auto flex items-center gap-1">
+        {updateCount > 0 || filters.updated ? (
+          <Tip label="Tasks with activity since your last visit">
+            <Button
+              aria-pressed={filters.updated}
+              className={cn(
+                filters.updated && "border-info/32 bg-info/8 dark:bg-info/16",
+              )}
+              onClick={() =>
+                onChange({ ...filters, updated: !filters.updated })
+              }
+              size="sm"
+              variant="outline"
+            >
+              <BellDotIcon aria-hidden="true" />
+              <span className="max-md:hidden">Updates</span>
+              {updateCount > 0 ? (
+                <Badge className="tabular-nums" size="sm" variant="info">
+                  {updateCount}
+                </Badge>
+              ) : null}
+            </Button>
+          </Tip>
+        ) : null}
+        {updateCount > 0 ? (
+          <Tip label="Mark all as seen">
+            <Button
+              aria-label="Mark all as seen"
+              onClick={onMarkAllSeen}
+              size="icon-sm"
+              variant="ghost"
+            >
+              <CheckCheckIcon aria-hidden="true" />
+            </Button>
+          </Tip>
+        ) : null}
         <Tip label="Weekly digest">
           <Button
             aria-label="Weekly digest"

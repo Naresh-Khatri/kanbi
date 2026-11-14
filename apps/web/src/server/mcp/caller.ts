@@ -5,7 +5,9 @@ import { eq } from "drizzle-orm";
 import { createCaller } from "@/server/api/root";
 import { type createTRPCContext } from "@/server/api/trpc";
 import { db } from "@/server/db";
-import { user as userTable } from "@/server/db/schema";
+import { oauthClient, user as userTable } from "@/server/db/schema";
+
+import type { McpAuthorization } from "./authorization";
 
 type Ctx = Awaited<ReturnType<typeof createTRPCContext>>;
 
@@ -16,10 +18,10 @@ type Ctx = Awaited<ReturnType<typeof createTRPCContext>>;
  * from its `sub` so every existing protected/project/board procedure - and the
  * authorization encoded in those procedure types - runs unchanged. Mutations
  * still emit on the realtime bus, so agent-driven changes show up live in the
- * web UI. This owes nothing to the device-token path; it's just how a
- * server-side tRPC call gets an identity.
+ * web UI. `ctx.agent` tags activity and uploads as agent-made.
  */
-export async function createMcpCaller(userId: string) {
+export async function createMcpCaller(auth: McpAuthorization) {
+  const userId = auth.userId;
   const [u] = await db
     .select({
       id: userTable.id,
@@ -47,6 +49,21 @@ export async function createMcpCaller(userId: string) {
     user: { ...u, emailVerified: true, createdAt: now, updatedAt: now },
   } as Ctx["session"];
 
-  const ctx: Ctx = { db, session, device: null, headers: new Headers() };
+  const ctx: Ctx = {
+    db,
+    session,
+    device: null,
+    agent: { clientId: auth.clientId, name: await clientName(auth.clientId) },
+    headers: new Headers(),
+  };
   return createCaller(ctx);
+}
+
+export async function clientName(clientId: string): Promise<string> {
+  const [row] = await db
+    .select({ name: oauthClient.name })
+    .from(oauthClient)
+    .where(eq(oauthClient.clientId, clientId))
+    .limit(1);
+  return row?.name?.trim() || "AI agent";
 }

@@ -47,4 +47,17 @@ describe("markdownToHtml", () => {
     const md = "Fixed **login**.\n\n- one\n\n- two";
     expect(htmlToMarkdown(markdownToHtml(md))).toBe(md);
   });
+
+  it("renders attachment and upload-ref images, not external ones", () => {
+    expect(
+      markdownToHtml(
+        "Before: ![shot](/api/files/abc) then ![new](kanbi-upload:attachments/t/x.png)",
+      ),
+    ).toBe(
+      '<p>Before: <img src="/api/files/abc" alt="shot"> then <img src="kanbi-upload:attachments/t/x.png" alt="new"></p>',
+    );
+    expect(markdownToHtml("![x](https://evil.dev/p.gif)")).not.toContain(
+      "<img",
+    );
+  });
 });

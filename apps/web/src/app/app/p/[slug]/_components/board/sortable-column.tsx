@@ -27,6 +27,7 @@ import type {
 } from "./board-types";
 import { ColumnHeader } from "./column-header";
 import { DropIndicator, SortableTaskCard } from "./task-card";
+import type { TaskUpdate } from "./use-board-updates";
 import type { ColumnSortDir, ColumnSortMode } from "@/lib/task-sort";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +65,7 @@ export const SortableColumn = memo(function SortableColumn({
   onDefaultColumnChange,
   selectedTaskIds,
   onToggleTaskSelection,
+  updates,
 }: {
   boardId: string;
   column: ColumnRow;
@@ -92,6 +94,7 @@ export const SortableColumn = memo(function SortableColumn({
   onDefaultColumnChange: (isDefault: boolean) => void;
   selectedTaskIds: Set<string>;
   onToggleTaskSelection: (taskId: string, extend: boolean) => void;
+  updates: ReadonlyMap<string, TaskUpdate>;
 }) {
   const sortable = useSortable({
     id: column.id,
@@ -188,6 +191,7 @@ export const SortableColumn = memo(function SortableColumn({
         sortBlocked={sortBlocked}
         sortDir={sortDir}
         sortMode={sortMode}
+        newCount={tasks.filter((t) => updates.has(t.id)).length}
         taskCount={tasks.length}
         totalTaskCount={totalTaskCount}
       />
@@ -219,6 +223,7 @@ export const SortableColumn = memo(function SortableColumn({
                   !sortBlocked && dropTarget?.beforeTaskId === t.id
                 }
                 task={t}
+                update={updates.get(t.id)}
                 onToggleSelection={canWrite ? onToggleTaskSelection : undefined}
               />
             ))}

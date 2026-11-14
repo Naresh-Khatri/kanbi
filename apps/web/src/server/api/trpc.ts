@@ -32,6 +32,9 @@ import { resolveBearerSession } from "@/server/device-tokens";
  *
  * @see https://trpc.io/docs/server/context
  */
+/** Set when an MCP client acts on the user's behalf; null for browser/device calls. */
+export type AgentIdentity = { clientId: string; name: string };
+
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const cookieSession = await auth.api.getSession({ headers: opts.headers });
 
@@ -68,6 +71,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     db,
     session,
     device,
+    agent: null as AgentIdentity | null,
     ...opts,
   };
 };

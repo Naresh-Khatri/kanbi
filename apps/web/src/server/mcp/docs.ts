@@ -72,7 +72,7 @@ export function registerDocTools(server: McpServer, auth: McpAuthorization) {
     fn: (caller: Caller) => Promise<CallToolResult>,
   ): Promise<CallToolResult> {
     try {
-      return await fn(await createMcpCaller(auth.userId));
+      return await fn(await createMcpCaller(auth));
     } catch (err) {
       if (err instanceof TRPCError && err.code === "NOT_FOUND") {
         return toFailure(new McpUserError("Doc not found or not accessible."));

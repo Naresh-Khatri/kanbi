@@ -216,10 +216,9 @@ export const taskRouter = createTRPCRouter({
         .returning();
       bus.emitBoard(input.boardId, { scope: "task", ids: row ? [row.id] : [] });
       if (row) {
-        await recordActivity(ctx.db, {
+        await recordActivity(ctx, {
           boardId: input.boardId,
           taskId: row.id,
-          actorId: ctx.session.user.id,
           verb: "task.created",
           payload: { title: row.title },
         });
@@ -294,10 +293,9 @@ export const taskRouter = createTRPCRouter({
         .set(rest)
         .where(and(eq(task.id, taskId), eq(task.boardId, boardId)));
       bus.emitBoard(boardId, { scope: "task", ids: [taskId] });
-      await recordActivity(ctx.db, {
+      await recordActivity(ctx, {
         boardId,
         taskId,
-        actorId: ctx.session.user.id,
         verb: "task.updated",
         payload: { fields: Object.keys(rest) },
       });
@@ -425,10 +423,9 @@ export const taskRouter = createTRPCRouter({
         });
       }
       bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
-      await recordActivity(ctx.db, {
+      await recordActivity(ctx, {
         boardId: input.boardId,
         taskId: input.taskId,
-        actorId: ctx.session.user.id,
         verb: "task.moved",
         payload: {
           toColumnId: input.toColumnId,
@@ -529,10 +526,9 @@ export const taskRouter = createTRPCRouter({
       bus.emitBoard(input.boardId, { scope: "task", ids: taskIds });
 
       for (const row of orderedRows) {
-        await recordActivity(ctx.db, {
+        await recordActivity(ctx, {
           boardId: input.boardId,
           taskId: row.id,
-          actorId: ctx.session.user.id,
           verb: "task.moved",
           payload: {
             toColumnId: input.toColumnId,
@@ -1033,10 +1029,9 @@ export const taskRouter = createTRPCRouter({
       }
 
       for (const row of inserted) {
-        await recordActivity(ctx.db, {
+        await recordActivity(ctx, {
           boardId: input.boardId,
           taskId: row.id,
-          actorId: ctx.session.user.id,
           verb: "task.created",
           payload: { title: row.title },
         });

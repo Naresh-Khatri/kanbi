@@ -4,22 +4,20 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import {
+  filenameFromKey,
+  replaceUploadRefs,
+  uploadRefKeys,
+} from "@/lib/file-url";
 import { markdownToHtml } from "@/lib/markdown-to-html";
 import { db } from "@/server/db";
-import {
-  board,
-  boardColumn,
-  comment,
-  oauthClient,
-  project,
-  task,
-} from "@/server/db/schema";
+import { board, boardColumn, comment, project, task } from "@/server/db/schema";
 import { sanitizeRichText } from "@/server/rich-text/sanitize";
 
 import { agentFooter } from "./agent-note";
-import type { createMcpCaller } from "./caller";
+import { clientName, type createMcpCaller } from "./caller";
 import { MCP_ORIGIN } from "./config";
-import { McpUserError } from "./result";
+import { McpUserError, userFacing } from "./result";
 import { parseIdentifier } from "./work-queue";
 
 export type Caller = Awaited<ReturnType<typeof createMcpCaller>>;
@@ -186,14 +184,7 @@ export async function moveToEnd(
   }
 }
 
-export async function clientName(clientId: string): Promise<string> {
-  const [row] = await db
-    .select({ name: oauthClient.name })
-    .from(oauthClient)
-    .where(eq(oauthClient.clientId, clientId))
-    .limit(1);
-  return row?.name?.trim() || "AI agent";
-}
+export { clientName } from "./caller";
 
 export const commentBodyInput = z
   .string()
@@ -201,13 +192,39 @@ export const commentBodyInput = z
   .min(10)
   .max(8_000)
   .describe(
-    "Markdown (paragraphs, lists, **bold**, `code`, links). Plain and specific; no filler.",
+    "Markdown (paragraphs, lists, **bold**, `code`, links). Plain and specific; no filler. Embed screenshots with the `markdown` from add_attachment after its PUT.",
   );
 
-/** Html body with the agent footer; sanitized like any other rich text. */
-export async function agentCommentBody(markdown: string, clientId: string) {
-  const html = sanitizeRichText(markdownToHtml(markdown)) || "<p></p>";
-  return `${html}${agentFooter(await clientName(clientId))}`;
+/**
+ * Html body with the agent footer. `kanbi-upload:` image refs are registered as
+ * attachments and swapped for file urls, so one call posts text + screenshots.
+ */
+export async function agentCommentBody(
+  markdown: string,
+  clientId: string,
+  caller: Caller,
+  t: { id: string; boardId: string },
+) {
+  let html = markdownToHtml(markdown);
+  const keys = uploadRefKeys(html);
+  if (keys.length > 0) {
+    const ids = new Map<string, string>();
+    for (const key of keys) {
+      const row = await caller.attachment
+        .create({
+          boardId: t.boardId,
+          taskId: t.id,
+          key,
+          filename: filenameFromKey(key),
+          inline: true,
+        })
+        .catch(userFacing);
+      ids.set(key, row.id);
+    }
+    html = replaceUploadRefs(html, ids);
+  }
+  // sanitized whole (footer too) so the stored body matches for dedupe
+  return sanitizeRichText(`${html}${agentFooter(await clientName(clientId))}`);
 }
 
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;

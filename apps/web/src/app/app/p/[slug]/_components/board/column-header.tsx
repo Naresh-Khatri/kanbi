@@ -31,6 +31,7 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -263,11 +264,14 @@ export function ColumnHeader({
   onMoveRight,
   isDefaultColumn,
   onDefaultColumnChange,
+  newCount = 0,
 }: {
   boardId: string;
   column: ColumnRow;
   canWrite: boolean;
   taskCount: number;
+  /** visible tasks with unseen activity */
+  newCount?: number;
   dragHandleProps: React.HTMLAttributes<HTMLButtonElement>;
   onAddTask: (columnId: string) => void;
   sortBlocked: boolean;
@@ -535,7 +539,7 @@ export function ColumnHeader({
               <span className="truncate">{column.name}</span>
               <span
                 className={cn(
-                  "text-muted-foreground ms-0.5 text-xs tabular-nums",
+                  "text-muted-foreground ms-0.5 shrink-0 text-xs whitespace-nowrap tabular-nums",
                   overWipLimit && "text-warning-foreground",
                 )}
                 title={
@@ -548,6 +552,15 @@ export function ColumnHeader({
               >
                 {countLabel}
               </span>
+              {newCount > 0 ? (
+                <Badge
+                  className="shrink-0 tabular-nums"
+                  size="sm"
+                  variant="info"
+                >
+                  {newCount} new
+                </Badge>
+              ) : null}
             </button>
           )}
           {canWrite ? (

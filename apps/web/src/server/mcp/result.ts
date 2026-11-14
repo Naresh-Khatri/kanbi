@@ -1,4 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { TRPCError } from "@trpc/server";
 
 /** Error whose message is safe and useful to show the agent verbatim. */
 export class McpUserError extends Error {}
@@ -19,4 +20,16 @@ export function toFailure(err: unknown): CallToolResult {
   if (err instanceof McpUserError) return fail(err.message);
   console.error("[mcp] tool failed", err);
   return fail("Kanbi could not complete this request.");
+}
+
+/** `.catch(userFacing)`: router validation messages are written for people, so pass them through. */
+export function userFacing(err: unknown): never {
+  if (
+    err instanceof TRPCError &&
+    err.code !== "INTERNAL_SERVER_ERROR" &&
+    !err.message.startsWith(err.code)
+  ) {
+    throw new McpUserError(err.message);
+  }
+  throw err;
 }

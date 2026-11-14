@@ -1,5 +1,7 @@
 import sanitizeHtml from "sanitize-html";
 
+import { FILE_SRC_RE } from "@/lib/file-url";
+
 const OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
     "p",
@@ -24,11 +26,16 @@ const OPTIONS: sanitizeHtml.IOptions = {
     "a",
     "span",
     "hr",
+    "img",
   ],
   allowedAttributes: {
     a: ["href", "title", "rel"],
     span: ["data-type", "data-id", "data-label"],
+    img: ["src", "alt", "width"],
   },
+  // only our own attachment route: no tracking pixels or hotlinks
+  exclusiveFilter: (frame) =>
+    frame.tag === "img" && !FILE_SRC_RE.test(frame.attribs.src ?? ""),
   allowedSchemes: ["http", "https", "mailto"],
   allowProtocolRelative: false,
   transformTags: {

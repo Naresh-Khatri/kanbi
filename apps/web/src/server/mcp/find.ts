@@ -201,7 +201,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
     },
     async (input) => {
       try {
-        const caller = await createMcpCaller(auth.userId);
+        const caller = await createMcpCaller(auth);
         const projects = await caller.project.list();
         const scope = input.projectId
           ? projects.filter((p) => p.id === input.projectId)
