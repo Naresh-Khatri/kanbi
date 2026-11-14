@@ -29,7 +29,7 @@ import { useAppShell } from "@/components/keybinds/shell-store";
 import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
 import { Badge } from "@/components/ui/badge";
 import { toastManager } from "@/components/ui/toast";
-import { OPEN_TASK_EVENT } from "@/components/rich-text/mention";
+import { OPEN_TASK_EVENT } from "@/components/rich-text/hover-card";
 import { POSITION_STEP, positionBetween } from "@/lib/position";
 import { compareTasks } from "@/lib/task-sort";
 import { api } from "@/trpc/react";

@@ -41,6 +41,7 @@ import {
   imageFiles,
   insertImages,
 } from "./image";
+import { createLinkExtension } from "./link";
 import {
   createMentionExtension,
   createMentionRenderExtension,
@@ -145,8 +146,10 @@ export function RichTextEditor({
 
   const extensions = React.useMemo(
     () => [
-      StarterKit.configure({
-        link: { openOnClick: false, autolink: true },
+      StarterKit.configure({ link: false }),
+      createLinkExtension({
+        openOnClick: false,
+        getTickets: () => ticketsRef.current,
       }),
       Placeholder.configure({ placeholder }),
       Markdown,
@@ -573,8 +576,10 @@ export function RichTextContent({
   ticketsRef.current = tickets ?? [];
   const extensions = React.useMemo(
     () => [
-      StarterKit.configure({
-        link: { openOnClick: true, autolink: true },
+      StarterKit.configure({ link: false }),
+      createLinkExtension({
+        openOnClick: true,
+        getTickets: () => ticketsRef.current,
       }),
       createImageExtension({ allowBlob: false }),
       createMentionRenderExtension(() => mentionsRef.current),
