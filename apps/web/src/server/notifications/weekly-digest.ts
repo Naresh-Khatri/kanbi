@@ -33,7 +33,14 @@ export async function runWeeklyDigests(db: typeof Database) {
   let emailed = 0;
 
   for (const { boardId } of activeBoards) {
-    const result = await generateBoardDigest(db, boardId);
+    let result;
+    try {
+      result = await generateBoardDigest(db, boardId);
+    } catch (error) {
+      // free ai tiers rate-limit; skip this board, don't abort the whole run
+      console.error(`[weekly-digest] board ${boardId} failed`, error);
+      continue;
+    }
     if (!result) continue;
     generated += 1;
 

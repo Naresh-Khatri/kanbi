@@ -3,7 +3,7 @@ import "server-only";
 import { generateObject } from "ai";
 import { z } from "zod";
 
-import { draftModel } from "@/server/ai/mistral";
+import { draftModel } from "@/server/ai/model";
 import type { DigestStats } from "@/server/db/schema";
 
 const CATEGORIES = [

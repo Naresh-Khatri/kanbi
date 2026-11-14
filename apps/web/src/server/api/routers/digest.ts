@@ -7,6 +7,7 @@ import {
   createTRPCRouter,
 } from "@/server/api/trpc";
 import { digest } from "@/server/db/schema";
+import { AiNotConfiguredError } from "@/server/ai/model";
 import { generateBoardDigest } from "@/server/digest/generate";
 
 export const digestRouter = createTRPCRouter({
@@ -24,7 +25,19 @@ export const digestRouter = createTRPCRouter({
   /** Mine the last 7 days of activity and write a fresh AI digest. */
   generate: boardProcedure.mutation(async ({ ctx, input }) => {
     assertCanWrite(ctx.access);
-    const result = await generateBoardDigest(ctx.db, input.boardId);
+    let result;
+    try {
+      result = await generateBoardDigest(ctx.db, input.boardId);
+    } catch (error) {
+      console.error("[digest] generate failed", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message:
+          error instanceof AiNotConfiguredError
+            ? "AI digests aren't configured on this server."
+            : "Couldn't write the digest right now. Try again in a moment.",
+      });
+    }
     if (!result) {
       throw new TRPCError({
         code: "BAD_REQUEST",

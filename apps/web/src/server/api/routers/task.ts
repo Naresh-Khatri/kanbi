@@ -17,7 +17,7 @@ import { z } from "zod";
 import type { db as Database } from "@/server/db";
 import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
 import { recordActivity } from "@/server/activity/record";
-import { draftModel } from "@/server/ai/mistral";
+import { AiNotConfiguredError, draftModel } from "@/server/ai/model";
 import {
   assertCanWrite,
   boardProcedure,
@@ -748,10 +748,14 @@ export const taskRouter = createTRPCRouter({
             prompt: input.message,
           })
         ).object;
-      } catch {
+      } catch (error) {
+        console.error("[ai] task draft failed", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "AI response did not match expected shape",
+          message:
+            error instanceof AiNotConfiguredError
+              ? "AI drafting isn't configured on this server."
+              : "The AI couldn't draft this right now. Try again in a moment.",
         });
       }
 
@@ -856,10 +860,14 @@ export const taskRouter = createTRPCRouter({
             prompt: userContent,
           })
         ).object;
-      } catch {
+      } catch (error) {
+        console.error("[ai] task enhance failed", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "AI response did not match expected shape",
+          message:
+            error instanceof AiNotConfiguredError
+              ? "AI drafting isn't configured on this server."
+              : "The AI couldn't draft this right now. Try again in a moment.",
         });
       }
 

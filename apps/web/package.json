@@ -21,7 +21,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/mistral": "^2.0.0",
+    "@ai-sdk/groq": "^2.0.63",
+    "@ai-sdk/openai-compatible": "^1.0.63",
     "@auth/drizzle-adapter": "^1.7.2",
     "@aws-sdk/client-s3": "^3.1030.0",
     "@aws-sdk/s3-request-presigner": "^3.1030.0",

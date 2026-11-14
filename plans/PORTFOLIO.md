@@ -32,7 +32,7 @@ dnd-kit · Zustand · Tiptap · Zod · superjson · Sonner
 **Mobile:** Expo (SDK 55) · React Native 0.83 · expo-router · NativeWind ·
 custom native Android module (Kotlin)
 
-**AI / Agents:** Model Context Protocol (MCP) server · OAuth 2.1 · Mistral LLM SDK
+**AI / Agents:** Model Context Protocol (MCP) server · OAuth 2.1 · Vercel AI SDK (Groq gpt-oss, OpenRouter)
 
 **Infra / tooling:** pnpm workspaces · Turborepo · Docker (standalone output) ·
 Cloudflare R2 / S3 · t3-env runtime env validation · cron-driven email digests

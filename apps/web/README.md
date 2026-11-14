@@ -10,7 +10,7 @@ It borrows the parts of Linear that make it pleasant to live in day-to-day, whil
 - Kanban boards with columns, drag-and-drop reordering, labels, priorities, due dates, and rich-text descriptions
 - Board sharing and member invites with proper roles
 - Proper authentication (email/password + sessions) via Better Auth
-- AI task drafting — paste a client message, let Mistral (`mistral-small-latest`) extract actionable issues with title, description, label, and priority. Shift+V on any board, or the command palette.
+- AI task drafting — paste a client message, let an LLM (Groq `gpt-oss-20b`) extract actionable issues with title, description, label, and priority. Shift+V on any board, or the command palette.
 - Built for personal projects and small teams, not enterprise sprawl
 
 ## Stack
@@ -22,7 +22,8 @@ Bootstrapped with [create-t3-app](https://create.t3.gg/):
 - [Drizzle](https://orm.drizzle.team)
 - [Tailwind CSS](https://tailwindcss.com)
 - [tRPC](https://trpc.io)
-- [Mistral](https://mistral.ai) — powers the AI task drafter (optional; set `MISTRAL_API_KEY` to enable)
+- [Groq](https://console.groq.com) — powers AI drafting, Ask Docs and digests via its free `openai/gpt-oss-20b` model (optional; set `GROQ_API_KEY`)
+- [OpenRouter](https://openrouter.ai) — free fallback via the `openrouter/free` router (optional; set `OPENROUTER_API_KEY`)
 
 ## Getting started
 

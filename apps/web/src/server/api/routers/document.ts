@@ -16,7 +16,7 @@ import {
 import { z } from "zod";
 
 import { positionAtEnd, positionBetween } from "@/lib/position";
-import { draftModel } from "@/server/ai/mistral";
+import { AiNotConfiguredError, draftModel } from "@/server/ai/model";
 import {
   assertCanWrite,
   boardProcedure,
@@ -683,13 +683,11 @@ export const documentRouter = createTRPCRouter({
           })
         ).object;
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes("MISTRAL_API_KEY")
-        ) {
+        console.error("[ai] ask docs failed", error);
+        if (error instanceof AiNotConfiguredError) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "Ask Docs requires MISTRAL_API_KEY to be configured.",
+            message: "Ask Docs isn't configured on this server.",
           });
         }
         throw new TRPCError({

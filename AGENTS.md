@@ -79,7 +79,7 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 
 ### AI
 
-`src/server/ai/mistral.ts` (server-only) uses the Mistral SDK to draft structured tasks; only active when `MISTRAL_API_KEY` is set — treat the feature as optional.
+`src/server/ai/model.ts` (server-only) builds a fallback chain — Groq (`gpt-oss-20b` → `gpt-oss-120b` → `qwen3.8-27b`; free limits are per model), then OpenRouter (`openrouter/free`) — for structured drafting, Ask Docs, and digests; only active when `GROQ_API_KEY` and/or `OPENROUTER_API_KEY` is set — treat the feature as optional.
 
 ### MCP server
 
