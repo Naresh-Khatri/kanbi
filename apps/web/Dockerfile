@@ -24,7 +24,9 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 FROM base AS builder
 COPY --from=deps /app ./
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1 SKIP_ENV_VALIDATION=1
+# static pages (/docs/mcp, metadataBase) bake this in at build, not runtime
+ARG BETTER_AUTH_URL
+ENV NEXT_TELEMETRY_DISABLED=1 SKIP_ENV_VALIDATION=1 BETTER_AUTH_URL=$BETTER_AUTH_URL
 RUN pnpm --filter web build
 
 # ---- runner: minimal standalone server ----

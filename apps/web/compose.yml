@@ -4,6 +4,8 @@ services:
       # Context is the monorepo root; the Dockerfile lives in apps/web.
       context: ../..
       dockerfile: apps/web/Dockerfile
+      args:
+        BETTER_AUTH_URL: ${BETTER_AUTH_URL}
     image: kanbi
     ports:
       - "3000:3000"
