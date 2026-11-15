@@ -90,6 +90,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AgentBadge } from "@/components/agent-badge";
+import { ImageLightbox } from "@/components/image-lightbox";
 import { agentFromClientName } from "@/lib/agents";
 import { UserAvatar } from "@/components/user-avatar";
 import { ColorSwatchGroup } from "@/components/color-swatch-group";
@@ -1367,82 +1368,9 @@ function AttachmentsPanel({
       <ImageLightbox
         images={images}
         index={viewerIndex}
-        onChange={setViewerIndex}
-        onClose={() => setViewerIndex(null)}
+        onIndexChange={setViewerIndex}
       />
     </Section>
-  );
-}
-
-type ImageItem = {
-  id: string;
-  url: string;
-  filename: string;
-};
-
-function ImageLightbox({
-  images,
-  index,
-  onChange,
-  onClose,
-}: {
-  images: ImageItem[];
-  index: number | null;
-  onChange: (i: number) => void;
-  onClose: () => void;
-}) {
-  const current = index !== null ? images[index] : undefined;
-  return (
-    <Dialog
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-      open={current !== undefined}
-    >
-      <DialogPopup className="max-w-5xl">
-        <DialogHeader>
-          <DialogTitle className="truncate pe-8 text-base">
-            {current?.filename ?? "Image"}
-          </DialogTitle>
-        </DialogHeader>
-        <DialogPanel className="flex flex-col gap-4">
-          {current ? (
-            <div className="flex items-center justify-center">
-              <img
-                alt={current.filename}
-                className="max-h-[70vh] max-w-full rounded-lg object-contain"
-                src={current.url}
-              />
-            </div>
-          ) : null}
-          {images.length > 1 ? (
-            <div className="flex gap-2 overflow-x-auto">
-              {images.map((img, i) => (
-                <button
-                  aria-current={i === index}
-                  aria-label={`Show ${img.filename}`}
-                  className={cn(
-                    "size-16 shrink-0 overflow-hidden rounded-lg border outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring",
-                    i === index
-                      ? "border-foreground"
-                      : "opacity-64 hover:opacity-100",
-                  )}
-                  key={img.id}
-                  onClick={() => onChange(i)}
-                  type="button"
-                >
-                  <img
-                    alt=""
-                    className="size-full object-cover"
-                    src={img.url}
-                  />
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </DialogPanel>
-      </DialogPopup>
-    </Dialog>
   );
 }
 

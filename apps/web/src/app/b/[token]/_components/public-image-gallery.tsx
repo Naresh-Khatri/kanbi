@@ -1,19 +1,11 @@
 "use client";
 
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ImageOffIcon,
-  PaperclipIcon,
-} from "lucide-react";
-import { useRef, useState } from "react";
+import { ImageOffIcon, PaperclipIcon } from "lucide-react";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogPopup, DialogTitle } from "@/components/ui/dialog";
+import { ImageLightbox } from "@/components/image-lightbox";
 import { cn } from "@/lib/utils";
 import type { PublicImage } from "./public-types";
-
-const SWIPE_PX = 48;
 
 export function PublicImageGallery({
   images,
@@ -61,96 +53,8 @@ export function PublicImageGallery({
         </p>
       ) : null}
 
-      <Lightbox images={images} index={index} onIndexChange={setIndex} />
+      <ImageLightbox images={images} index={index} onIndexChange={setIndex} />
     </section>
-  );
-}
-
-function Lightbox({
-  images,
-  index,
-  onIndexChange,
-}: {
-  images: PublicImage[];
-  index: number | null;
-  onIndexChange: (i: number | null) => void;
-}) {
-  const touchX = useRef<number | null>(null);
-  const current = index != null ? images[index] : undefined;
-  const many = images.length > 1;
-
-  function step(delta: number) {
-    if (index == null) return;
-    onIndexChange((index + delta + images.length) % images.length);
-  }
-
-  return (
-    <Dialog
-      onOpenChange={(open) => !open && onIndexChange(null)}
-      open={current != null}
-    >
-      <DialogPopup
-        bottomStickOnMobile={false}
-        className="max-w-[min(64rem,calc(100vw-2rem))] overflow-hidden"
-        onKeyDown={(e) => {
-          if (!many) return;
-          if (e.key === "ArrowRight") step(1);
-          else if (e.key === "ArrowLeft") step(-1);
-        }}
-        onTouchEnd={(e) => {
-          const start = touchX.current;
-          touchX.current = null;
-          const end = e.changedTouches[0]?.clientX;
-          if (!many || start == null || end == null) return;
-          if (Math.abs(end - start) > SWIPE_PX) step(end < start ? 1 : -1);
-        }}
-        onTouchStart={(e) => {
-          touchX.current = e.touches[0]?.clientX ?? null;
-        }}
-      >
-        {current ? (
-          <>
-            <div className="bg-muted/40 flex min-h-48 items-center justify-center p-2 pt-12">
-              <SignedImage
-                className="max-h-[75dvh] w-auto max-w-full rounded-md object-contain"
-                image={current}
-                key={current.id}
-              />
-            </div>
-            <div className="flex items-center gap-3 border-t px-4 py-3">
-              <DialogTitle className="min-w-0 flex-1 truncate text-sm font-normal">
-                {current.filename}
-              </DialogTitle>
-              {many ? (
-                <>
-                  <span className="text-muted-foreground text-xs tabular-nums">
-                    {(index ?? 0) + 1} / {images.length}
-                  </span>
-                  <div className="flex gap-1">
-                    <Button
-                      aria-label="Previous image"
-                      onClick={() => step(-1)}
-                      size="icon-sm"
-                      variant="outline"
-                    >
-                      <ChevronLeftIcon aria-hidden="true" />
-                    </Button>
-                    <Button
-                      aria-label="Next image"
-                      onClick={() => step(1)}
-                      size="icon-sm"
-                      variant="outline"
-                    >
-                      <ChevronRightIcon aria-hidden="true" />
-                    </Button>
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </>
-        ) : null}
-      </DialogPopup>
-    </Dialog>
   );
 }
 

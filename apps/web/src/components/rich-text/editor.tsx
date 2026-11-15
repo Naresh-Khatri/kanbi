@@ -5,6 +5,7 @@ import FileHandler from "@tiptap/extension-file-handler";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "@tiptap/markdown";
 import { Fragment, Slice } from "@tiptap/pm/model";
+import type { EditorView } from "@tiptap/pm/view";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -35,6 +36,7 @@ import {
   ToolbarSeparator,
 } from "@/components/ui/toolbar";
 import { cn } from "@/lib/utils";
+import { ImageLightbox, type LightboxImage } from "@/components/image-lightbox";
 import {
   createImageExtension,
   IMAGE_MIME_TYPES,
@@ -194,6 +196,7 @@ export function RichTextEditor({
     ],
   );
 
+  const gallery = useImageGallery();
   const editorRef = React.useRef<Editor | null>(null);
   const editor = useEditor({
     extensions,
@@ -210,6 +213,11 @@ export function RichTextEditor({
         ),
         style: `min-height: ${minHeight};`,
       },
+      // read-only: click opens; editable: click selects, double-click opens
+      handleClickOn: (view, pos, node) =>
+        !view.editable && node.type.name === "image" && gallery.open(view, pos),
+      handleDoubleClickOn: (view, pos, node) =>
+        view.editable && node.type.name === "image" && gallery.open(view, pos),
       // text-only clipboard (editors, terminals, READMEs) = markdown, like GitHub; shift-paste stays plain
       clipboardTextParser: (text, $context, plain, view) => {
         const { schema } = view.state;
@@ -256,7 +264,13 @@ export function RichTextEditor({
   }, [editor, disabled]);
 
   if (!editor) return null;
-  if (disabled) return <EditorContent editor={editor} />;
+  if (disabled)
+    return (
+      <>
+        <EditorContent editor={editor} />
+        {gallery.lightbox}
+      </>
+    );
 
   const toolbar = (
     <EditorToolbar
@@ -279,6 +293,7 @@ export function RichTextEditor({
           {toolbar}
         </div>
         <EditorContent editor={editor} />
+        {gallery.lightbox}
       </>
     );
 
@@ -293,6 +308,7 @@ export function RichTextEditor({
       >
         <EditorContent editor={editor} />
         <div className={revealed}>{toolbar}</div>
+        {gallery.lightbox}
       </div>
     );
 
@@ -300,6 +316,7 @@ export function RichTextEditor({
     <div className="border-input bg-background ring-ring/24 focus-within:border-ring dark:bg-input/32 rounded-lg border shadow-xs/5 transition-shadow focus-within:ring-[3px]">
       <EditorContent editor={editor} />
       <div className={revealed}>{toolbar}</div>
+      {gallery.lightbox}
     </div>
   );
 }
@@ -607,6 +624,7 @@ export function RichTextContent({
   mentionsRef.current = mentions ?? [];
   const ticketsRef = React.useRef<TicketMentionItem[]>(tickets ?? []);
   ticketsRef.current = tickets ?? [];
+  const gallery = useImageGallery();
   const extensions = React.useMemo(
     () => [
       StarterKit.configure({ link: false }),
@@ -628,11 +646,8 @@ export function RichTextContent({
     immediatelyRender: false,
     editorProps: {
       attributes: { class: cn(RICH_TEXT_PROSE, className) },
-      handleClickOn: (_view, _pos, node) => {
-        if (node.type.name !== "image") return false;
-        window.open(String(node.attrs.src), "_blank", "noopener");
-        return true;
-      },
+      handleClickOn: (view, pos, node) =>
+        node.type.name === "image" && gallery.open(view, pos),
     },
   });
 
@@ -644,5 +659,48 @@ export function RichTextContent({
 
   if (!editor) return null;
 
-  return <EditorContent editor={editor} />;
+  return (
+    <>
+      <EditorContent editor={editor} />
+      {gallery.lightbox}
+    </>
+  );
+}
+
+/** Opens every image in the doc in a lightbox, starting at the one at `pos`. */
+function useImageGallery() {
+  const [state, setState] = React.useState<{
+    images: LightboxImage[];
+    index: number;
+  } | null>(null);
+
+  const open = React.useCallback((view: EditorView, pos: number) => {
+    const images: LightboxImage[] = [];
+    let index = -1;
+    view.state.doc.descendants((n, p) => {
+      const src = n.type.name === "image" ? String(n.attrs.src ?? "") : "";
+      // blob: = still uploading
+      if (!src || src.startsWith("blob:")) return;
+      if (p === pos) index = images.length;
+      images.push({
+        id: String(p),
+        url: src,
+        filename: String(n.attrs.alt || n.attrs.title || "Image"),
+      });
+    });
+    if (index < 0) return false;
+    setState({ images, index });
+    return true;
+  }, []);
+
+  const lightbox = (
+    <ImageLightbox
+      images={state?.images ?? []}
+      index={state?.index ?? null}
+      onIndexChange={(i) =>
+        setState((g) => (g && i != null ? { ...g, index: i } : null))
+      }
+    />
+  );
+  return { open, lightbox };
 }
