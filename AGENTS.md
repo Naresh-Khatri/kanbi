@@ -15,6 +15,7 @@ pnpm dev:web          # dev server for web only (port 3333, turbopack)
 pnpm build            # turbo build (all apps)
 pnpm lint             # next lint (web)
 pnpm typecheck        # tsc --noEmit
+pnpm test             # vitest (web; *.test.ts beside the source)
 pnpm format:write     # prettier (has tailwind class sorting plugin)
 
 pnpm db:push          # push Drizzle schema to Postgres (dev workflow)
@@ -23,7 +24,7 @@ pnpm db:migrate       # run migrations (prod applies them on boot via src/instru
 pnpm db:studio        # Drizzle Studio
 ```
 
-There is no test suite. Inside `apps/web` you can also run `pnpm lint:fix`. Env vars are validated at startup by `src/env.js` (t3-env + Zod); `SKIP_ENV_VALIDATION=1` bypasses it (used in Docker builds). Empty-string env vars are treated as undefined.
+Inside `apps/web` you can also run `pnpm lint:fix`. Env vars are validated at startup by `src/env.js` (t3-env + Zod); `SKIP_ENV_VALIDATION=1` bypasses it (used in Docker builds). Empty-string env vars are treated as undefined.
 
 ## Web app architecture (`apps/web/src`)
 
@@ -83,7 +84,7 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 
 ### MCP server
 
-`src/server/mcp/` exposes a Model Context Protocol server at `/api/mcp` (Streamable HTTP) so external agents (Claude Code, opencode) can capture approved tasks and work the user's own assigned tasks (`work.ts`: queue inferred from the repo name, start/finish via compare-and-swap `task.move`; `collaborate.ts`: comments, blockers, checklist, labels, presigned attachments, all limited to the user's assigned tasks, with agent comments marked by an html footer (`agent-note.ts`) instead of a schema column; `docs.ts`: read-only docs list/get/search). Auth is OAuth 2.1 via `@better-auth/oauth-provider`, registered alongside the `jwt()` plugin in `src/server/better-auth/config.ts`: agents self-register (RFC 7591 DCR), the user consents at `/consent`, and the route (`src/app/api/[transport]/route.ts`) verifies the resulting JWT against the JWKS. Tools wrap existing tRPC procedures through a JWT-to-session bridge (`caller.ts`), so ACLs, validation, and the realtime bus are all reused; per-tool checks gate the `kanbi:read` vs `kanbi:write` scopes. Agent-authored HTML is sanitized server-side (`sanitize.ts`). The `oauth_*` and `jwks` tables are unprefixed (owned by the Better Auth adapter); OAuth discovery docs live under `src/app/.well-known/`, served at both the root and the RFC-path-aware locations. **See `src/server/mcp/README.md`** for connecting agents, the tool/scope reference, and troubleshooting.
+`src/server/mcp/` exposes a Model Context Protocol server at `/api/mcp` (Streamable HTTP) so external agents (Claude Code, Codex, opencode, Grok) can capture approved tasks and work the user's own assigned tasks (`work.ts`: queue inferred from the repo name, start/finish via compare-and-swap `task.move`; `collaborate.ts`: comments, blockers, checklist, labels, presigned attachments, all limited to the user's assigned tasks, with agent comments marked by an html footer (`agent-note.ts`) instead of a schema column; `docs.ts`: read-only docs list/get/search). Auth is OAuth 2.1 via `@better-auth/oauth-provider`, registered alongside the `jwt()` plugin in `src/server/better-auth/config.ts`: agents self-register (RFC 7591 DCR), the user consents at `/consent`, and the route (`src/app/api/[transport]/route.ts`) verifies the resulting JWT against the JWKS. Tools wrap existing tRPC procedures through a JWT-to-session bridge (`caller.ts`), so ACLs, validation, and the realtime bus are all reused; per-tool checks gate the `kanbi:read` vs `kanbi:write` scopes. Agent-authored HTML is sanitized server-side (`sanitize.ts`). The `oauth_*` and `jwks` tables are unprefixed (owned by the Better Auth adapter); OAuth discovery docs live under `src/app/.well-known/`, served at both the root and the RFC-path-aware locations. **See `src/server/mcp/README.md`** for connecting agents, the tool/scope reference, and troubleshooting.
 
 ## Design language
 

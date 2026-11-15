@@ -5,8 +5,8 @@ two things: it turns a finished agent discussion into reviewed Kanbi tasks
 (capture), and it lets a coding agent pull your own assigned tasks for the
 current repo, fix them, and close them (work).
 
-- **Endpoint:** `https://<your-kanbi-host>/api/mcp` (Streamable HTTP). In local
-  dev that is `http://kanbi.localhost:3333/api/mcp`.
+- **Endpoint:** `https://kanbi.nareshkhatri.dev/api/mcp` (Streamable HTTP). In
+  local dev it is `http://kanbi.localhost:3333/api/mcp`.
 - **Auth:** OAuth 2.1 with a browser consent screen. The agent registers itself
   (RFC 7591 Dynamic Client Registration), you log in once and approve, and it
   receives a JWT access token. There are no API keys to copy or paste.
@@ -14,17 +14,17 @@ current repo, fix them, and close them (work).
   live OAuth consent on every MCP request. Revoking an app takes effect
   immediately, even for an unexpired JWT.
 
-Everything below uses `kanbi.localhost:3333` as the example host. Swap in your
-own deployment origin in production, including the exact scheme. Public
-deployments should use `https://`; MCP OAuth clients reject discovery redirects
-that change origin, including an `http://` to `https://` redirect.
+Everything below uses the production host, `kanbi.nareshkhatri.dev`. Against a
+local dev server, swap in `http://kanbi.localhost:3333`. Keep the exact scheme:
+MCP OAuth clients reject discovery redirects that change origin, including an
+`http://` to `https://` redirect.
 
 ## Connect an agent
 
 ### Claude Code
 
 ```bash
-claude mcp add --transport http kanbi http://kanbi.localhost:3333/api/mcp
+claude mcp add --transport http kanbi https://kanbi.nareshkhatri.dev/api/mcp
 ```
 
 Then run any Kanbi tool (or `/mcp` in the TUI) and Claude opens the browser
@@ -35,7 +35,7 @@ consent flow. After you approve, the tools are available.
 Add the remote Streamable HTTP server, then complete the OAuth login:
 
 ```bash
-codex mcp add kanbi --url http://kanbi.localhost:3333/api/mcp
+codex mcp add kanbi --url https://kanbi.nareshkhatri.dev/api/mcp
 codex mcp login kanbi
 ```
 
@@ -53,7 +53,7 @@ Add the server to `opencode.json` (project root) or
   "mcp": {
     "kanbi": {
       "type": "remote",
-      "url": "http://kanbi.localhost:3333/api/mcp",
+      "url": "https://kanbi.nareshkhatri.dev/api/mcp",
       "enabled": true
     }
   }
@@ -75,7 +75,7 @@ server.
 Add Kanbi as a remote MCP server. Grok starts the OAuth flow on first use:
 
 ```bash
-grok mcp add --transport http kanbi http://kanbi.localhost:3333/api/mcp
+grok mcp add --transport http kanbi https://kanbi.nareshkhatri.dev/api/mcp
 ```
 
 Run `grok mcp doctor kanbi` if the connection or OAuth flow needs diagnosis.
@@ -84,9 +84,10 @@ then add it at [grok.com/connectors](https://grok.com/connectors) with **New
 Connector → Custom**. A local development URL cannot be reached by Grok's
 hosted service.
 
-> Prefer the `kanbi.localhost` host over `localhost`: it matches the server's
-> configured origin, so OAuth discovery, the token audience, and your existing
-> browser login session all line up on one origin.
+> Against a local dev server, use `http://kanbi.localhost:3333/api/mcp` rather
+> than `localhost`: it matches the server's configured origin, so OAuth
+> discovery, the token audience, and your existing browser login session all
+> line up on one origin.
 
 ## Capture approved work
 
@@ -248,7 +249,7 @@ the client binds a `resource` that matches a valid audience; otherwise it issues
 an opaque token the JWKS-verifying route cannot accept. Re-authorize with a
 clean token:
 
-- Claude Code: `claude mcp remove kanbi && claude mcp add --transport http kanbi http://kanbi.localhost:3333/api/mcp`, then authenticate.
+- Claude Code: `claude mcp remove kanbi && claude mcp add --transport http kanbi https://kanbi.nareshkhatri.dev/api/mcp`, then authenticate.
 - opencode: `rm ~/.local/share/opencode/mcp-auth.json` (clears the cached token), then `opencode mcp auth kanbi`.
 
 To confirm a token is a JWT, decode it: a JWT has three dot-separated segments;
@@ -261,9 +262,10 @@ discovers the resource from RFC 9728 Protected Resource Metadata at
 the PRM path 404s, opencode omits the `resource` indicator and gets an opaque
 token (see above).
 
-**Host mismatch.** Point the agent at the same host the server advertises
-(`kanbi.localhost` in dev). The server also accepts `localhost` as an audience,
-but the discovery metadata and login cookie live on the configured origin.
+**Host mismatch.** Point the agent at the same origin the server advertises
+(`BETTER_AUTH_URL`; `kanbi.localhost` in dev). The server also accepts
+`localhost` as an audience, but the discovery metadata and login cookie live on
+the configured origin.
 
 ## Architecture (for maintainers)
 

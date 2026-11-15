@@ -30,9 +30,9 @@ Bootstrapped with [create-t3-app](https://create.t3.gg/):
 ```bash
 pnpm install
 pnpm db:push
-pnpm dev
+pnpm dev:web   # http://kanbi.localhost:3333
 ```
 
 ## Deployment
 
-See the T3 deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify), or [Docker](https://create.t3.gg/en/deployment/docker).
+Deploy as a single long-running Node instance with Docker: build from the repo root with `apps/web/Dockerfile` (Next.js `standalone` output). Migrations run on boot. Serverless hosts (Vercel, Netlify) are not supported: the realtime bus is in-process, see `TODO.md`.

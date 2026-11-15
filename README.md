@@ -31,15 +31,15 @@ kanbi/
   actionable issues with title, description, label, and priority.
 - **Focus app**: an Expo companion that pairs to your account over a QR code and
   authenticates with per-device tokens.
-- **MCP server**: connect AI agents (Claude Code, opencode) over OAuth to
-  capture approved tasks from finished discussions. See
+- **MCP server**: connect AI agents (Claude Code, Codex, opencode, Grok) over
+  OAuth to capture approved tasks from finished discussions. See
   [`apps/web/src/server/mcp/README.md`](apps/web/src/server/mcp/README.md).
 - **Auth**: email/password plus Google and GitHub OAuth, via Better Auth.
 
 ## Tech stack
 
 Next.js 15 (App Router) - tRPC v11 + TanStack Query - Drizzle ORM on Postgres -
-Better Auth - Tailwind v4 with shadcn/Radix - dnd-kit - Zustand - Tiptap.
+Better Auth - Tailwind v4 with coss ui (Base UI) - dnd-kit - Zustand - Tiptap.
 Turborepo + pnpm; the companion app is Expo / React Native.
 
 ## Getting started
@@ -58,10 +58,11 @@ pnpm install
 
 cp apps/web/.env.example apps/web/.env   # then set DATABASE_URL (rest is optional)
 pnpm db:push                             # create the schema in your database
-pnpm dev:web                             # http://localhost:3333
+pnpm dev:web                             # http://kanbi.localhost:3333
 ```
 
-The web app runs on **port 3333**.
+The web app runs on **port 3333**. Use `kanbi.localhost` rather than
+`localhost` so OAuth and MCP discovery stay on one origin.
 
 ### Environment
 
@@ -71,15 +72,15 @@ required in production (`openssl rand -base64 32`).
 
 Everything else is optional and gates one feature:
 
-| Variable                                        | Enables                                                                                |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `BETTER_AUTH_URL`                               | OAuth redirects and the MCP server (your origin, e.g. `http://kanbi.localhost:3333`).  |
-| `BETTER_AUTH_GITHUB_*` / `BETTER_AUTH_GOOGLE_*` | Social login (each provider needs both its id and secret).                             |
-| `SMTP_*`                                        | Transactional email (password reset, invites, digests); unset means sends are skipped. |
-| `R2_*`                                          | Task attachments (Cloudflare R2 / S3-compatible).                                      |
-| `GROQ_API_KEY` / `OPENROUTER_API_KEY`           | AI drafting, Ask Docs, digests (free; tried in that order).                            |
-| `CRON_SECRET`                                   | Auth for the `/api/cron/*` endpoints.                                                  |
-| `MCP_RESOURCE_URL`                              | Override the MCP OAuth audience (defaults to `<BETTER_AUTH_URL>/api/mcp`).             |
+| Variable                                        | Enables                                                                                        |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_URL`                               | OAuth redirects and the MCP server (your public origin; `http://kanbi.localhost:3333` in dev). |
+| `BETTER_AUTH_GITHUB_*` / `BETTER_AUTH_GOOGLE_*` | Social login (each provider needs both its id and secret).                                     |
+| `SMTP_*`                                        | Transactional email (password reset, invites, digests); unset means sends are skipped.         |
+| `R2_*`                                          | Task attachments (Cloudflare R2 / S3-compatible).                                              |
+| `GROQ_API_KEY` / `OPENROUTER_API_KEY`           | AI drafting, Ask Docs, digests (free; tried in that order).                                    |
+| `CRON_SECRET`                                   | Auth for the `/api/cron/*` endpoints.                                                          |
+| `MCP_RESOURCE_URL`                              | Override the MCP OAuth audience (defaults to `<BETTER_AUTH_URL>/api/mcp`).                     |
 
 See `apps/web/.env.example` for the full list.
 
@@ -94,6 +95,7 @@ pnpm dev:focus      # Expo companion app
 pnpm build          # build all apps
 pnpm lint           # next lint
 pnpm typecheck      # tsc --noEmit
+pnpm test           # vitest (web)
 pnpm format:write   # prettier
 
 pnpm db:push        # push the Drizzle schema (the dev workflow)
@@ -102,20 +104,18 @@ pnpm db:migrate     # run migrations (production applies them automatically on b
 pnpm db:studio      # Drizzle Studio
 ```
 
-There is no test suite.
-
 ## Connect an AI agent
 
 Kanbi ships an MCP server at `/api/mcp` so agents can capture reviewed tasks
 from finished discussions in an editor or terminal. Quick version for Claude
-Code:
+Code against production (`http://kanbi.localhost:3333/api/mcp` in dev):
 
 ```bash
-claude mcp add --transport http kanbi http://kanbi.localhost:3333/api/mcp
+claude mcp add --transport http kanbi https://kanbi.nareshkhatri.dev/api/mcp
 ```
 
-Then run a tool and approve the browser consent screen. The full guide (opencode
-setup, tool/scope reference, troubleshooting) lives in
+Then run a tool and approve the browser consent screen. The full guide (Codex,
+opencode and Grok setup, tool/scope reference, troubleshooting) lives in
 [`apps/web/src/server/mcp/README.md`](apps/web/src/server/mcp/README.md).
 
 ## Documentation

@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
 import { TRPCReactProvider } from "@/trpc/react";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(
+    process.env.BETTER_AUTH_URL ?? "http://kanbi.localhost:3333",
+  ),
   title: "Kanbi",
   description: "A fast, keyboard-first kanban.",
 };
