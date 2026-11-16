@@ -603,7 +603,7 @@ export function registerWorkTools(
             dueAt: r.dueAt ? r.dueAt.toISOString().slice(0, 10) : null,
             column: r.columnName,
             imageCount: imageCounts.get(r.id) ?? 0,
-            url: taskUrl(chosen.slug, r.id),
+            url: taskUrl(chosen.slug, r.number),
           });
           const inProgress = mine.filter((r) => r.category === "started");
           const ready = mine.filter((r) => r.category !== "started");
@@ -620,7 +620,7 @@ export function registerWorkTools(
                 identifier: `${chosen.key}-${r.number}`,
                 title: r.title,
                 blockedAt: waiting.get(r.id)!.toISOString(),
-                url: taskUrl(chosen.slug, r.id),
+                url: taskUrl(chosen.slug, r.number),
               })),
             note:
               chosen.status === "on_hold"
@@ -754,7 +754,7 @@ export function registerWorkTools(
             COMMENT_PAGE,
           );
 
-          const url = taskUrl(t.projectSlug, t.id);
+          const url = taskUrl(t.projectSlug, t.number);
           const brief = buildBrief({
             identifier: t.identifier,
             title: t.title,
@@ -978,7 +978,7 @@ export function registerWorkTools(
         run(async (caller) => {
           const t = await resolveTask(caller, ref);
           assertMine(t, auth.userId);
-          const url = taskUrl(t.projectSlug, t.id);
+          const url = taskUrl(t.projectSlug, t.number);
           // review = client sent it back; reopen
           if (
             t.category !== "backlog" &&
@@ -1124,7 +1124,7 @@ export function registerWorkTools(
             commentId,
             identifier: t.identifier,
             column: target.name,
-            url: taskUrl(t.projectSlug, t.id),
+            url: taskUrl(t.projectSlug, t.number),
             checklistRemaining: items.filter(
               (i) => !i.done && !toTick.has(i.id),
             ).length,

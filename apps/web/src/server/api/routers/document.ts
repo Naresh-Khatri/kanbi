@@ -195,6 +195,7 @@ export const documentRouter = createTRPCRouter({
       members,
       tickets: tickets.map((ticket) => ({
         id: ticket.id,
+        number: ticket.number,
         label: `${key}-${ticket.number}`,
         title: ticket.title,
         status: ticket.status,

@@ -1,3 +1,4 @@
+import { taskBoardHref } from "@/lib/task-link";
 import { toastManager } from "@/components/ui/toast";
 
 export function copyText(text: string, successTitle: string) {
@@ -13,8 +14,18 @@ export function copyText(text: string, successTitle: string) {
   );
 }
 
-/** Build a shareable URL that deep-links to a task and copy it to the clipboard. */
-export function copyTaskLink(taskId: string) {
-  const url = `${window.location.origin}${window.location.pathname}?task=${taskId}`;
-  return copyText(url, "Link copied");
+// board link, not the page one -> opens in each viewer's saved view
+export function copyTaskLink(projectSlug: string, number: number) {
+  return copyText(
+    `${window.location.origin}${taskBoardHref(projectSlug, number)}`,
+    "Link copied",
+  );
+}
+
+// board-only: path is /app/p/<slug>; avoids useParams in every card (re-renders on url sync)
+export function copyBoardTaskLink(number: number) {
+  return copyText(
+    `${window.location.origin}${window.location.pathname}?task=${number}`,
+    "Link copied",
+  );
 }

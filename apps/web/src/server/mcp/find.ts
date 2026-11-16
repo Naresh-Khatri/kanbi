@@ -34,6 +34,7 @@ import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
 import { MCP_ORIGIN } from "./config";
 import { McpUserError, ok, toFailure } from "./result";
+import { taskBoardHref } from "@/lib/task-link";
 
 const DAY_MS = 86_400_000;
 
@@ -349,8 +350,10 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           ]);
         }
         const tasks = page.map((r) => {
-          const url = new URL(`/app/p/${r.projectSlug}`, MCP_ORIGIN);
-          url.searchParams.set("task", r.id);
+          const url = new URL(
+            taskBoardHref(r.projectSlug, r.number),
+            MCP_ORIGIN,
+          );
           return {
             id: r.id,
             identifier: `${r.projectKey}-${r.number}`,

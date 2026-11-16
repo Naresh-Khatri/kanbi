@@ -115,7 +115,7 @@ export function registerCollaborationTools(
     async ({ task: ref }) =>
       run(async (caller) => {
         const t = await resolveTask(caller, ref);
-        const url = taskUrl(t.projectSlug, t.id);
+        const url = taskUrl(t.projectSlug, t.number);
         if (t.assigneeId === auth.userId) {
           return ok({ status: "already_mine", identifier: t.identifier, url });
         }
@@ -163,7 +163,7 @@ export function registerCollaborationTools(
         return ok({
           commentId,
           identifier: t.identifier,
-          url: taskUrl(t.projectSlug, t.id),
+          url: taskUrl(t.projectSlug, t.number),
         });
       }, agent),
   );
@@ -245,7 +245,7 @@ export function registerCollaborationTools(
           column: moved ? target!.name : t.columnName,
           moved,
           commentId,
-          url: taskUrl(t.projectSlug, t.id),
+          url: taskUrl(t.projectSlug, t.number),
           ...(note ? { note } : {}),
         });
       }, agent),
@@ -474,7 +474,7 @@ export function registerCollaborationTools(
           identifier: t.identifier,
           sizeBytes: row.sizeBytes,
           markdown: `![${row.filename}](${fileUrl(row.id)})`,
-          url: taskUrl(t.projectSlug, t.id),
+          url: taskUrl(t.projectSlug, t.number),
         });
       }),
   );

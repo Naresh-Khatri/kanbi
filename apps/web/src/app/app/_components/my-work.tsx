@@ -36,6 +36,7 @@ import {
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { TodayQueue } from "./today-queue";
+import { taskBoardHref } from "@/lib/task-link";
 
 type Assigned = RouterOutputs["user"]["myWork"]["assigned"][number];
 type Mention = RouterOutputs["user"]["myWork"]["mentions"][number];
@@ -204,7 +205,7 @@ const rowClass =
 function TaskRow({ task: t, danger }: { task: Assigned; danger?: boolean }) {
   return (
     <li className="break-inside-avoid">
-      <Link className={rowClass} href={`/app/p/${t.projectSlug}?task=${t.id}`}>
+      <Link className={rowClass} href={taskBoardHref(t.projectSlug, t.number)}>
         <PriorityIcon
           className="size-3.5 shrink-0"
           priority={t.priority as Priority}
@@ -249,7 +250,11 @@ function MentionRow({ mention: m }: { mention: Mention }) {
       {m.taskId && m.projectSlug ? (
         <Link
           className={rowClass}
-          href={`/app/p/${m.projectSlug}?task=${m.taskId}`}
+          href={
+            m.taskNumber != null
+              ? taskBoardHref(m.projectSlug, m.taskNumber)
+              : `/app/p/${m.projectSlug}?task=${m.taskId}`
+          }
         >
           {body}
         </Link>

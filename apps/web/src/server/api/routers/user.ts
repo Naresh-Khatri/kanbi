@@ -38,6 +38,7 @@ export const userRouter = createTRPCRouter({
     const assigned = await ctx.db
       .select({
         id: task.id,
+        number: task.number,
         title: task.title,
         priority: task.priority,
         dueAt: task.dueAt,
@@ -65,6 +66,7 @@ export const userRouter = createTRPCRouter({
       .select({
         id: notification.id,
         taskId: notification.taskId,
+        taskNumber: task.number,
         taskTitle: task.title,
         projectSlug: project.slug,
         projectName: project.name,

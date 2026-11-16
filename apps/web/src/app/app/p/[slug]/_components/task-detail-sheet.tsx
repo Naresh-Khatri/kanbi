@@ -9,7 +9,9 @@ import {
   GitBranchIcon,
   HashIcon,
   Link2Icon,
+  Maximize2Icon,
   MinusIcon,
+  PanelRightIcon,
   PaperclipIcon,
   PencilIcon,
   PlusIcon,
@@ -22,7 +24,7 @@ import {
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import {
   isRichTextEmpty,
   RichTextContent,
@@ -90,11 +92,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/components/ui/toast";
-import {
-  Tooltip,
-  TooltipPopup,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { AgentBadge } from "@/components/agent-badge";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { agentFromClientName } from "@/lib/agents";
@@ -144,10 +142,12 @@ const toastError = (e: { message: string }) =>
 export function TaskDetailSheet({
   open,
   onOpenChange,
+  onExpand,
   task,
   boardId,
   projectId,
   projectKey,
+  projectSlug,
   columns,
   tasks,
   labels,
@@ -157,10 +157,12 @@ export function TaskDetailSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onExpand: (number: number) => void;
   task: TaskRow | null;
   boardId: string;
   projectId: string;
   projectKey: string;
+  projectSlug: string;
   columns: ColumnRow[];
   tasks: TaskRow[];
   labels: LabelRow[];
@@ -179,8 +181,10 @@ export function TaskDetailSheet({
             key={task.id}
             labels={labels}
             onClose={() => onOpenChange(false)}
+            onToggleView={() => onExpand(task.number)}
             projectId={projectId}
             projectKey={projectKey}
+            projectSlug={projectSlug}
             task={task}
             taskLabels={taskLabels.filter((tl) => tl.taskId === task.id)}
             tasks={tasks}
@@ -192,31 +196,65 @@ export function TaskDetailSheet({
   );
 }
 
-function TaskDetail({
+const SHEET_PARTS = {
+  Header: DrawerHeader,
+  Title: DrawerTitle,
+  Description: DrawerDescription,
+  Panel: DrawerPanel,
+};
+
+type PartProps = React.ComponentProps<"div"> & { allowSelection?: boolean };
+const PAGE_PARTS = {
+  Header: ({ className, allowSelection: _, ...props }: PartProps) => (
+    <div className={cn("flex flex-col gap-2 p-6 pb-3", className)} {...props} />
+  ),
+  Title: ({ className, ...props }: React.ComponentProps<"h1">) => (
+    <h1
+      className={cn("font-heading text-xl leading-none font-bold", className)}
+      {...props}
+    />
+  ),
+  Description: ({ className, ...props }: React.ComponentProps<"p">) => (
+    <p className={cn("text-muted-foreground text-sm", className)} {...props} />
+  ),
+  Panel: ({ className, allowSelection: _, ...props }: PartProps) => (
+    <div className={cn("p-6 pt-1", className)} {...props} />
+  ),
+};
+
+export function TaskDetail({
+  variant = "sheet",
   task,
   boardId,
   projectId,
   projectKey,
+  projectSlug,
   columns,
   tasks,
   labels,
   taskLabels,
   canWrite,
   onClose,
+  onToggleView,
   tickets,
 }: {
+  variant?: "sheet" | "page";
   task: TaskRow;
   boardId: string;
   projectId: string;
   projectKey: string;
+  projectSlug: string;
   columns: ColumnRow[];
   tasks: TaskRow[];
   labels: LabelRow[];
   taskLabels: BoardData["taskLabels"];
   canWrite: boolean;
   onClose: () => void;
+  onToggleView: () => void;
   tickets: TicketMentionItem[];
 }) {
+  const { Header, Title, Description, Panel } =
+    variant === "page" ? PAGE_PARTS : SHEET_PARTS;
   const utils = api.useUtils();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -232,7 +270,10 @@ function TaskDetail({
   savedDescription.current = task.description ?? "";
   const saveDescription = () => {
     // blob: srcs = uploads still in flight; saved once they settle
-    const html = latestDescription.current.replace(/<img\b[^>]*src="blob:[^"]*"[^>]*>/g, "");
+    const html = latestDescription.current.replace(
+      /<img\b[^>]*src="blob:[^"]*"[^>]*>/g,
+      "",
+    );
     if (html === savedDescription.current) return;
     savedDescription.current = html;
     update.mutate({ boardId, taskId: task.id, description: html || null });
@@ -289,19 +330,23 @@ function TaskDetail({
   }
   const hasEstimate = task.estimatePomodoros != null;
   const hasDue = task.dueAt != null || showDue;
+  // page = full navigation, nothing to animate -> render everything at once
+  const ready = useAfterFirstPaint(variant === "sheet");
 
   return (
     <>
-      <DrawerHeader allowSelection className="gap-1 pe-4 pt-4">
+      <Header allowSelection className="gap-1 pe-4 pt-4">
         <div className="flex items-center gap-1">
           <CopyIdButton identifier={identifier} />
           <div className="ms-auto flex items-center gap-0.5">
             <TodayToggle taskId={task.id} />
-            <CopyLinkButton taskId={task.id} />
+            <CopyLinkButton number={task.number} projectSlug={projectSlug} />
+            <ViewToggleButton onClick={onToggleView} variant={variant} />
             <TaskActionsMenu
               canWrite={canWrite}
               identifier={identifier}
               labelNames={activeLabelNames}
+              projectSlug={projectSlug}
               onDelete={() =>
                 void remove(
                   { kind: "task", id: task.id, name: task.title },
@@ -310,16 +355,27 @@ function TaskDetail({
               }
               task={task}
             />
-            <DrawerClose
-              render={
-                <Button aria-label="Close" size="icon-sm" variant="ghost" />
-              }
-            >
-              <XIcon aria-hidden="true" />
-            </DrawerClose>
+            {variant === "page" ? (
+              <Button
+                aria-label="Back to board"
+                onClick={onClose}
+                size="icon-sm"
+                variant="ghost"
+              >
+                <XIcon aria-hidden="true" />
+              </Button>
+            ) : (
+              <DrawerClose
+                render={
+                  <Button aria-label="Close" size="icon-sm" variant="ghost" />
+                }
+              >
+                <XIcon aria-hidden="true" />
+              </DrawerClose>
+            )}
           </div>
         </div>
-        <DrawerTitle>
+        <Title>
           <TitleField
             disabled={!canWrite}
             onChange={setTitle}
@@ -330,16 +386,16 @@ function TaskDetail({
             }}
             value={title}
           />
-        </DrawerTitle>
-        <DrawerDescription className="text-xs">
+        </Title>
+        <Description className="text-xs">
           Updated{" "}
           <span title={formatDateTime(updatedAt)}>
             {formatRelative(updatedAt)}
           </span>
-        </DrawerDescription>
-      </DrawerHeader>
+        </Description>
+      </Header>
 
-      <DrawerPanel className="flex flex-col gap-6">
+      <Panel className="flex flex-col gap-6">
         <dl className="flex flex-col gap-0.5">
           <PropertyRow label="Status">
             <StatusSelect
@@ -460,45 +516,55 @@ function TaskDetail({
           ) : null}
         </dl>
 
-        <Section title="Description">
-          <RichTextEditor
-            disabled={!canWrite}
-            mentions={mentionItems}
-            minHeight="40px"
-            onBlur={saveDescription}
-            onChange={(html) => {
-              latestDescription.current = html;
-              setDescription(html);
-            }}
-            // blur may have saved without the in-flight image
-            onUploadingChange={(n) => {
-              if (n === 0) saveDescription();
-            }}
-            placeholder="Add a description…"
-            tickets={tickets}
-            uploadImage={canWrite ? uploadImage : undefined}
-            value={description}
-            variant="inline"
-          />
-        </Section>
+        {ready ? (
+          <>
+            <Section title="Description">
+              <RichTextEditor
+                disabled={!canWrite}
+                mentions={mentionItems}
+                minHeight="40px"
+                onBlur={saveDescription}
+                onChange={(html) => {
+                  latestDescription.current = html;
+                  setDescription(html);
+                }}
+                // blur may have saved without the in-flight image
+                onUploadingChange={(n) => {
+                  if (n === 0) saveDescription();
+                }}
+                placeholder="Add a description…"
+                tickets={tickets}
+                uploadImage={canWrite ? uploadImage : undefined}
+                value={description}
+                variant="inline"
+              />
+            </Section>
 
-        <LinkedDocsPanel boardId={boardId} taskId={task.id} />
-        <ChecklistPanel boardId={boardId} canWrite={canWrite} taskId={task.id} />
-        <AttachmentsPanel
-          boardId={boardId}
-          canWrite={canWrite}
-          inlineIds={extractFileIds(task.description ?? "")}
-          taskId={task.id}
-        />
-        <CommentsPanel
-          boardId={boardId}
-          canWrite={canWrite}
-          mentions={mentionItems}
-          taskId={task.id}
-          tickets={tickets}
-        />
-        <ActivityPanel boardId={boardId} taskId={task.id} />
-      </DrawerPanel>
+            <LinkedDocsPanel boardId={boardId} taskId={task.id} />
+            <ChecklistPanel
+              boardId={boardId}
+              canWrite={canWrite}
+              taskId={task.id}
+            />
+            <AttachmentsPanel
+              boardId={boardId}
+              canWrite={canWrite}
+              inlineIds={extractFileIds(task.description ?? "")}
+              taskId={task.id}
+            />
+            <CommentsPanel
+              boardId={boardId}
+              canWrite={canWrite}
+              mentions={mentionItems}
+              taskId={task.id}
+              tickets={tickets}
+            />
+            <ActivityPanel boardId={boardId} taskId={task.id} />
+          </>
+        ) : (
+          <BodySkeleton />
+        )}
+      </Panel>
     </>
   );
 }
@@ -507,11 +573,13 @@ function TaskActionsMenu({
   task,
   identifier,
   labelNames,
+  projectSlug,
   canWrite,
   onDelete,
 }: {
   task: TaskRow;
   identifier: string;
+  projectSlug: string;
   labelNames: string[];
   canWrite: boolean;
   onDelete: () => void;
@@ -539,7 +607,7 @@ function TaskActionsMenu({
           <CopyIcon aria-hidden="true" />
           Copy ID and title
         </MenuItem>
-        <MenuItem onClick={() => void copyTaskLink(task.id)}>
+        <MenuItem onClick={() => void copyTaskLink(projectSlug, task.number)}>
           <Link2Icon aria-hidden="true" />
           Copy link
         </MenuItem>
@@ -575,15 +643,15 @@ function LinkedDocsPanel({
         {linked.data.map((document) => (
           <li key={document.id}>
             <Link
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+              className="hover:bg-accent focus-visible:ring-ring flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors outline-none focus-visible:ring-2"
               href={`/app/p/${document.projectSlug}/docs/${document.id}`}
             >
               <FileTextIcon
                 aria-hidden="true"
-                className="size-4 shrink-0 text-muted-foreground"
+                className="text-muted-foreground size-4 shrink-0"
               />
               <span className="truncate">{document.title}</span>
-              <span className="ms-auto shrink-0 text-muted-foreground text-xs">
+              <span className="text-muted-foreground ms-auto shrink-0 text-xs">
                 {formatRelative(document.updatedAt ?? document.createdAt)}
               </span>
             </Link>
@@ -694,7 +762,7 @@ function TitleField({
     <Textarea
       aria-label="Task title"
       // coss textarea = field-sizing-content; drop its min-height + padding for an inline title
-      className="w-full rounded-md font-semibold text-xl leading-snug [&_textarea]:min-h-0 [&_textarea]:resize-none [&_textarea]:px-0 [&_textarea]:py-0 [&_textarea]:disabled:cursor-default"
+      className="w-full rounded-md text-xl leading-snug font-semibold [&_textarea]:min-h-0 [&_textarea]:resize-none [&_textarea]:px-0 [&_textarea]:py-0 [&_textarea]:disabled:cursor-default"
       disabled={disabled}
       onBlur={onCommit}
       onChange={(e) => onChange(e.target.value)}
@@ -732,7 +800,12 @@ function CopyIdButton({ identifier }: { identifier: string }) {
   copyRef.current = copy;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "." && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+      if (
+        e.key === "." &&
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey
+      ) {
         e.preventDefault();
         copyRef.current();
       }
@@ -749,7 +822,7 @@ function CopyIdButton({ identifier }: { identifier: string }) {
         render={
           <button
             aria-label={`Copy ${identifier}`}
-            className="-ms-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-mono text-muted-foreground text-xs outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring -ms-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-mono text-xs transition-colors outline-none focus-visible:ring-2"
             onClick={copy}
             type="button"
           />
@@ -759,18 +832,54 @@ function CopyIdButton({ identifier }: { identifier: string }) {
         {copied ? (
           <CheckIcon
             aria-hidden="true"
-            className="size-3 text-success-foreground"
+            className="text-success-foreground size-3"
           />
         ) : null}
       </TooltipTrigger>
-      <TooltipPopup>
-        {copied ? "Copied" : `Copy ID · ${MOD_KEY}.`}
-      </TooltipPopup>
+      <TooltipPopup>{copied ? "Copied" : `Copy ID · ${MOD_KEY}.`}</TooltipPopup>
     </Tooltip>
   );
 }
 
-function CopyLinkButton({ taskId }: { taskId: string }) {
+function ViewToggleButton({
+  variant,
+  onClick,
+}: {
+  variant: "sheet" | "page";
+  onClick: () => void;
+}) {
+  const label = variant === "page" ? "Open in side sheet" : "Open as full page";
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label={label}
+            onClick={onClick}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          />
+        }
+      >
+        {variant === "page" ? (
+          <PanelRightIcon aria-hidden="true" />
+        ) : (
+          <Maximize2Icon aria-hidden="true" />
+        )}
+      </TooltipTrigger>
+      <TooltipPopup>{label}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+function CopyLinkButton({
+  projectSlug,
+  number,
+}: {
+  projectSlug: string;
+  number: number;
+}) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -786,7 +895,7 @@ function CopyLinkButton({ taskId }: { taskId: string }) {
           <Button
             aria-label="Copy link to this task"
             onClick={() => {
-              copyTaskLink(taskId);
+              copyTaskLink(projectSlug, number);
               setCopied(true);
               if (timer.current) clearTimeout(timer.current);
               timer.current = setTimeout(() => setCopied(false), 1500);
@@ -798,10 +907,7 @@ function CopyLinkButton({ taskId }: { taskId: string }) {
         }
       >
         {copied ? (
-          <CheckIcon
-            aria-hidden="true"
-            className="text-success-foreground"
-          />
+          <CheckIcon aria-hidden="true" className="text-success-foreground" />
         ) : (
           <Link2Icon aria-hidden="true" />
         )}
@@ -891,7 +997,7 @@ function LabelsPicker({
         disabled={!canWrite}
         footer={
           <Button
-            className="w-full justify-start text-muted-foreground"
+            className="text-muted-foreground w-full justify-start"
             onClick={() => {
               setOpen(false);
               setManaging(true);
@@ -966,10 +1072,10 @@ function BranchSubmenu({
       </MenuSubTrigger>
       <MenuSubPopup className="w-72">
         <div className="px-2 pt-1.5 pb-2">
-          <p className="font-medium text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-xs font-medium">
             Branch name
           </p>
-          <p className="mt-1 break-all font-mono text-foreground text-xs">
+          <p className="text-foreground mt-1 font-mono text-xs break-all">
             {branch}
           </p>
         </div>
@@ -1184,7 +1290,9 @@ function ManageLabelRow({
         aria-label={`Color for ${l.name}`}
         className="gap-1.5"
         itemClassName="size-5 sm:size-5"
-        onValueChange={(c) => update.mutate({ boardId, labelId: l.id, color: c })}
+        onValueChange={(c) =>
+          update.mutate({ boardId, labelId: l.id, color: c })
+        }
         options={LABEL_SWATCHES}
         value={l.color}
       />
@@ -1255,7 +1363,7 @@ function ChecklistPanel({
         <ul className="-mx-2 flex flex-col">
           {items.map((it) => (
             <li
-              className="group flex min-h-8 items-center gap-2 rounded-md px-2 hover:bg-accent/50"
+              className="group hover:bg-accent/50 flex min-h-8 items-center gap-2 rounded-md px-2"
               key={it.id}
             >
               <label className="flex flex-1 cursor-pointer items-center gap-2 py-1.5 text-sm">
@@ -1277,7 +1385,7 @@ function ChecklistPanel({
               {canWrite ? (
                 <Button
                   aria-label="Remove item"
-                  className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                   onClick={() => remove.mutate({ boardId, itemId: it.id })}
                   size="icon-xs"
                   type="button"
@@ -1413,12 +1521,12 @@ function AttachmentsPanel({
             <FramePanel className="grid grid-cols-3 gap-2 p-2">
               {images.map((a, i) => (
                 <div
-                  className="group relative overflow-hidden rounded-lg border bg-muted"
+                  className="group bg-muted relative overflow-hidden rounded-lg border"
                   key={a.id}
                 >
                   <button
                     aria-label={`View ${a.filename}`}
-                    className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="focus-visible:ring-ring block w-full outline-none focus-visible:ring-2"
                     onClick={() => setViewerIndex(i)}
                     type="button"
                   >
@@ -1431,7 +1539,7 @@ function AttachmentsPanel({
                   {canWrite ? (
                     <Button
                       aria-label="Remove attachment"
-                      className="absolute end-1 top-1 bg-popover/80 opacity-0 backdrop-blur-sm focus-visible:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+                      className="bg-popover/80 absolute end-1 top-1 opacity-0 backdrop-blur-sm group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                       onClick={() =>
                         remove.mutate({ boardId, attachmentId: a.id })
                       }
@@ -1446,7 +1554,7 @@ function AttachmentsPanel({
               ))}
               {pendingImages.map((p) => (
                 <div
-                  className="relative overflow-hidden rounded-lg border bg-muted"
+                  className="bg-muted relative overflow-hidden rounded-lg border"
                   key={p.id}
                 >
                   {p.previewUrl ? (
@@ -1475,7 +1583,7 @@ function AttachmentsPanel({
                   >
                     <PaperclipIcon
                       aria-hidden="true"
-                      className="size-4 shrink-0 text-muted-foreground"
+                      className="text-muted-foreground size-4 shrink-0"
                     />
                     <a
                       className="flex-1 truncate hover:underline"
@@ -1505,7 +1613,7 @@ function AttachmentsPanel({
                 ))}
                 {pendingFiles.map((p) => (
                   <li
-                    className="flex min-h-8 items-center gap-2 px-2 text-muted-foreground"
+                    className="text-muted-foreground flex min-h-8 items-center gap-2 px-2"
                     key={p.id}
                   >
                     <Spinner className="size-4" />
@@ -1660,8 +1768,8 @@ function CommentItem({
     <li className="group flex gap-3">
       <UserAvatar image={c.authorImage} name={c.authorName} size={28} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex min-h-6 items-center gap-2 text-muted-foreground text-xs">
-          <span className="font-medium text-foreground text-sm">
+        <div className="text-muted-foreground flex min-h-6 items-center gap-2 text-xs">
+          <span className="text-foreground text-sm font-medium">
             {c.authorName}
           </span>
           {c.agent ? (
@@ -1680,7 +1788,7 @@ function CommentItem({
                 render={
                   <Button
                     aria-label="Comment actions"
-                    className="ms-auto opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-popup-open:opacity-100 pointer-coarse:opacity-100"
+                    className="ms-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 pointer-coarse:opacity-100"
                     size="icon-xs"
                     variant="ghost"
                   />
@@ -1796,11 +1904,11 @@ function ActivityPanel({
       <ul className="flex flex-col gap-2">
         {list.data.map((a) => (
           <li
-            className="flex items-center gap-2 text-muted-foreground text-xs"
+            className="text-muted-foreground flex items-center gap-2 text-xs"
             key={a.id}
           >
             <UserAvatar image={a.actorImage} name={a.actorName} size={18} />
-            <span className="font-medium text-foreground">{a.actorName}</span>
+            <span className="text-foreground font-medium">{a.actorName}</span>
             <span className="min-w-0 truncate">
               {formatVerb(a.verb, a.payload)}
             </span>
@@ -1815,7 +1923,10 @@ function ActivityPanel({
                 tooltip={`Done via ${a.payload.agent} on ${a.actorName}'s behalf`}
               />
             ) : null}
-            <span className="ms-auto shrink-0" title={formatDateTime(a.createdAt)}>
+            <span
+              className="ms-auto shrink-0"
+              title={formatDateTime(a.createdAt)}
+            >
               {formatRelative(a.createdAt)}
             </span>
           </li>
@@ -1846,6 +1957,38 @@ function formatVerb(verb: string, payload: Record<string, unknown> | null) {
   }
 }
 
+// editors + panels are the slow mount; paint header/props first so the sheet opens instantly
+function useAfterFirstPaint(defer: boolean) {
+  const [ready, setReady] = useState(!defer);
+  useEffect(() => {
+    if (!defer) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() =>
+        startTransition(() => setReady(true)),
+      );
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [defer]);
+  return ready;
+}
+
+function BodySkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-col gap-6">
+      {["Description", "Checklist", "Comments"].map((title) => (
+        <div className="flex flex-col gap-2" key={title}>
+          <Skeleton className="h-4 w-24" />
+          <SectionSkeleton />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // loading != empty; "No attachments." mid-fetch reads as data loss
 function SectionSkeleton() {
   return (
@@ -1870,7 +2013,7 @@ function Section({
   return (
     <section className="flex flex-col gap-2 border-t pt-5">
       <div className="flex min-h-6 items-center gap-2">
-        <h3 className="font-medium text-muted-foreground text-xs">{title}</h3>
+        <h3 className="text-muted-foreground text-xs font-medium">{title}</h3>
         {meta ? (
           <span className="text-muted-foreground/72 text-xs tabular-nums">
             {meta}
@@ -1892,7 +2035,7 @@ function PropertyRow({
 }) {
   return (
     <div className="flex min-h-8 items-center">
-      <dt className="w-24 shrink-0 text-muted-foreground text-sm">{label}</dt>
+      <dt className="text-muted-foreground w-24 shrink-0 text-sm">{label}</dt>
       <dd className="flex min-w-0 items-center gap-1">{children}</dd>
     </div>
   );

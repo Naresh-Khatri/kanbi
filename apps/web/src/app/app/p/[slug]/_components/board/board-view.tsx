@@ -23,14 +23,22 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useAppShell } from "@/components/keybinds/shell-store";
-import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
 import { Badge } from "@/components/ui/badge";
 import { toastManager } from "@/components/ui/toast";
 import { OPEN_TASK_EVENT } from "@/components/rich-text/hover-card";
 import { POSITION_STEP, positionBetween } from "@/lib/position";
+import { matchTaskParam, taskPageHref } from "@/lib/task-link";
 import { compareTasks } from "@/lib/task-sort";
 import { api } from "@/trpc/react";
 import { AddColumn } from "./add-column";
@@ -57,9 +65,13 @@ import { BulkTaskActions } from "./bulk-task-actions";
 import { SortableColumn } from "./sortable-column";
 import { TaskCardPreview } from "./task-card";
 import { HiddenColumns } from "./hidden-columns";
+import { TaskSheetHost } from "./task-sheet-host";
+import { isTaskSheetOpen, openTaskSheet } from "./task-sheet-store";
+import { useBoardRealtime } from "./use-board-realtime";
+import { useTicketItems } from "./use-ticket-items";
 import { useBoardUpdates, useMarkSeen } from "./use-board-updates";
 import { useBoardViewPreferences } from "./use-board-view-preferences";
-import { TaskDetailSheet } from "../task-detail-sheet";
+import { getTaskViewMode, setTaskViewMode } from "../task-view-mode";
 
 const DROP_ANIMATION: DropAnimation = {
   duration: 160,
@@ -91,6 +103,7 @@ export function BoardView({
   boardId,
   projectId,
   projectKey,
+  projectSlug,
 }: {
   boardId: string;
   projectId: string;
@@ -117,19 +130,40 @@ export function BoardView({
     setDefaultColumnId,
   } = useBoardViewPreferences(boardId, data.viewPreferences);
   const canWrite = access.canWrite;
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const router = useRouter();
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const openTaskRef = useRef((_taskId: string) => {});
+  openTaskRef.current = (taskId: string) => {
+    const t = tasks.find((x) => x.id === taskId);
+    if (t && getTaskViewMode() === "page") {
+      router.push(taskPageHref(projectSlug, t.number));
+      return;
+    }
+    openTaskSheet(taskId);
+    // focus ring re-renders the board -> after the sheet paints
+    startTransition(() => setFocusedTaskId(taskId));
+  };
+  // read once, not via useSearchParams: url sync would re-render the whole board.
+  // page mode -> replace so Back skips the board
   useEffect(() => {
-    const taskId = new URLSearchParams(window.location.search).get("task");
-    if (taskId) setOpenTaskId(taskId);
-  }, []);
+    const taskParam = new URLSearchParams(window.location.search).get("task");
+    if (!taskParam) return;
+    const t = matchTaskParam(taskParam, tasksRef.current);
+    if (!t) return;
+    if (getTaskViewMode() === "page") {
+      router.replace(taskPageHref(projectSlug, t.number));
+      return;
+    }
+    setFocusedTaskId(t.id);
+    openTaskSheet(t.id);
+  }, [projectSlug, router]);
   // Clicking a "#KEY-123" ticket chip in any read-only render dispatches this
   // event; open that task here (chips are scoped to the current project).
   useEffect(() => {
     function onOpenTask(e: Event) {
       const id = (e as CustomEvent<{ taskId: string }>).detail?.taskId;
-      if (!id) return;
-      setFocusedTaskId(id);
-      setOpenTaskId(id);
+      if (id) openTaskRef.current(id);
     }
     window.addEventListener(OPEN_TASK_EVENT, onOpenTask);
     return () => window.removeEventListener(OPEN_TASK_EVENT, onOpenTask);
@@ -167,56 +201,28 @@ export function BoardView({
     }
   }, [createTaskToken, columns, preferences.defaultColumnId]);
 
-  const openTask = openTaskId
-    ? (tasks.find((t) => t.id === openTaskId) ?? null)
-    : null;
+  const expandTask = useCallback(
+    (number: number) => {
+      setTaskViewMode("page");
+      // drop ?task= first, else Back lands here and bounces to the page again
+      const url = new URL(window.location.href);
+      url.searchParams.delete("task");
+      window.history.replaceState(null, "", url);
+      router.push(taskPageHref(projectSlug, number));
+    },
+    [router, projectSlug],
+  );
 
   const updates = useBoardUpdates(boardId);
   const markSeen = useMarkSeen(boardId);
   // seen while the updates filter is on -> keep showing until it's cleared
   const [keptIds, setKeptIds] = useState<ReadonlySet<string>>(() => new Set());
-  const openHasUpdate = !!openTaskId && updates.has(openTaskId);
-  useEffect(() => {
-    if (!openTaskId || !openHasUpdate) return;
-    setKeptIds((s) => new Set(s).add(openTaskId));
-    markSeen(openTaskId);
-  }, [openTaskId, openHasUpdate, markSeen]);
-
-  api.realtime.onBoardChange.useSubscription(
-    { boardId },
-    {
-      onData: (evt) => {
-        if (evt.scope === "presence") {
-          // Keeps the header team/presence popover live while the board is open.
-          utils.realtime.presence.invalidate({ boardId });
-          return;
-        }
-        if (evt.scope === "board") {
-          void invalidateProjectLifecycle(utils);
-          return;
-        }
-        if (evt.scope === "comment") {
-          utils.comment.list.invalidate();
-          utils.activity.list.invalidate();
-          return;
-        }
-        if (evt.scope === "checklist") {
-          utils.checklist.list.invalidate();
-          return;
-        }
-        if (evt.scope === "attachment") {
-          utils.attachment.list.invalidate();
-          return;
-        }
-        if (evt.scope === "activity") {
-          utils.activity.list.invalidate();
-          utils.board.updates.invalidate({ boardId });
-          return;
-        }
-        utils.board.get.invalidate({ boardId });
-      },
-    },
+  const keepSeen = useCallback(
+    (taskId: string) => setKeptIds((s) => new Set(s).add(taskId)),
+    [],
   );
+
+  useBoardRealtime(boardId);
 
   const preappliedTaskMoves = useRef(new Map<string, typeof data>());
   const preappliedColumnMoves = useRef(new Map<string, typeof data>());
@@ -404,21 +410,7 @@ export function BoardView({
     return map;
   }, [taskLabels]);
 
-  // Mentionable tickets for the editors in the task sheet — current project only.
-  // Enriched with status/priority/assignee so chips can show a summary hover card.
-  const ticketItems = useMemo(() => {
-    const colName = new Map(columns.map((c) => [c.id, c.name]));
-    return tasks.map((t) => ({
-      id: t.id,
-      label: `${projectKey}-${t.number}`,
-      title: t.title,
-      status: colName.get(t.columnId),
-      priority: t.priority,
-      assignee: t.assigneeId
-        ? (membersById.get(t.assigneeId)?.name ?? null)
-        : null,
-    }));
-  }, [tasks, projectKey, columns, membersById]);
+  const ticketItems = useTicketItems(tasks, columns, projectKey, membersById);
 
   const cardLabelsByTask = useMemo(() => {
     const byId = new Map(labels.map((l) => [l.id, l]));
@@ -971,10 +963,10 @@ export function BoardView({
     reorderColumn.mutate(vars);
   }
 
-  const handleOpenTask = useCallback((taskId: string) => {
-    setFocusedTaskId(taskId);
-    setOpenTaskId(taskId);
-  }, []);
+  const handleOpenTask = useCallback(
+    (taskId: string) => openTaskRef.current(taskId),
+    [],
+  );
 
   const handleAddTask = useCallback((columnId: string) => {
     setQuickAddColumnId(columnId);
@@ -994,7 +986,8 @@ export function BoardView({
   );
   // aiDraftOpen lives in the shell store (read imperatively in nav handlers so
   // opening the AI dialog never re-renders the board); the rest are local.
-  const navActive = !openTask && !quickAddOpen && !archiveOpen && !digestOpen;
+  // sheet state read imperatively (isTaskSheetOpen) for the same reason
+  const navActive = !quickAddOpen && !archiveOpen && !digestOpen;
   const kbRef = useRef({
     navColumns,
     focusedTaskId,
@@ -1058,7 +1051,12 @@ export function BoardView({
   useHotkeys(
     "down",
     (e) => {
-      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
+      if (
+        useAppShell.getState().aiDraftOpen ||
+        !kbRef.current.active ||
+        isTaskSheetOpen()
+      )
+        return;
       e.preventDefault();
       moveFocusWithSelection("down", e.shiftKey);
     },
@@ -1067,7 +1065,12 @@ export function BoardView({
   useHotkeys(
     "up",
     (e) => {
-      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
+      if (
+        useAppShell.getState().aiDraftOpen ||
+        !kbRef.current.active ||
+        isTaskSheetOpen()
+      )
+        return;
       e.preventDefault();
       moveFocusWithSelection("up", e.shiftKey);
     },
@@ -1076,7 +1079,12 @@ export function BoardView({
   useHotkeys(
     "right",
     (e) => {
-      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
+      if (
+        useAppShell.getState().aiDraftOpen ||
+        !kbRef.current.active ||
+        isTaskSheetOpen()
+      )
+        return;
       e.preventDefault();
       moveFocusWithSelection("right", e.shiftKey);
     },
@@ -1085,7 +1093,12 @@ export function BoardView({
   useHotkeys(
     "left",
     (e) => {
-      if (useAppShell.getState().aiDraftOpen || !kbRef.current.active) return;
+      if (
+        useAppShell.getState().aiDraftOpen ||
+        !kbRef.current.active ||
+        isTaskSheetOpen()
+      )
+        return;
       e.preventDefault();
       moveFocusWithSelection("left", e.shiftKey);
     },
@@ -1097,6 +1110,7 @@ export function BoardView({
       if (
         useAppShell.getState().aiDraftOpen ||
         !kbRef.current.active ||
+        isTaskSheetOpen() ||
         !kbRef.current.focusedTaskId
       )
         return;
@@ -1111,6 +1125,7 @@ export function BoardView({
       if (
         useAppShell.getState().aiDraftOpen ||
         !kbRef.current.active ||
+        isTaskSheetOpen() ||
         !kbRef.current.focusedTaskId ||
         !kbRef.current.canWrite
       )
@@ -1123,7 +1138,12 @@ export function BoardView({
   useHotkeys(
     "esc",
     () => {
-      if (!kbRef.current.active || selectedTaskIds.size === 0) return;
+      if (
+        !kbRef.current.active ||
+        isTaskSheetOpen() ||
+        selectedTaskIds.size === 0
+      )
+        return;
       clearTaskSelection();
     },
     cardKeyOpts,
@@ -1260,18 +1280,16 @@ export function BoardView({
           onPriorityChange={setSelectedPriority}
         />
       ) : null}
-      <TaskDetailSheet
+      <TaskSheetHost
         boardId={boardId}
         canWrite={canWrite}
         columns={columns}
         labels={labels}
-        onOpenChange={(o) => {
-          if (!o) setOpenTaskId(null);
-        }}
-        open={!!openTask}
+        onExpand={expandTask}
+        onSeen={keepSeen}
         projectId={projectId}
         projectKey={projectKey}
-        task={openTask}
+        projectSlug={projectSlug}
         taskLabels={taskLabels}
         tasks={tasks}
         tickets={ticketItems}

@@ -11,6 +11,7 @@ import { DocsHome } from "./docs-home";
 import { DocsTree } from "./docs-tree";
 import { DocumentView } from "./document-view";
 import { MovePageDialog } from "./move-page-dialog";
+import { taskBoardHref } from "@/lib/task-link";
 
 export function DocsWorkspace({
   projectId,
@@ -55,7 +56,7 @@ export function DocsWorkspace({
       (context.data?.tickets ?? []).map((ticket) => ({
         ...ticket,
         assignee: ticket.assignee ?? null,
-        href: `/app/p/${slug}?task=${ticket.id}`,
+        href: taskBoardHref(slug, ticket.number),
       })),
     [context.data?.tickets, slug],
   );

@@ -28,7 +28,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
 import { copyBranchCommand, defaultBranchType } from "../copy-branch-command";
-import { copyTaskLink } from "../copy-task-link";
+import { copyBoardTaskLink } from "../copy-task-link";
 import { type Priority, PriorityInline } from "../priority";
 import { useArchiveTask } from "../use-archive-task";
 import { useUndoableBoardDelete } from "../use-undoable-board-delete";
@@ -301,6 +301,7 @@ export const TaskCard = memo(function TaskCard({
   const remove = useUndoableBoardDelete(boardId);
   const archiveTask = useArchiveTask(boardId);
   const toggleToday = useToggleToday(task.id);
+  const prefetch = usePrefetchTaskDetail(boardId, task.id);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -310,7 +311,7 @@ export const TaskCard = memo(function TaskCard({
   const actions: TaskActions = {
     canWrite,
     onToday: toggleToday.onToday,
-    onCopyLink: () => copyTaskLink(task.id),
+    onCopyLink: () => copyBoardTaskLink(task.number),
     onCopyBranch: () =>
       copyBranchCommand({
         number: task.number,
@@ -341,6 +342,8 @@ export const TaskCard = memo(function TaskCard({
           }
           onOpen();
         }}
+        onPointerEnter={prefetch.start}
+        onPointerLeave={prefetch.cancel}
         ref={ref}
       >
         {onToggleSelection ? (
@@ -473,4 +476,27 @@ function useToggleToday(taskId: string) {
     onSelect: () =>
       onToday ? remove.mutate({ taskId }) : add.mutate({ taskId }),
   };
+}
+
+// hover intent -> warm the sheet's queries so it opens with data
+function usePrefetchTaskDetail(boardId: string, taskId: string) {
+  const utils = api.useUtils();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancel = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }, []);
+  const start = useCallback(() => {
+    cancel();
+    timer.current = setTimeout(() => {
+      const input = { boardId, taskId };
+      void utils.checklist.list.prefetch(input);
+      void utils.attachment.list.prefetch(input);
+      void utils.comment.list.prefetch(input);
+      void utils.activity.list.prefetch({ ...input, limit: 50 });
+      void utils.document.linkedToTask.prefetch(input);
+    }, 120);
+  }, [boardId, taskId, utils, cancel]);
+  useEffect(() => cancel, [cancel]);
+  return { start, cancel };
 }

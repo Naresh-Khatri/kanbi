@@ -18,6 +18,7 @@ import {
 import { toastManager } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
+import { taskBoardHref } from "@/lib/task-link";
 
 type Item = RouterOutputs["today"]["list"][number];
 
@@ -116,7 +117,7 @@ function TodayRow({ item, onRemove }: { item: Item; onRemove: () => void }) {
     <li className="group hover:bg-accent flex items-center gap-1 rounded-lg ps-2 pe-1 transition-colors">
       <Link
         className="flex min-w-0 flex-1 items-center gap-2 py-1.5"
-        href={`/app/p/${item.projectSlug}?task=${item.taskId}`}
+        href={taskBoardHref(item.projectSlug, item.number)}
       >
         <PriorityIcon
           className={cn("size-3.5 shrink-0", done && "opacity-50")}

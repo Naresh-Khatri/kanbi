@@ -11,6 +11,7 @@ import {
 } from "@/lib/file-url";
 import { AGENT_IDS } from "@/lib/agents";
 import { markdownToHtml } from "@/lib/markdown-to-html";
+import { taskBoardHref } from "@/lib/task-link";
 import { db } from "@/server/db";
 import { board, boardColumn, comment, project, task } from "@/server/db/schema";
 import { sanitizeRichText } from "@/server/rich-text/sanitize";
@@ -44,10 +45,8 @@ export const taskRefInput = z
   .max(100)
   .describe('Ticket identifier like "KAN-42", or the task id.');
 
-export function taskUrl(projectSlug: string, taskId: string): string {
-  const url = new URL(`/app/p/${projectSlug}`, MCP_ORIGIN);
-  url.searchParams.set("task", taskId);
-  return url.toString();
+export function taskUrl(projectSlug: string, number: number): string {
+  return new URL(taskBoardHref(projectSlug, number), MCP_ORIGIN).toString();
 }
 
 export function docUrl(projectSlug: string, documentId: string): string {

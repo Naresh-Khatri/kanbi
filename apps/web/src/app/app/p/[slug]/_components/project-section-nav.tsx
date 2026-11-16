@@ -13,7 +13,7 @@ export function ProjectSectionNav({ slug }: { slug: string }) {
     ? "docs"
     : pathname.startsWith(`${base}/settings`)
       ? "settings"
-      : pathname === base
+      : pathname === base || pathname.startsWith(`${base}/t/`)
         ? "board"
         : null;
 

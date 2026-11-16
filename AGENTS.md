@@ -58,13 +58,14 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 
 - `/` plus `/login`, `/signup`, etc. — marketing/auth surfaces.
 - `/app/(dashboard)/` — project list, profile.
-- `/app/p/[slug]/` — the board (the heart of the app), `/app/p/[slug]/settings/`.
+- `/app/p/[slug]/` — the board (the heart of the app; `?task=<number>` opens a task), `/app/p/[slug]/t/[number]/` — a task as a full page, `/app/p/[slug]/settings/`.
 - `/b/[token]/` — public read-only shared board (no auth); `/invite/[token]/` — invite acceptance.
 - Conventions: `_components/` holds route-private client components; `_lib/` holds server-only route helpers (e.g. `resolve-project.ts`). Pages/layouts are server components that prefetch via the server caller; interactivity lives in `"use client"` files under `_components/`.
 
 ### Board feature (`src/app/app/p/[slug]/_components/board/`)
 
-- `board-view.tsx` orchestrates everything: dnd-kit DnD (sortable columns horizontally, tasks vertically; `closestCenter` for columns, `closestCorners` for tasks), filters, realtime subscription, open-task state. Types in `board-types.ts` derive from `RouterOutputs["board"]["get"]`.
+- `board-view.tsx` orchestrates everything: dnd-kit DnD (sortable columns horizontally, tasks vertically; `closestCenter` for columns, `closestCorners` for tasks), filters, realtime subscription. Types in `board-types.ts` derive from `RouterOutputs["board"]["get"]`.
+- The open task lives in `task-sheet-store.ts` (zustand), rendered by `task-sheet-host.tsx`. board-view must not subscribe to it: re-rendering board-view re-renders every column, which made opening a task lag. Don't read `useSearchParams`/`useParams` in board-view or cards for the same reason. Tasks open in the sheet or as a full page per the user's saved choice (`task-view-mode.ts`, localStorage). Build task links with `src/lib/task-link.ts`.
 - **Mutations are optimistic**: `onMutate` cancels queries, snapshots, writes to the TanStack Query cache; `onError` rolls back; `onSettled` invalidates. Follow this pattern for new board mutations.
 - Deletes are undoable (`use-undoable-board-delete.ts`): remove from cache immediately, defer the server mutation 6s, a coss toast (`toastManager`) with an Undo action restores the snapshot.
 - Cross-component signals (create-task, AI import, command palette) go through the Zustand store `src/components/keybinds/shell-store.ts` (`useAppShell`).

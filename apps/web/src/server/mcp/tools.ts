@@ -313,7 +313,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
                 : null,
               dueAt: item.dueAt ? item.dueAt.toISOString().slice(0, 10) : null,
               updatedAt: (item.updatedAt ?? item.createdAt).toISOString(),
-              url: taskUrl(item.projectSlug, item.id),
+              url: taskUrl(item.projectSlug, item.number),
             })),
           };
         }),
@@ -396,7 +396,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
                   ? await resolveTask(caller, followUpOf)
                   : null;
                 const parentLink = parent
-                  ? `<p>Follow-up from <a href="${taskUrl(parent.projectSlug, parent.id)}">${parent.identifier}</a>.</p>`
+                  ? `<p>Follow-up from <a href="${taskUrl(parent.projectSlug, parent.number)}">${parent.identifier}</a>.</p>`
                   : "";
                 const [projectBoard] = await db
                   .select({ id: board.id })
@@ -429,7 +429,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
                   id: item.id,
                   identifier: `${item.projectKey}-${item.number}`,
                   title: item.title,
-                  url: taskUrl(item.projectSlug, item.id),
+                  url: taskUrl(item.projectSlug, item.number),
                 }));
                 if (parent && parent.assigneeId === auth.userId) {
                   // creation already succeeded; the backlink note is best-effort
