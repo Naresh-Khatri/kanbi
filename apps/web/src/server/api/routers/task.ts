@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import type { db as Database } from "@/server/db";
 import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
+import { stripReplyPrefix } from "@/lib/task-title";
 import { recordActivity } from "@/server/activity/record";
 import { AiNotConfiguredError, draftModel } from "@/server/ai/model";
 import {
@@ -992,7 +993,7 @@ export const taskRouter = createTRPCRouter({
           boardId: input.boardId,
           columnId: t.columnId,
           number: numbers[i]!,
-          title: t.title,
+          title: stripReplyPrefix(t.title),
           description: t.description,
           priority: t.priority ?? ("none" as const),
           position: pos,
