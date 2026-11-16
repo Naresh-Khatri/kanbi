@@ -9,6 +9,8 @@ export type Release = {
   /** YYYY-MM-DD */
   date: string;
   entries: string[];
+  /** 16:9 walkthrough */
+  video?: { src: string; poster: string };
 };
 
 export const releases: Release[] = [
@@ -22,6 +24,10 @@ export const releases: Release[] = [
       "Shareable invite links with a limit on how many people can join",
       "Cards show what changed since you last looked and how long ago",
     ],
+    video: {
+      src: "https://kanbi-cdn.nareshkhatri.dev/videos/release-0-3.mp4",
+      poster: "https://kanbi-cdn.nareshkhatri.dev/videos/release-0-3.jpg",
+    },
   },
   {
     version: "0.2.0",

@@ -1,6 +1,7 @@
 import { formatDate } from "@kanbi/shared";
 
 import { releases } from "@/changelog";
+import { ReleaseVideo } from "@/components/release-video";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata = { title: "Changelog" };
@@ -33,6 +34,9 @@ export default function ChangelogPage() {
                 })}
               </time>
             </div>
+            {release.video ? (
+              <ReleaseVideo className="mb-1" video={release.video} />
+            ) : null}
             <ul className="text-muted-foreground marker:text-muted-foreground/50 flex list-disc flex-col gap-2 ps-5 text-sm">
               {release.entries.map((entry) => (
                 <li key={entry}>{entry}</li>

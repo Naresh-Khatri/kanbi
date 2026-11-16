@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { APP_VERSION, releases } from "@/changelog";
+import { ReleaseVideo } from "@/components/release-video";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,7 +49,8 @@ export function WhatsNewDialog() {
             Here&apos;s what changed since you were last here.
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel>
+        <DialogPanel className="flex flex-col gap-4">
+          {latest.video ? <ReleaseVideo video={latest.video} /> : null}
           <ul className="text-muted-foreground marker:text-muted-foreground/48 flex list-disc flex-col gap-2 ps-5 text-sm">
             {latest.entries.map((entry) => (
               <li key={entry}>{entry}</li>
