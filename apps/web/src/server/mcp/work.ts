@@ -41,6 +41,7 @@ import {
 
 import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
+import { fitImage } from "./image-fit";
 import { McpUserError, ok, toFailure } from "./result";
 import {
   agentCommentBody,
@@ -70,8 +71,6 @@ import {
 
 const READY_LIMIT = 5;
 const MAX_IMAGES = 4;
-// base64 inflates ~4/3; keeps each image under the 5 MB model limit
-const MAX_IMAGE_BYTES = 3_750_000;
 const IMAGE_MIMES = new Set([
   "image/png",
   "image/jpeg",
@@ -185,23 +184,25 @@ async function loadImages(attachments: Attachment[], offset = 0) {
       index++;
       if (index < offset || index >= offset + MAX_IMAGES)
         note = `not inlined; get_task_images offset ${pageOf(index)}`;
-      else if (a.sizeBytes > MAX_IMAGE_BYTES)
-        note = "image too large to inline";
       else {
-        try {
-          const bytes = await getObjectBytes(a.key);
+        const fit = await getObjectBytes(a.key)
+          .then((bytes) => fitImage(bytes, a.mime))
+          .catch(() => undefined);
+        if (fit) {
           images.push({
             filename: a.filename,
-            data: Buffer.from(bytes).toString("base64"),
-            mimeType: a.mime,
+            data: fit.data.toString("base64"),
+            mimeType: fit.mimeType,
           });
           imageNames.push(`${a.filename} (${a.source})`);
           inlined.add(a.id);
           labels.set(a.id, `image ${images.length} below: ${a.filename}`);
           continue;
-        } catch {
-          note = "image could not be loaded";
         }
+        note =
+          fit === null
+            ? "image too large to inline"
+            : "image could not be loaded";
       }
     }
     const url = await presign(a.key);

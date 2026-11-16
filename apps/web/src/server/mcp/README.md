@@ -170,9 +170,12 @@ report_blocker(KAN-42, reason)
   opens with what people did after that (latest move, comments, edits,
   attachments) and marks their newer comments `NEW`, so a task sent back from
   review shows the feedback first.
-- **Images:** up to 4 png/jpeg/gif/webp attachments of up to about 3.75 MB each
-  are inlined as image content: the reporter's first task screenshot, then
-  people's images newest first, then agent uploads. Images embedded in the
+- **Images:** up to 4 png/jpeg/gif/webp attachments are inlined as image
+  content: the reporter's first task screenshot, then people's images newest
+  first, then agent uploads. `get_task_images` inlines the next 4 from the
+  offset the brief gives. Images wider or taller than 1568px, or over about
+  3.75 MB, are shrunk with sharp (png, jpeg if still too heavy; first frame of
+  a gif) instead of skipped. Images embedded in the
   description or comments appear in the text as `[label]` placeholders that
   match the image list. Other files are listed with short-lived links.
 - **Attachments from the agent:** `add_attachment` returns a presigned R2 PUT
