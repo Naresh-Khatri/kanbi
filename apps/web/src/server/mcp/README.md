@@ -193,9 +193,10 @@ report_blocker(KAN-42, reason)
   the user opens the task or marks the board as seen.
 - **Docs:** read-only. `get_task` inlines up to 3 docs linked to the task
   (4,000 chars each); `list_docs`, `get_doc`, and `search_docs` (keyword,
-  ranked) cover the rest. Docs are presented as possibly outdated reference
-  data. There is no doc writing and no `ask_docs` (that would be a second model
-  call).
+  ranked) cover the rest. Images pasted into a doc come back as 1-hour
+  presigned urls, since the agent has no session cookie for `/api/files`. Docs
+  are presented as possibly outdated reference data. There is no doc writing
+  and no `ask_docs` (that would be a second model call).
 
 ## What an agent can do
 

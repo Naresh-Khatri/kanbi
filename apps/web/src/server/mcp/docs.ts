@@ -6,9 +6,16 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
+import { extractFileIds } from "@/lib/file-url";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
+import { presignDownload } from "@/lib/r2";
 import { db } from "@/server/db";
-import { projectDocument } from "@/server/db/schema";
+import {
+  board,
+  projectDocument,
+  task,
+  taskAttachment,
+} from "@/server/db/schema";
 import {
   documentExcerpt,
   documentRelevance,
@@ -25,6 +32,49 @@ const MAX_DOC_CHARS = 60_000;
 const CANDIDATES = 60;
 
 const likeTerm = (term: string) => `%${term.replace(/[\\%_]/g, "\\$&")}%`;
+
+/**
+ * Doc markdown with /api/files/<id> swapped for 1h presigned urls: the agent
+ * has no session cookie, so the stored url would 401.
+ */
+export async function docMarkdown(
+  html: string,
+  projectIds: readonly string[],
+): Promise<string> {
+  const ids = extractFileIds(html);
+  if (ids.length === 0 || projectIds.length === 0) return htmlToMarkdown(html);
+  const rows = await db
+    .select({ id: taskAttachment.id, key: taskAttachment.key })
+    .from(taskAttachment)
+    .innerJoin(task, eq(task.id, taskAttachment.taskId))
+    .innerJoin(board, eq(board.id, task.boardId))
+    .where(
+      and(
+        inArray(taskAttachment.id, ids),
+        inArray(board.projectId, [...projectIds]),
+      ),
+    );
+  const urls = new Map<string, string>();
+  await Promise.all(
+    rows.map(async (r) => {
+      const url = await presignDownload({
+        key: r.key,
+        expiresIn: 60 * 60,
+      }).catch(() => null);
+      if (url) urls.set(r.id, url);
+    }),
+  );
+  const resolved = html.replace(
+    /<(img|video)\b[^>]*?\bsrc="\/api\/files\/([A-Za-z0-9_-]+)"[^>]*>/g,
+    (tag, kind: string, id: string) => {
+      const url = urls.get(id);
+      return url
+        ? tag.replace(/\bsrc="[^"]*"/, `src="${url.replace(/&/g, "&amp;")}"`)
+        : `[${kind === "video" ? "video" : "image"} not available]`;
+    },
+  );
+  return htmlToMarkdown(resolved);
+}
 
 /** Depth-first page order, matching the sidebar tree. */
 export function flattenTree<
@@ -181,7 +231,10 @@ export function registerDocTools(server: McpServer, auth: McpAuthorization) {
           projectId: loc.projectId,
           documentId,
         });
-        const markdown = htmlToMarkdown(doc.body);
+        const markdown = await docMarkdown(
+          doc.body,
+          projects.map((p) => p.id),
+        );
         const end = offset + maxChars;
         const truncated = markdown.length > end;
         const slug = projects.find((p) => p.id === loc.projectId)!.slug;

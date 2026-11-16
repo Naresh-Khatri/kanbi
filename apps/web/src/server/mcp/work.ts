@@ -42,6 +42,7 @@ import {
 import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
 import { fitImage } from "./image-fit";
+import { docMarkdown } from "./docs";
 import { McpUserError, ok, toFailure } from "./result";
 import {
   agentCommentBody,
@@ -722,19 +723,21 @@ export function registerWorkTools(
               sinceLastAgentUpdate(t.id, viewer),
             ]);
 
-          const linkedDocs = docs.slice(0, LINKED_DOCS).map((d) => {
-            const markdown = htmlToMarkdown(d.body);
-            const truncated = markdown.length > LINKED_DOC_CHARS;
-            return {
-              id: d.id,
-              title: d.title,
-              updatedAt: d.updatedAt ?? null,
-              markdown: truncated
-                ? `${markdown.slice(0, LINKED_DOC_CHARS)}…`
-                : markdown,
-              truncated,
-            };
-          });
+          const linkedDocs = await Promise.all(
+            docs.slice(0, LINKED_DOCS).map(async (d) => {
+              const markdown = await docMarkdown(d.body, [t.projectId]);
+              const truncated = markdown.length > LINKED_DOC_CHARS;
+              return {
+                id: d.id,
+                title: d.title,
+                updatedAt: d.updatedAt ?? null,
+                markdown: truncated
+                  ? `${markdown.slice(0, LINKED_DOC_CHARS)}…`
+                  : markdown,
+                truncated,
+              };
+            }),
+          );
           const {
             images,
             imageNames,

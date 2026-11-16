@@ -382,7 +382,7 @@ export function registerCollaborationTools(
     {
       title: "Start an attachment upload",
       description:
-        "Step 1 of 2 for attaching a file (screenshot, log) to a task assigned to the user. Returns a short-lived upload url; PUT the file bytes there with the exact Content-Type (curl command included), then call confirm_attachment. For visible changes, attach a screenshot of the fixed screen by default (and the broken one, if you have it); use a short mp4 or webm video instead when the fix involves motion or several steps. Embedded .mp4/.webm files play inline. Only attach files that help the reporter see the fix; never attach secrets, .env files, or screens showing credentials.",
+        "Attach a file (screenshot, log) to a task assigned to the user. Returns a short-lived upload url; PUT the file bytes there with the exact Content-Type (curl command included). Then paste the returned markdown into a finish_task / comment_on_task / report_blocker body to embed it, which also records the attachment; call confirm_attachment only to attach without embedding. For visible changes, attach a screenshot of the fixed screen by default (and the broken one, if you have it); use a short mp4 or webm video instead when the fix involves motion or several steps. Embedded .mp4/.webm files play inline. Only attach files that help the reporter see the fix; never attach secrets, .env files, or screens showing credentials.",
       inputSchema: {
         task: taskRefInput,
         filename: z.string().trim().min(1).max(160),
