@@ -430,16 +430,18 @@ export function DueDatePicker({
   onChange,
   size = "chip",
   disabled,
+  defaultOpen = false,
 }: {
   // YYYY-MM-DD
   value: string | null;
+  defaultOpen?: boolean;
   // display override when the shown date isn't derived from `value`
   label?: string;
   onChange: (value: string | null) => void;
   size?: PropertySize;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const selected = parseIsoDate(value);
   const row = size === "row";
 

@@ -7,6 +7,7 @@ import {
   EllipsisIcon,
   FileTextIcon,
   GitBranchIcon,
+  HashIcon,
   Link2Icon,
   MinusIcon,
   PaperclipIcon,
@@ -73,6 +74,10 @@ import {
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
+  MenuShortcut,
+  MenuSub,
+  MenuSubPopup,
+  MenuSubTrigger,
   MenuTrigger,
 } from "@/components/ui/menu";
 import {
@@ -81,6 +86,7 @@ import {
   SelectPopup,
   SelectPrimitive,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/components/ui/toast";
@@ -106,7 +112,7 @@ import {
   copyBranchName,
   defaultBranchType,
 } from "./copy-branch-command";
-import { copyTaskLink } from "./copy-task-link";
+import { copyTaskLink, copyText } from "./copy-task-link";
 import type { Priority } from "./priority";
 import {
   AssigneePicker,
@@ -269,26 +275,40 @@ function TaskDetail({
   );
 
   const activeLabelIds = new Set(taskLabels.map((tl) => tl.labelId));
+  const activeLabelNames = labels
+    .filter((l) => activeLabelIds.has(l.id))
+    .map((l) => l.name);
+  const identifier = `${projectKey}-${task.number}`;
   const updatedAt = task.updatedAt ?? task.createdAt;
+  // empty optional props stay hidden until asked for; reset per task
+  const [showDue, setShowDue] = useState(false);
+  const [prevTaskId, setPrevTaskId] = useState(task.id);
+  if (prevTaskId !== task.id) {
+    setPrevTaskId(task.id);
+    setShowDue(false);
+  }
+  const hasEstimate = task.estimatePomodoros != null;
+  const hasDue = task.dueAt != null || showDue;
 
   return (
     <>
       <DrawerHeader allowSelection className="gap-1 pe-4 pt-4">
         <div className="flex items-center gap-1">
-          <span className="font-mono text-muted-foreground text-xs">
-            {projectKey}-{task.number}
-          </span>
+          <CopyIdButton identifier={identifier} />
           <div className="ms-auto flex items-center gap-0.5">
+            <TodayToggle taskId={task.id} />
             <CopyLinkButton taskId={task.id} />
             <TaskActionsMenu
               canWrite={canWrite}
+              identifier={identifier}
+              labelNames={activeLabelNames}
               onDelete={() =>
                 void remove(
                   { kind: "task", id: task.id, name: task.title },
                   onClose,
                 )
               }
-              taskId={task.id}
+              task={task}
             />
             <DrawerClose
               render={
@@ -350,28 +370,23 @@ function TaskDetail({
               size="row"
               value={task.assigneeId}
             />
-          </PropertyRow>
-          <PropertyRow label="Estimate">
-            <EstimateControl
-              canWrite={canWrite}
-              onChange={(n) =>
-                update.mutate({
-                  boardId,
-                  taskId: task.id,
-                  estimatePomodoros: n,
-                })
-              }
-              value={task.estimatePomodoros}
-            />
-          </PropertyRow>
-          <PropertyRow label="Due">
-            <DueControl
-              canWrite={canWrite}
-              onChange={(d) =>
-                update.mutate({ boardId, taskId: task.id, dueAt: d })
-              }
-              value={task.dueAt}
-            />
+            {canWrite && !task.assigneeId && me.data ? (
+              <Button
+                className="text-muted-foreground"
+                onClick={() =>
+                  update.mutate({
+                    boardId,
+                    taskId: task.id,
+                    assigneeId: me.data!.id,
+                  })
+                }
+                size="xs"
+                type="button"
+                variant="ghost"
+              >
+                Assign to me
+              </Button>
+            ) : null}
           </PropertyRow>
           <PropertyRow label="Labels">
             <LabelsPicker
@@ -382,17 +397,67 @@ function TaskDetail({
               taskId={task.id}
             />
           </PropertyRow>
-          <PropertyRow label="Branch">
-            <BranchMenu
-              labelNames={labels
-                .filter((l) => activeLabelIds.has(l.id))
-                .map((l) => l.name)}
-              task={task}
-            />
-          </PropertyRow>
-          <PropertyRow label="Today">
-            <TodayToggle taskId={task.id} />
-          </PropertyRow>
+          {hasDue ? (
+            <PropertyRow label="Due">
+              <DueControl
+                canWrite={canWrite}
+                defaultOpen={showDue && task.dueAt == null}
+                onChange={(d) =>
+                  update.mutate({ boardId, taskId: task.id, dueAt: d })
+                }
+                value={task.dueAt}
+              />
+            </PropertyRow>
+          ) : null}
+          {hasEstimate ? (
+            <PropertyRow label="Estimate">
+              <EstimateControl
+                canWrite={canWrite}
+                onChange={(n) =>
+                  update.mutate({
+                    boardId,
+                    taskId: task.id,
+                    estimatePomodoros: n,
+                  })
+                }
+                value={task.estimatePomodoros}
+              />
+            </PropertyRow>
+          ) : null}
+          {canWrite && (!hasDue || !hasEstimate) ? (
+            <div className="flex min-h-8 items-center gap-1 ps-24">
+              {!hasDue ? (
+                <Button
+                  className="text-muted-foreground"
+                  onClick={() => setShowDue(true)}
+                  size="xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <PlusIcon aria-hidden="true" />
+                  Due date
+                </Button>
+              ) : null}
+              {!hasEstimate ? (
+                <Button
+                  className="text-muted-foreground"
+                  onClick={() =>
+                    update.mutate({
+                      boardId,
+                      taskId: task.id,
+                      estimatePomodoros: 1,
+                    })
+                  }
+                  size="xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <PlusIcon aria-hidden="true" />
+                  Estimate
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </dl>
 
         <Section title="Description">
@@ -439,11 +504,15 @@ function TaskDetail({
 }
 
 function TaskActionsMenu({
-  taskId,
+  task,
+  identifier,
+  labelNames,
   canWrite,
   onDelete,
 }: {
-  taskId: string;
+  task: TaskRow;
+  identifier: string;
+  labelNames: string[];
   canWrite: boolean;
   onDelete: () => void;
 }) {
@@ -457,10 +526,24 @@ function TaskActionsMenu({
         <EllipsisIcon aria-hidden="true" />
       </MenuTrigger>
       <MenuPopup align="end">
-        <MenuItem onClick={() => copyTaskLink(taskId)}>
+        <MenuItem onClick={() => void copyText(identifier, "ID copied")}>
+          <HashIcon aria-hidden="true" />
+          Copy ID
+          <MenuShortcut>{MOD_KEY}.</MenuShortcut>
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            void copyText(`${identifier} ${task.title}`, "ID and title copied")
+          }
+        >
+          <CopyIcon aria-hidden="true" />
+          Copy ID and title
+        </MenuItem>
+        <MenuItem onClick={() => void copyTaskLink(task.id)}>
           <Link2Icon aria-hidden="true" />
           Copy link
         </MenuItem>
+        <BranchSubmenu labelNames={labelNames} task={task} />
         {canWrite ? (
           <>
             <MenuSeparator />
@@ -515,14 +598,17 @@ function DueControl({
   value,
   onChange,
   canWrite,
+  defaultOpen,
 }: {
   value: Date | string | null;
   onChange: (d: Date | null) => void;
   canWrite: boolean;
+  defaultOpen?: boolean;
 }) {
   const has = value != null;
   return (
     <DueDatePicker
+      defaultOpen={defaultOpen}
       disabled={!canWrite}
       label={has ? formatDate(value) : undefined}
       onChange={(v) => onChange(v ? new Date(v) : null)}
@@ -564,7 +650,7 @@ function EstimateControl({
       <PropertyButton disabled={!canWrite} onClick={inc} type="button">
         <TimerIcon aria-hidden="true" />
         <PropertyText placeholder={!has}>
-          {has ? `${value} pomodoro${value === 1 ? "" : "s"}` : "None"}
+          {has ? `${value} × 25m` : "None"}
         </PropertyText>
       </PropertyButton>
       {has && canWrite ? (
@@ -622,6 +708,65 @@ function TitleField({
       unstyled
       value={value}
     />
+  );
+}
+
+const MOD_KEY =
+  typeof navigator !== "undefined" && /Mac|iP(hone|ad)/.test(navigator.platform)
+    ? "⌘"
+    : "Ctrl+";
+
+// plain button -> copies just the id; double-click select dragged in header newlines
+function CopyIdButton({ identifier }: { identifier: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copy = () => {
+    void copyText(identifier, "ID copied").then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "." && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        copyRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            aria-label={`Copy ${identifier}`}
+            className="-ms-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-mono text-muted-foreground text-xs outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={copy}
+            type="button"
+          />
+        }
+      >
+        {identifier}
+        {copied ? (
+          <CheckIcon
+            aria-hidden="true"
+            className="size-3 text-success-foreground"
+          />
+        ) : null}
+      </TooltipTrigger>
+      <TooltipPopup>
+        {copied ? "Copied" : `Copy ID · ${MOD_KEY}.`}
+      </TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -801,7 +946,7 @@ function LabelsPicker({
 }
 
 // compose a branch name + copy the fetch -> sync main -> branch command block
-function BranchMenu({
+function BranchSubmenu({
   task,
   labelNames,
 }: {
@@ -814,12 +959,12 @@ function BranchMenu({
   const branchArgs = { number: task.number, title: task.title, type };
   const branch = buildBranchName(branchArgs);
   return (
-    <Menu>
-      <MenuTrigger render={propertyButton("row")}>
+    <MenuSub>
+      <MenuSubTrigger>
         <GitBranchIcon aria-hidden="true" />
-        <PropertyText>Copy branch name</PropertyText>
-      </MenuTrigger>
-      <MenuPopup align="start" className="w-72">
+        Git branch
+      </MenuSubTrigger>
+      <MenuSubPopup className="w-72">
         <div className="px-2 pt-1.5 pb-2">
           <p className="font-medium text-muted-foreground text-xs">
             Branch name
@@ -856,8 +1001,8 @@ function BranchMenu({
           <GitBranchIcon aria-hidden="true" />
           Copy branch name
         </MenuItem>
-      </MenuPopup>
-    </Menu>
+      </MenuSubPopup>
+    </MenuSub>
   );
 }
 
@@ -902,22 +1047,29 @@ function TodayToggle({ taskId }: { taskId: string }) {
   });
 
   return (
-    <PropertyButton
-      aria-pressed={onToday}
-      onClick={() =>
-        onToday ? remove.mutate({ taskId }) : add.mutate({ taskId })
-      }
-      type="button"
-    >
-      <SunIcon
-        aria-hidden="true"
-        className={cn(onToday && "text-warning-foreground")}
-        fill={onToday ? "currentColor" : "none"}
-      />
-      <PropertyText placeholder={!onToday}>
-        {onToday ? "On today" : "Add to today"}
-      </PropertyText>
-    </PropertyButton>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label={onToday ? "Remove from Today" : "Add to Today"}
+            aria-pressed={onToday}
+            onClick={() =>
+              onToday ? remove.mutate({ taskId }) : add.mutate({ taskId })
+            }
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          />
+        }
+      >
+        <SunIcon
+          aria-hidden="true"
+          className={cn(onToday && "text-warning-foreground")}
+          fill={onToday ? "currentColor" : "none"}
+        />
+      </TooltipTrigger>
+      <TooltipPopup>{onToday ? "On Today" : "Add to Today"}</TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -1098,6 +1250,7 @@ function ChecklistPanel({
       meta={items.length > 0 ? `${done}/${items.length}` : undefined}
       title="Checklist"
     >
+      {list.isPending ? <SectionSkeleton /> : null}
       {items.length > 0 ? (
         <ul className="-mx-2 flex flex-col">
           {items.map((it) => (
@@ -1252,7 +1405,9 @@ function AttachmentsPanel({
       }
       title="Attachments"
     >
-      {hasImages || hasFiles ? (
+      {list.isPending ? (
+        <SectionSkeleton />
+      ) : hasImages || hasFiles ? (
         <Frame>
           {hasImages ? (
             <FramePanel className="grid grid-cols-3 gap-2 p-2">
@@ -1413,6 +1568,7 @@ function CommentsPanel({
       meta={comments.length > 0 ? String(comments.length) : undefined}
       title="Comments"
     >
+      {list.isPending ? <SectionSkeleton /> : null}
       {comments.length > 0 ? (
         <ul className="flex flex-col gap-4 text-sm">
           {comments.map((c) => (
@@ -1690,6 +1846,16 @@ function formatVerb(verb: string, payload: Record<string, unknown> | null) {
   }
 }
 
+// loading != empty; "No attachments." mid-fetch reads as data loss
+function SectionSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-col gap-2 py-1">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+    </div>
+  );
+}
+
 function Section({
   title,
   meta,
@@ -1727,7 +1893,7 @@ function PropertyRow({
   return (
     <div className="flex min-h-8 items-center">
       <dt className="w-24 shrink-0 text-muted-foreground text-sm">{label}</dt>
-      <dd className="min-w-0">{children}</dd>
+      <dd className="flex min-w-0 items-center gap-1">{children}</dd>
     </div>
   );
 }

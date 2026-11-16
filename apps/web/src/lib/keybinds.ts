@@ -35,4 +35,8 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
       { keys: "Esc", description: "Clear card selection" },
     ],
   },
+  {
+    title: "Task",
+    entries: [{ keys: "⌘. / Ctrl+.", description: "Copy task ID" }],
+  },
 ];
