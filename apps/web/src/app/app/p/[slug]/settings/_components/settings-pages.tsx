@@ -7,6 +7,7 @@ import { AgentDisclosureSection } from "./agent-disclosure-section";
 import { AiContextSection } from "./ai-context-section";
 import { DangerZoneSection } from "./danger-zone-section";
 import { GeneralSection } from "./general-section";
+import { InviteLinksSection } from "./invite-links-section";
 import { MembersSection } from "./members-section";
 import { NotificationsSection } from "./notifications-section";
 import { SharingSection } from "./sharing-section";
@@ -48,6 +49,7 @@ export function AccessSettings({ slug }: { slug: string }) {
   return (
     <>
       <MembersSection isOwner={isOwner} projectId={project.id} slug={slug} />
+      {isOwner ? <InviteLinksSection projectId={project.id} /> : null}
       <SharingSection boardId={project.boardId} isOwner={isOwner} />
     </>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDate } from "@kanbi/shared";
-import { LinkIcon, Trash2Icon } from "lucide-react";
+import { LinkIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +15,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -30,9 +25,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toastManager } from "@/components/ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/trpc/react";
-import { CopyButton } from "./copy-button";
+import { LinkField } from "./link-field";
 import { Section } from "./section";
 
 const EXPIRY_ITEMS = [
@@ -165,46 +159,19 @@ export function SharingSection({
                     : false;
                   const exhausted =
                     s.maxUses != null && s.usesCount >= s.maxUses;
-                  const url = shareUrl(s.token);
                   return (
                     <li className="flex flex-col gap-1.5" key={s.id}>
-                      <div className="flex items-center gap-2">
-                        <InputGroup>
-                          <InputGroupInput
-                            aria-label="Share link"
-                            className="font-mono text-xs"
-                            onFocus={(e) => e.currentTarget.select()}
-                            readOnly
-                            size="sm"
-                            value={url}
-                          />
-                          <InputGroupAddon align="inline-end">
-                            <CopyButton value={url} />
-                          </InputGroupAddon>
-                        </InputGroup>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                aria-label="Revoke link"
-                                disabled={
-                                  revoke.isPending &&
-                                  revoke.variables?.shareId === s.id
-                                }
-                                onClick={() =>
-                                  revoke.mutate({ boardId, shareId: s.id })
-                                }
-                                size="icon-sm"
-                                type="button"
-                                variant="ghost"
-                              />
-                            }
-                          >
-                            <Trash2Icon aria-hidden="true" />
-                          </TooltipTrigger>
-                          <TooltipPopup>Revoke link</TooltipPopup>
-                        </Tooltip>
-                      </div>
+                      <LinkField
+                        label="Share link"
+                        onRemove={() =>
+                          revoke.mutate({ boardId, shareId: s.id })
+                        }
+                        removeLabel="Revoke link"
+                        removing={
+                          revoke.isPending && revoke.variables?.shareId === s.id
+                        }
+                        url={shareUrl(s.token)}
+                      />
                       <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
                         <span className="tabular-nums">
                           {s.usesCount}

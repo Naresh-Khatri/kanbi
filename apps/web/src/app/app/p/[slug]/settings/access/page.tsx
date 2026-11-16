@@ -16,6 +16,7 @@ export default async function ProjectAccessSettingsPage({
   void api.project.members.prefetch({ projectId: project.id });
   if (project.role === "owner") {
     void api.project.listInvites.prefetch({ projectId: project.id });
+    void api.project.listInviteLinks.prefetch({ projectId: project.id });
     void api.share.list.prefetch({ boardId: project.boardId });
   }
 

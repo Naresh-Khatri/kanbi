@@ -23,6 +23,7 @@ const ROLE_COPY: Record<string, { label: string; body: string }> = {
 };
 
 export function AcceptInvite({
+  kind,
   token,
   projectName,
   role,
@@ -30,6 +31,7 @@ export function AcceptInvite({
   email,
   image,
 }: {
+  kind: "email" | "link";
   token: string;
   projectName: string;
   role: string;
@@ -40,16 +42,24 @@ export function AcceptInvite({
   const router = useRouter();
   const [declined, setDeclined] = useState(false);
 
-  const accept = api.project.acceptInvite.useMutation({
-    onSuccess: (res) => {
-      toastManager.add({ type: "success", title: `You joined ${projectName}` });
-      router.replace(res.projectSlug ? `/app/p/${res.projectSlug}` : "/app");
-    },
-    onError: (e) => toastManager.add({ type: "error", title: e.message }),
+  const onJoined = (res: { projectSlug: string | null }) => {
+    toastManager.add({ type: "success", title: `You joined ${projectName}` });
+    router.replace(res.projectSlug ? `/app/p/${res.projectSlug}` : "/app");
+  };
+  const onError = (e: { message: string }) =>
+    toastManager.add({ type: "error", title: e.message });
+  const acceptEmail = api.project.acceptInvite.useMutation({
+    onSuccess: onJoined,
+    onError,
   });
+  const acceptLink = api.project.acceptInviteLink.useMutation({
+    onSuccess: onJoined,
+    onError,
+  });
+  const accept = kind === "link" ? acceptLink : acceptEmail;
   const decline = api.project.declineInvite.useMutation({
     onSuccess: () => setDeclined(true),
-    onError: (e) => toastManager.add({ type: "error", title: e.message }),
+    onError,
   });
   const busy = accept.isPending || decline.isPending || accept.isSuccess;
   const copy = ROLE_COPY[role] ?? { label: role, body: "" };
@@ -69,7 +79,7 @@ export function AcceptInvite({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1.5 rounded-xl bg-muted px-4 py-3 text-sm">
+      <div className="bg-muted flex flex-col gap-1.5 rounded-xl px-4 py-3 text-sm">
         <div className="flex items-center justify-between gap-3">
           <span className="text-muted-foreground">You&apos;ll join as</span>
           <Badge variant="outline">{copy.label}</Badge>
@@ -93,7 +103,10 @@ export function AcceptInvite({
           className="w-full"
           disabled={busy && !decline.isPending}
           loading={decline.isPending}
-          onClick={() => decline.mutate({ token })}
+          // shared link -> nothing to delete server-side
+          onClick={() =>
+            kind === "link" ? setDeclined(true) : decline.mutate({ token })
+          }
           variant="ghost"
         >
           Decline
@@ -101,7 +114,7 @@ export function AcceptInvite({
       </div>
 
       <Separator />
-      <div className="flex items-center justify-center gap-2 text-muted-foreground text-xs">
+      <div className="text-muted-foreground flex items-center justify-center gap-2 text-xs">
         <UserAvatar image={image} name={name} size={18} />
         <span>
           Signed in as <span className="text-foreground">{email}</span>

@@ -85,11 +85,17 @@ export function LoginForm({
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-xl">
-              {invite ? "Sign in to accept" : "Welcome back"}
+              {invite
+                ? invite.email
+                  ? "Sign in to accept"
+                  : "Sign in to join"
+                : "Welcome back"}
             </CardTitle>
             <CardDescription>
               {invite
-                ? "Sign in with the invited account, then confirm joining."
+                ? invite.email
+                  ? "Sign in with the invited account, then confirm joining."
+                  : "Sign in with any account, then confirm joining."
                 : "Sign in to your Kanbi account."}
             </CardDescription>
           </CardHeader>
@@ -108,13 +114,13 @@ export function LoginForm({
                   autoComplete="email"
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  readOnly={!!invite}
+                  readOnly={!!invite?.email}
                   required
                   size="lg"
                   type="email"
                   value={email}
                 />
-                {invite ? (
+                {invite?.email ? (
                   <FieldDescription>
                     <InvitedEmailHint providers={providerNames} />
                   </FieldDescription>
@@ -124,7 +130,7 @@ export function LoginForm({
                 <div className="flex w-full items-center justify-between">
                   <FieldLabel>Password</FieldLabel>
                   <Link
-                    className="text-muted-foreground text-xs underline-offset-4 hover:text-foreground hover:underline"
+                    className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
                     href="/forgot-password"
                   >
                     Forgot password?
@@ -141,17 +147,22 @@ export function LoginForm({
               </Field>
               <div className="relative mt-2">
                 {lastUsed === "email" && <LastUsedBadge />}
-                <Button className="w-full" loading={pending} size="lg" type="submit">
+                <Button
+                  className="w-full"
+                  loading={pending}
+                  size="lg"
+                  type="submit"
+                >
                   Sign in
                 </Button>
               </div>
             </Form>
           </CardPanel>
         </Card>
-        <p className="text-center text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-center text-sm">
           No account?{" "}
           <Link
-            className="font-medium text-foreground underline-offset-4 hover:underline"
+            className="text-foreground font-medium underline-offset-4 hover:underline"
             href={preserveOAuthQuery("/signup", currentQuery)}
           >
             Create one

@@ -146,13 +146,13 @@ export function SignupForm({
                   autoComplete="email"
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  readOnly={!!invite}
+                  readOnly={!!invite?.email}
                   required
                   size="lg"
                   type="email"
                   value={email}
                 />
-                {invite ? (
+                {invite?.email ? (
                   <FieldDescription>
                     <InvitedEmailHint providers={providerNames} />
                   </FieldDescription>

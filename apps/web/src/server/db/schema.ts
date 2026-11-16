@@ -301,6 +301,10 @@ export const projectMember = createTable(
       .references(() => user.id, { onDelete: "cascade" }),
     role: projectRole("role").notNull().default("viewer"),
     digestEmail: boolean("digest_email").notNull().default(false),
+    joinedViaLinkId: text("joined_via_link_id").references(
+      (): AnyPgColumn => projectInviteLink.id,
+      { onDelete: "set null" },
+    ),
     invitedAt: createdAt(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   },
@@ -331,6 +335,28 @@ export const projectInvite = createTable(
     index("project_invite_project_idx").on(t.projectId),
     index("project_invite_email_idx").on(t.email),
   ],
+);
+
+// shareable multi-use invite (any email); revoke = soft so joiners keep attribution
+export const projectInviteLink = createTable(
+  "project_invite_link",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    role: projectRole("role").notNull().default("viewer"),
+    maxUses: integer("max_uses").notNull(),
+    usesCount: integer("uses_count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdById: text("created_by_id")
+      .notNull()
+      .references(() => user.id),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("project_invite_link_project_idx").on(t.projectId)],
 );
 
 // ── Boards / Columns / Tasks ────────────────────────────────────────────────

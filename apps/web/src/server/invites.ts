@@ -6,11 +6,13 @@ import type { db as DB } from "@/server/db";
 import {
   project,
   projectInvite,
+  projectInviteLink,
   projectMember,
   user as userTable,
 } from "@/server/db/schema";
 
 export type InviteStatus = "valid" | "expired" | "used";
+export type InviteLinkStatus = "valid" | "expired" | "revoked" | "full";
 
 export type InvitePreview = NonNullable<Awaited<ReturnType<typeof loadInvite>>>;
 
@@ -51,6 +53,48 @@ export async function loadInvite(db: typeof DB, token: string) {
   return { ...row, status };
 }
 
+export function inviteLinkStatus(
+  link: {
+    revokedAt: Date | null;
+    expiresAt: Date | null;
+    maxUses: number;
+    usesCount: number;
+  },
+  now = new Date(),
+): InviteLinkStatus {
+  if (link.revokedAt) return "revoked";
+  if (link.expiresAt && link.expiresAt <= now) return "expired";
+  if (link.usesCount >= link.maxUses) return "full";
+  return "valid";
+}
+
+export async function loadInviteLink(db: typeof DB, token: string) {
+  const [row] = await db
+    .select({
+      id: projectInviteLink.id,
+      role: projectInviteLink.role,
+      maxUses: projectInviteLink.maxUses,
+      usesCount: projectInviteLink.usesCount,
+      expiresAt: projectInviteLink.expiresAt,
+      revokedAt: projectInviteLink.revokedAt,
+      createdById: projectInviteLink.createdById,
+      projectId: project.id,
+      projectName: project.name,
+      projectSlug: project.slug,
+      projectColor: project.color,
+      ownerId: project.ownerId,
+      inviterName: userTable.name,
+      inviterImage: userTable.image,
+    })
+    .from(projectInviteLink)
+    .innerJoin(project, eq(project.id, projectInviteLink.projectId))
+    .innerJoin(userTable, eq(userTable.id, projectInviteLink.createdById))
+    .where(eq(projectInviteLink.token, token))
+    .limit(1);
+  if (!row) return null;
+  return { ...row, status: inviteLinkStatus(row) };
+}
+
 /** true when the user already owns or belongs to the project. */
 export async function hasProjectAccess(
   db: typeof DB,
@@ -79,13 +123,18 @@ export async function accountExists(db: typeof DB, email: string) {
   return !!u;
 }
 
-/** invite banner for /login + /signup; only for a still-valid token. no ids leak. */
+/** invite banner for /login + /signup; only for a still-valid token. no ids leak.
+ * email null = shareable link -> any account may join. */
 export async function resolveAuthInvite(
   db: typeof DB,
   token: string | undefined,
 ) {
   if (!token) return null;
-  const inv = await loadInvite(db, token);
+  const inv =
+    (await loadInvite(db, token)) ??
+    (await loadInviteLink(db, token).then((l) =>
+      l ? { ...l, email: null } : null,
+    ));
   if (inv?.status !== "valid") return null;
   return {
     token,

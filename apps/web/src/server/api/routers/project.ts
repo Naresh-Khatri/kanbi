@@ -35,14 +35,30 @@ import {
   label,
   project,
   projectInvite,
+  projectInviteLink,
   projectMember,
   task,
   user as userTable,
 } from "@/server/db/schema";
-import { loadInvite, normalizeEmail, sameEmail } from "@/server/invites";
+import {
+  inviteLinkStatus,
+  loadInvite,
+  loadInviteLink,
+  normalizeEmail,
+  sameEmail,
+} from "@/server/invites";
 import { sendProjectInviteEmail } from "@/server/mail";
 import { createNotifications } from "@/server/notifications/create";
 import { bus } from "@/server/realtime/bus";
+
+const INVITE_LINK_MAX_USES = 100;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const INVITE_LINK_ERRORS = {
+  expired: "This invite link has expired",
+  revoked: "This invite link was turned off",
+  full: "This invite link has reached its join limit",
+} as const;
 
 async function requireOpenInvite(
   db: Parameters<typeof loadInvite>[0],
@@ -588,9 +604,7 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      const expiresAt = new Date(
-        Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000,
-      );
+      const expiresAt = new Date(Date.now() + input.expiresInDays * DAY_MS);
       const [row] = await ctx.db
         .insert(projectInvite)
         .values({
@@ -640,8 +654,10 @@ export const projectRouter = createTRPCRouter({
       return row;
     }),
 
-  listInvites: projectProcedure.query(({ ctx, input }) =>
-    ctx.db
+  listInvites: projectProcedure.query(({ ctx, input }) => {
+    // rows carry tokens -> admins only
+    if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+    return ctx.db
       .select()
       .from(projectInvite)
       .where(
@@ -650,8 +666,8 @@ export const projectRouter = createTRPCRouter({
           // unaccepted only
         ),
       )
-      .orderBy(desc(projectInvite.createdAt)),
-  ),
+      .orderBy(desc(projectInvite.createdAt));
+  }),
 
   revokeInvite: projectProcedure
     .input(z.object({ inviteId: z.string().min(1) }))
@@ -756,6 +772,156 @@ export const projectRouter = createTRPCRouter({
         ctx.session.user,
       );
       await ctx.db.delete(projectInvite).where(eq(projectInvite.id, inv.id));
+    }),
+
+  createInviteLink: projectProcedure
+    .input(
+      z.object({
+        role: z.enum(["editor", "viewer"]).default("viewer"),
+        maxUses: z.number().int().min(1).max(INVITE_LINK_MAX_USES),
+        expiresInDays: z.number().int().min(1).max(30),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+      const [row] = await ctx.db
+        .insert(projectInviteLink)
+        .values({
+          projectId: input.projectId,
+          token: shareToken(),
+          role: input.role,
+          maxUses: input.maxUses,
+          expiresAt: new Date(Date.now() + input.expiresInDays * DAY_MS),
+          createdById: ctx.session.user.id,
+        })
+        .returning();
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return row;
+    }),
+
+  listInviteLinks: projectProcedure.query(async ({ ctx, input }) => {
+    if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+    const links = await ctx.db
+      .select()
+      .from(projectInviteLink)
+      .where(
+        and(
+          eq(projectInviteLink.projectId, input.projectId),
+          isNull(projectInviteLink.revokedAt),
+        ),
+      )
+      .orderBy(desc(projectInviteLink.createdAt));
+    if (links.length === 0) return [];
+    const joiners = await ctx.db
+      .select({
+        linkId: projectMember.joinedViaLinkId,
+        userId: userTable.id,
+        name: userTable.name,
+        image: userTable.image,
+      })
+      .from(projectMember)
+      .innerJoin(userTable, eq(userTable.id, projectMember.userId))
+      .where(
+        inArray(
+          projectMember.joinedViaLinkId,
+          links.map((l) => l.id),
+        ),
+      );
+    const now = new Date();
+    return links.map((l) => ({
+      ...l,
+      status: inviteLinkStatus(l, now),
+      joined: joiners.filter((j) => j.linkId === l.id),
+    }));
+  }),
+
+  revokeInviteLink: projectProcedure
+    .input(z.object({ linkId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.access.canAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+      await ctx.db
+        .update(projectInviteLink)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(projectInviteLink.id, input.linkId),
+            eq(projectInviteLink.projectId, input.projectId),
+          ),
+        );
+    }),
+
+  acceptInviteLink: protectedProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const link = await loadInviteLink(ctx.db, input.token);
+      if (!link) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Invite not found" });
+      }
+      const userId = ctx.session.user.id;
+      if (link.ownerId === userId) return { projectSlug: link.projectSlug };
+      if (link.status !== "valid") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: INVITE_LINK_ERRORS[link.status],
+        });
+      }
+      const now = new Date();
+
+      const joined = await ctx.db.transaction(async (tx) => {
+        // existing members never consume a seat (and never get downgraded)
+        const [member] = await tx
+          .insert(projectMember)
+          .values({
+            projectId: link.projectId,
+            userId,
+            role: link.role,
+            acceptedAt: now,
+            joinedViaLinkId: link.id,
+          })
+          .onConflictDoNothing()
+          .returning({ userId: projectMember.userId });
+        if (!member) return false;
+
+        // guarded increment = the real cap check under concurrency
+        const [claimed] = await tx
+          .update(projectInviteLink)
+          .set({ usesCount: sql`${projectInviteLink.usesCount} + 1` })
+          .where(
+            and(
+              eq(projectInviteLink.id, link.id),
+              isNull(projectInviteLink.revokedAt),
+              or(
+                isNull(projectInviteLink.expiresAt),
+                gt(projectInviteLink.expiresAt, now),
+              ),
+              sql`${projectInviteLink.usesCount} < ${projectInviteLink.maxUses}`,
+            ),
+          )
+          .returning({ id: projectInviteLink.id });
+        if (!claimed) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: INVITE_LINK_ERRORS.full,
+          });
+        }
+        return true;
+      });
+
+      if (joined) {
+        await createNotifications(ctx.db, [
+          {
+            userId: link.createdById,
+            actorId: userId,
+            type: "project.member_joined",
+            projectId: link.projectId,
+            data: {
+              projectName: link.projectName,
+              memberName: ctx.session.user.name,
+            },
+          },
+        ]);
+      }
+      return { projectSlug: link.projectSlug };
     }),
 
   members: projectProcedure.query(async ({ ctx, input }) => {
