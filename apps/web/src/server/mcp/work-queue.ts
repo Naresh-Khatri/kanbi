@@ -251,7 +251,7 @@ export function buildBrief(input: BriefInput): string {
       input.comments
         .map(
           (c) =>
-            `- ${c.isNew ? "**NEW** " : ""}**${c.author}** (${day(c.createdAt)}): ${htmlToMarkdown(c.body).replace(/\n+/g, " ")}`,
+            `- ${c.isNew ? "**NEW** " : ""}**${c.author}** (${day(c.createdAt)}): ${htmlToMarkdown(c.body).trim().replace(/\n/g, "\n  ")}`,
         )
         .join("\n"),
     );

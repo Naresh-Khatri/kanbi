@@ -20,22 +20,43 @@ function decodeEntities(text: string): string {
   });
 }
 
+function convertLists(html: string): string {
+  const stack: { ordered: boolean; n: number }[] = [];
+  return html.replace(
+    /<(\/?)(ul|ol|li)\b([^>]*)>/gi,
+    (_, close: string, tag: string, attrs: string) => {
+      const name = tag.toLowerCase();
+      if (name === "li") {
+        if (close) return "";
+        const list = stack.at(-1);
+        const indent = "   ".repeat(Math.max(0, stack.length - 1));
+        return `\n${indent}${list?.ordered ? `${++list.n}.` : "-"} `;
+      }
+      if (close) {
+        stack.pop();
+        return stack.length > 0 ? "" : "\n\n";
+      }
+      const start = Number(/\sstart="(\d+)"/i.exec(attrs)?.[1] ?? 1);
+      stack.push({ ordered: name === "ol", n: start - 1 });
+      return "";
+    },
+  );
+}
+
 /**
  * Lossy conversion of Kanbi's sanitized rich-text HTML to markdown for agents
  * and plain-text snapshots. Only expects the editor's small tag set.
  */
 export function htmlToMarkdown(html: string): string {
-  const md = html
-    .replace(/\r\n?/g, "\n")
+  const md = convertLists(html.replace(/\r\n?/g, "\n"))
     .replace(/<pre[^>]*>\s*(?:<code[^>]*>)?/gi, "\n\n```\n")
     .replace(/\s*(?:<\/code>)?\s*<\/pre>/gi, "\n```\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<h([1-6])[^>]*>/gi, (_, level: string) => {
       return `\n\n${"#".repeat(Number(level))} `;
     })
-    .replace(/<li[^>]*>\s*(?:<p[^>]*>)?/gi, "\n- ")
     .replace(/<blockquote[^>]*>\s*(?:<p[^>]*>)?/gi, "\n\n> ")
-    .replace(/<\/(p|h[1-6]|ul|ol|blockquote|div)>/gi, "\n\n")
+    .replace(/<\/(p|h[1-6]|blockquote|div)>/gi, "\n\n")
     .replace(/<\/?(strong|b)(\s[^>]*)?>/gi, "**")
     .replace(/<\/?(em|i)(\s[^>]*)?>/gi, "_")
     .replace(/<\/?code(\s[^>]*)?>/gi, "`")
@@ -49,11 +70,15 @@ export function htmlToMarkdown(html: string): string {
       const alt = /\salt="([^"]*)"/i.exec(tag)?.[1] ?? "image";
       return src ? `![${alt}](${src})` : "";
     })
+    .replace(/<video\s[^>]*>/gi, (tag) => {
+      const src = /\ssrc="([^"]*)"/i.exec(tag)?.[1];
+      return src ? `[video](${src})` : "";
+    })
     .replace(/<[^>]+>/g, "");
 
   return decodeEntities(md)
     .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n- \n+/g, "\n- ")
+    .replace(/\n( *(?:-|\d+\.)) \n+/g, "\n$1 ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

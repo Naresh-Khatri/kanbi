@@ -159,6 +159,24 @@ describe("buildBrief", () => {
       buildBrief({ ...base, sourceText: null, description: null }),
     ).not.toContain("get_task_comments");
   });
+
+  it("keeps a comment's line breaks inside its list item", () => {
+    const brief = buildBrief({
+      ...base,
+      sourceText: null,
+      description: null,
+      comments: [
+        {
+          author: "Asha",
+          createdAt: new Date("2026-01-02"),
+          body: "<p>two issues:</p><ul><li>totals off</li><li>header wraps</li></ul>",
+        },
+      ],
+    });
+    expect(brief).toMatch(
+      /two issues:\n {2}\n? *[-*] totals off\n {2}[-*] +header wraps/,
+    );
+  });
 });
 
 describe("isWaitingOnPeople", () => {

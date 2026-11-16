@@ -16,8 +16,24 @@ export const fail = (message: string): CallToolResult => ({
   isError: true,
 });
 
+const CODE_MESSAGES: Partial<Record<TRPCError["code"], string>> = {
+  NOT_FOUND: "Not found, or you do not have access to it.",
+  FORBIDDEN: "You do not have permission to do this.",
+  UNAUTHORIZED: "Not signed in; reconnect the Kanbi MCP server.",
+  CONFLICT: "Someone changed this meanwhile; read it again and retry.",
+  BAD_REQUEST: "Kanbi rejected the input.",
+  TOO_MANY_REQUESTS: "Too many requests; wait a moment and retry.",
+};
+
 export function toFailure(err: unknown): CallToolResult {
   if (err instanceof McpUserError) return fail(err.message);
+  // router messages are written for people; generic text leaves the agent unable to self-correct
+  if (err instanceof TRPCError && err.code !== "INTERNAL_SERVER_ERROR") {
+    const own = err.message && err.message !== err.code ? err.message : null;
+    return fail(
+      own ?? CODE_MESSAGES[err.code] ?? "Kanbi rejected this request.",
+    );
+  }
   console.error("[mcp] tool failed", err);
   return fail("Kanbi could not complete this request.");
 }

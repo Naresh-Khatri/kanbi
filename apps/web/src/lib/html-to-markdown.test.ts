@@ -15,9 +15,27 @@ describe("htmlToMarkdown", () => {
 
   it("flattens lists, including tiptap's <li><p> shape", () => {
     expect(
-      htmlToMarkdown("<ul><li><p>one</p></li><li><p>two</p></li></ul><p>after</p>"),
+      htmlToMarkdown(
+        "<ul><li><p>one</p></li><li><p>two</p></li></ul><p>after</p>",
+      ),
     ).toBe("- one\n\n- two\n\nafter");
-    expect(htmlToMarkdown("<ol><li>a</li><li>b</li></ol>")).toBe("- a\n- b");
+    expect(htmlToMarkdown("<ol><li>a</li><li>b</li></ol>")).toBe("1. a\n2. b");
+  });
+
+  it("numbers ordered lists and indents nested ones", () => {
+    expect(
+      htmlToMarkdown(
+        '<ol start="3"><li>open report<ul><li>edit mode</li></ul></li><li>save</li></ol>',
+      ),
+    ).toBe("3. open report\n   - edit mode\n4. save");
+  });
+
+  it("keeps embedded videos as links", () => {
+    expect(
+      htmlToMarkdown(
+        '<p>repro</p><video src="/api/files/v1" title="clip"></video>',
+      ),
+    ).toBe("repro\n\n[video](/api/files/v1)");
   });
 
   it("keeps code and escaped angle brackets", () => {
@@ -30,15 +48,19 @@ describe("htmlToMarkdown", () => {
   });
 
   it("collapses bare links to the url", () => {
-    expect(
-      htmlToMarkdown('<a href="https://x.dev">https://x.dev</a>'),
-    ).toBe("https://x.dev");
+    expect(htmlToMarkdown('<a href="https://x.dev">https://x.dev</a>')).toBe(
+      "https://x.dev",
+    );
   });
 
   it("keeps inline images as markdown images", () => {
     expect(
-      htmlToMarkdown('<p>See</p><img src="/api/files/abc" alt="shot"><img src="/api/files/d">'),
+      htmlToMarkdown(
+        '<p>See</p><img src="/api/files/abc" alt="shot"><img src="/api/files/d">',
+      ),
     ).toContain("![shot](/api/files/abc)");
-    expect(htmlToMarkdown('<img src="/api/files/d">')).toBe("![image](/api/files/d)");
+    expect(htmlToMarkdown('<img src="/api/files/d">')).toBe(
+      "![image](/api/files/d)",
+    );
   });
 });
