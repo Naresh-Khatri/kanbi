@@ -89,6 +89,11 @@ const searchTasksOutput = {
       }),
       columnName: z.string(),
       columnCategory: z.string(),
+      priority: priorityEnum,
+      assignee: z
+        .object({ id: z.string(), name: z.string(), isUser: z.boolean() })
+        .nullable(),
+      dueAt: z.string().nullable(),
       updatedAt: z.string(),
       url: z.string().url(),
     }),
@@ -268,7 +273,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
       {
         title: "Search tasks",
         description:
-          "Search task titles for likely duplicates before a proposal. Matching is title-only.",
+          "Search task titles for likely duplicates before a proposal, or look a task up by its identifier (e.g. KAN-42). Matches titles only, not descriptions; use find_tasks for that. assignee.isUser tells whether the task is already the user's; unassigned ones can be claimed with assign_to_me.",
         inputSchema: {
           query: z.string().trim().min(1).max(100),
           projectId: z.string().min(1).optional(),
@@ -298,6 +303,15 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
               },
               columnName: item.columnName,
               columnCategory: item.columnCategory,
+              priority: item.priority,
+              assignee: item.assigneeId
+                ? {
+                    id: item.assigneeId,
+                    name: item.assigneeName ?? "Unknown",
+                    isUser: item.assigneeId === auth.userId,
+                  }
+                : null,
+              dueAt: item.dueAt ? item.dueAt.toISOString().slice(0, 10) : null,
               updatedAt: (item.updatedAt ?? item.createdAt).toISOString(),
               url: taskUrl(item.projectSlug, item.id),
             })),

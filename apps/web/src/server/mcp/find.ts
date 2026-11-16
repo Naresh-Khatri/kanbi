@@ -66,12 +66,20 @@ async function knownPeople(projectIds: string[]): Promise<Person[]> {
   if (projectIds.length === 0) return [];
   const [owners, members] = await Promise.all([
     db
-      .select({ id: userTable.id, name: userTable.name, email: userTable.email })
+      .select({
+        id: userTable.id,
+        name: userTable.name,
+        email: userTable.email,
+      })
       .from(project)
       .innerJoin(userTable, eq(userTable.id, project.ownerId))
       .where(inArray(project.id, projectIds)),
     db
-      .select({ id: userTable.id, name: userTable.name, email: userTable.email })
+      .select({
+        id: userTable.id,
+        name: userTable.name,
+        email: userTable.email,
+      })
       .from(projectMember)
       .innerJoin(userTable, eq(userTable.id, projectMember.userId))
       .where(inArray(projectMember.projectId, projectIds)),
@@ -155,7 +163,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           .min(1)
           .optional()
           .describe(
-            "Column categories to include; omit for all. Open work = unstarted + started; review = waiting for the client to check.",
+            "Column categories to include; omit for all. Open work = backlog + unstarted + started (backlog is the to-do column on default boards); review = waiting for the client to check.",
           ),
         priority: z.array(z.enum(taskPriority.enumValues)).min(1).optional(),
         label: z
@@ -166,6 +174,12 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           .optional()
           .describe("Label name, case-insensitive."),
         limit: z.number().int().min(1).max(100).optional(),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Skip this many results; pass nextOffset to see more."),
       },
       outputSchema: {
         todayUtc: z.string(),
@@ -175,18 +189,22 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           createdFrom: z.string().nullable(),
         }),
         truncated: z.boolean(),
+        nextOffset: z.number().int().nullable(),
         tasks: z.array(
           z.object({
             id: z.string(),
             identifier: z.string(),
             title: z.string(),
+            projectId: z.string(),
             project: z.string(),
             column: z.string(),
             status: z.string(),
             priority: z.string(),
             createdBy: z.string(),
             assignee: z.string().nullable(),
+            labels: z.array(z.string()),
             createdAt: z.string(),
+            updatedAt: z.string(),
             dueAt: z.string().nullable(),
             url: z.string().url(),
           }),
@@ -235,6 +253,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           .filter((d): d is Date => d !== null)
           .sort((a, b) => b.getTime() - a.getTime())[0];
         const limit = input.limit ?? 25;
+        const offset = input.offset ?? 0;
 
         const reporter = alias(userTable, "reporter");
         const assigneeUser = alias(userTable, "assignee_user");
@@ -250,9 +269,11 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
                   title: task.title,
                   priority: task.priority,
                   createdAt: task.createdAt,
+                  updatedAt: task.updatedAt,
                   dueAt: task.dueAt,
                   column: boardColumn.name,
                   status: boardColumn.category,
+                  projectId: project.id,
                   projectKey: project.key,
                   projectSlug: project.slug,
                   projectName: project.name,
@@ -283,7 +304,10 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
                       ? inArray(task.priority, input.priority)
                       : undefined,
                     term
-                      ? or(ilike(task.title, term), ilike(task.description, term))
+                      ? or(
+                          ilike(task.title, term),
+                          ilike(task.description, term),
+                        )
                       : undefined,
                     input.label
                       ? inArray(
@@ -299,29 +323,55 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
                       : undefined,
                   ),
                 )
-                .orderBy(desc(task.createdAt))
+                .orderBy(desc(task.createdAt), desc(task.id))
+                .offset(offset)
                 .limit(limit + 1);
 
-        const tasks = rows.slice(0, limit).map((r) => {
+        const page = rows.slice(0, limit);
+        const labelRows =
+          page.length === 0
+            ? []
+            : await db
+                .select({ taskId: taskLabel.taskId, name: label.name })
+                .from(taskLabel)
+                .innerJoin(label, eq(label.id, taskLabel.labelId))
+                .where(
+                  inArray(
+                    taskLabel.taskId,
+                    page.map((r) => r.id),
+                  ),
+                );
+        const labelsByTask = new Map<string, string[]>();
+        for (const l of labelRows) {
+          labelsByTask.set(l.taskId, [
+            ...(labelsByTask.get(l.taskId) ?? []),
+            l.name,
+          ]);
+        }
+        const tasks = page.map((r) => {
           const url = new URL(`/app/p/${r.projectSlug}`, MCP_ORIGIN);
           url.searchParams.set("task", r.id);
           return {
             id: r.id,
             identifier: `${r.projectKey}-${r.number}`,
             title: r.title,
+            projectId: r.projectId,
             project: r.projectName,
             column: r.column,
             status: r.status,
             priority: r.priority,
             createdBy: r.createdBy,
             assignee: r.assignee,
+            labels: labelsByTask.get(r.id) ?? [],
             createdAt: r.createdAt.toISOString(),
+            updatedAt: (r.updatedAt ?? r.createdAt).toISOString(),
             dueAt: r.dueAt ? day(r.dueAt) : null,
             url: url.toString(),
           };
         });
 
-        const ref = (p: Person | null) => (p ? { id: p.id, name: p.name } : null);
+        const ref = (p: Person | null) =>
+          p ? { id: p.id, name: p.name } : null;
         return ok({
           todayUtc: day(now),
           resolved: {
@@ -330,6 +380,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
             createdFrom: from ? from.toISOString() : null,
           },
           truncated: rows.length > limit,
+          nextOffset: rows.length > limit ? offset + limit : null,
           tasks,
         });
       } catch (err) {

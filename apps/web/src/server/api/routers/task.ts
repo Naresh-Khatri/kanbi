@@ -630,11 +630,16 @@ export const taskRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const term = `%${input.query.replace(/[\\%_]/g, "\\$&")}%`;
+      const ticket = /^([a-z][a-z0-9]*)-(\d+)$/i.exec(input.query);
       return ctx.db
         .selectDistinct({
           id: task.id,
           title: task.title,
           number: task.number,
+          priority: task.priority,
+          dueAt: task.dueAt,
+          assigneeId: task.assigneeId,
+          assigneeName: userTable.name,
           updatedAt: task.updatedAt,
           createdAt: task.createdAt,
           boardId: task.boardId,
@@ -649,6 +654,7 @@ export const taskRouter = createTRPCRouter({
         .innerJoin(board, eq(board.id, task.boardId))
         .innerJoin(project, eq(project.id, board.projectId))
         .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
+        .leftJoin(userTable, eq(userTable.id, task.assigneeId))
         .leftJoin(
           projectMember,
           and(
@@ -660,7 +666,15 @@ export const taskRouter = createTRPCRouter({
           and(
             isNull(task.archivedAt),
             ne(project.status, "archived"),
-            ilike(task.title, term),
+            or(
+              ilike(task.title, term),
+              ticket
+                ? and(
+                    sql`upper(${project.key}) = ${ticket[1]!.toUpperCase()}`,
+                    eq(task.number, Number(ticket[2])),
+                  )
+                : undefined,
+            ),
             or(eq(project.ownerId, userId), eq(projectMember.userId, userId)),
             input.projectId ? eq(project.id, input.projectId) : undefined,
           ),

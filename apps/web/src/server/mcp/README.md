@@ -207,9 +207,9 @@ the mutations. The `work` prompt needs both scopes.
 | --------------------- | ----- | -------------------------------------------------------------------------------- |
 | `list_projects`       | read  | Resolve the target project when the discussion does not make it unambiguous.     |
 | `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.     |
-| `search_tasks`        | read  | Search task titles for likely duplicates before presenting a proposal.           |
+| `search_tasks`        | read  | Title search for duplicates, or lookup by identifier (`KAN-42`); shows assignee. |
 | `create_tasks`        | write | Create only the exact approved task set; retry-safe with `requestKey`.           |
-| `find_tasks`          | read  | Ad-hoc questions: who added what, when, status, assignee, label, priority, text. |
+| `find_tasks`          | read  | Ad-hoc questions: who, when, status, assignee, label, priority; pages by offset. |
 | `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                      |
 | `get_task`            | read  | Trust-ordered brief: first 4 images inlined, latest 20 comments.                 |
 | `get_task_comments`   | read  | Page older comments (`offset` back from newest, up to 50 per call).              |
@@ -230,11 +230,12 @@ the mutations. The `work` prompt needs both scopes.
 | `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                           |
 
 Use `get_project_context` to obtain canonical column, label, and member IDs.
-`search_tasks` is title-only and a duplicate match is a guardrail, not a
-blocker. After `create_tasks`, report every returned ticket identifier and link.
-Pass a `requestKey` (one per approved preview): a retry with the same key and
-tasks returns the first result for 24 hours instead of creating duplicates
-(`kanbi_mcp_request`). Reusing a key for different tasks is rejected.
+`search_tasks` matches titles (and exact identifiers) only, and a duplicate
+match is a guardrail, not a blocker. After `create_tasks`, report every
+returned ticket identifier and link. Pass a `requestKey` (one per approved
+preview): a retry with the same key and tasks returns the first result for 24
+hours instead of creating duplicates (`kanbi_mcp_request`). Reusing a key for
+different tasks is rejected.
 `create_tasks` takes an optional `followUpOf` task: each new description links
 back to it, and if that task is yours, it gets a comment listing the follow-ups.
 
