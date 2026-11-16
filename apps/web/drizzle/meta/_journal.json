@@ -134,6 +134,13 @@
       "when": 1794802158568,
       "tag": "0018_column_review",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794804296548,
+      "tag": "0019_mcp_request",
+      "breakpoints": true
     }
   ]
 }

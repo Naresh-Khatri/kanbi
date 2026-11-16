@@ -641,6 +641,24 @@ export const activity = createTable(
   ],
 );
 
+// create_tasks retry key -> first result; a repeat returns it instead of duplicating
+export const mcpRequest = createTable(
+  "mcp_request",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    key: text("key").notNull(),
+    // sha256 of the input; same key + different input = caller bug
+    fingerprint: text("fingerprint").notNull(),
+    // null while the first call is still running
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.clientId, t.key] })],
+);
+
 // last time a user looked at a task / the whole board; drives "new since last visit"
 export const taskSeen = createTable(
   "task_seen",

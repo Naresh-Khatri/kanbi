@@ -201,35 +201,38 @@ Each tool wraps the same tRPC procedures and access checks the web app uses.
 Read-only grants discover only the read tools; write-only grants discover only
 the mutations. The `work` prompt needs both scopes.
 
-| Tool                  | Scope | Purpose                                                                           |
-| --------------------- | ----- | --------------------------------------------------------------------------------- |
-| `list_projects`       | read  | Resolve the target project when the discussion does not make it unambiguous.      |
-| `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.      |
-| `search_tasks`        | read  | Search task titles for likely duplicates before presenting a proposal.            |
-| `create_tasks`        | write | Immediately create only the exact task set the user has approved; non-idempotent. |
-| `find_tasks`          | read  | Ad-hoc questions: who added what, when, status, assignee, label, priority, text.  |
-| `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
-| `get_task`            | read  | Trust-ordered brief: first 4 images inlined, latest 20 comments.                  |
-| `get_task_comments`   | read  | Page older comments (`offset` back from newest, up to 50 per call).               |
-| `get_task_images`     | read  | Inline the next 4 images from the `offset` `get_task` gives.                      |
-| `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
-| `finish_task`         | write | Tick checklist items, move to review (else done), post the summary as a comment.  |
-| `assign_to_me`        | write | Claim an unassigned open task; never takes one assigned to someone else.          |
-| `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.               |
-| `report_blocker`      | write | Post the blocker, move the task back to ready, park it in `waitingOnPeople`.      |
-| `update_checklist`    | write | Complete, reopen, or add checklist items on your task.                            |
-| `set_task_labels`     | write | Add/remove existing board labels by name; never creates labels.                   |
-| `add_attachment`      | write | Get a presigned upload URL (max 25 MB) and `markdown` to embed the image inline.  |
-| `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                    |
-| `edit_comment`        | write | Edit a comment this agent client posted.                                          |
-| `delete_comment`      | write | Delete a comment this agent client posted.                                        |
-| `list_docs`           | read  | A project's doc pages as a tree.                                                  |
-| `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.            |
-| `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                            |
+| Tool                  | Scope | Purpose                                                                          |
+| --------------------- | ----- | -------------------------------------------------------------------------------- |
+| `list_projects`       | read  | Resolve the target project when the discussion does not make it unambiguous.     |
+| `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.     |
+| `search_tasks`        | read  | Search task titles for likely duplicates before presenting a proposal.           |
+| `create_tasks`        | write | Create only the exact approved task set; retry-safe with `requestKey`.           |
+| `find_tasks`          | read  | Ad-hoc questions: who added what, when, status, assignee, label, priority, text. |
+| `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                      |
+| `get_task`            | read  | Trust-ordered brief: first 4 images inlined, latest 20 comments.                 |
+| `get_task_comments`   | read  | Page older comments (`offset` back from newest, up to 50 per call).              |
+| `get_task_images`     | read  | Inline the next 4 images from the `offset` `get_task` gives.                     |
+| `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                     |
+| `finish_task`         | write | Tick checklist items, move to review (else done), post the summary as a comment. |
+| `assign_to_me`        | write | Claim an unassigned open task; never takes one assigned to someone else.         |
+| `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.              |
+| `report_blocker`      | write | Post the blocker, move the task back to ready, park it in `waitingOnPeople`.     |
+| `update_checklist`    | write | Complete, reopen, or add checklist items on your task.                           |
+| `set_task_labels`     | write | Add/remove existing board labels by name; never creates labels.                  |
+| `add_attachment`      | write | Get a presigned upload URL (max 25 MB) and `markdown` to embed the image inline. |
+| `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                   |
+| `edit_comment`        | write | Edit a comment this agent client posted.                                         |
+| `delete_comment`      | write | Delete a comment this agent client posted.                                       |
+| `list_docs`           | read  | A project's doc pages as a tree.                                                 |
+| `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.           |
+| `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                           |
 
 Use `get_project_context` to obtain canonical column, label, and member IDs.
 `search_tasks` is title-only and a duplicate match is a guardrail, not a
 blocker. After `create_tasks`, report every returned ticket identifier and link.
+Pass a `requestKey` (one per approved preview): a retry with the same key and
+tasks returns the first result for 24 hours instead of creating duplicates
+(`kanbi_mcp_request`). Reusing a key for different tasks is rejected.
 `create_tasks` takes an optional `followUpOf` task: each new description links
 back to it, and if that task is yours, it gets a comment listing the follow-ups.
 
