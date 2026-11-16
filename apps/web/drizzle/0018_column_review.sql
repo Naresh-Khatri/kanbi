@@ -1,0 +1,1 @@
+ALTER TYPE "public"."kanbi_column_category" ADD VALUE 'review' BEFORE 'completed';

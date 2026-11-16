@@ -125,6 +125,7 @@ export const columnRouter = createTRPCRouter({
           "backlog",
           "unstarted",
           "started",
+          "review",
           "completed",
           "canceled",
         ]),

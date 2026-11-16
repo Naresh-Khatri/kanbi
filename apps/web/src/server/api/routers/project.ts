@@ -149,7 +149,10 @@ export const projectRouter = createTRPCRouter({
       };
       acc.totalTasks += row.count;
       if (row.columnCategory === "completed") acc.doneTasks += row.count;
-      else if (row.columnCategory === "started")
+      else if (
+        row.columnCategory === "started" ||
+        row.columnCategory === "review"
+      )
         acc.inProgressTasks += row.count;
       totals.set(row.projectId, acc);
     }
@@ -340,9 +343,15 @@ export const projectRouter = createTRPCRouter({
             },
             {
               boardId: boardRow.id,
+              name: "In Review",
+              category: "review",
+              position: 3,
+            },
+            {
+              boardId: boardRow.id,
               name: "Done",
               category: "completed",
-              position: 3,
+              position: 4,
             },
           ])
           .returning();

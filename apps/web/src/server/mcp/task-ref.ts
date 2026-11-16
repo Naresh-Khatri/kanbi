@@ -136,7 +136,7 @@ export function assertOpen(t: ResolvedTask) {
 
 export async function firstColumn(
   boardId: string,
-  category: "unstarted" | "backlog" | "started" | "completed",
+  category: "unstarted" | "backlog" | "started" | "review" | "completed",
 ) {
   const [col] = await db
     .select({ id: boardColumn.id, name: boardColumn.name })

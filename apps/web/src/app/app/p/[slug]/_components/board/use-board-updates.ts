@@ -36,6 +36,8 @@ export function updateLabel(u: TaskUpdate): string {
   switch (u.reason) {
     case "done":
       return u.agent ? `Done by ${u.agent}` : "Moved to done";
+    case "review":
+      return u.agent ? `Ready for review · ${u.agent}` : "Ready for review";
     case "blocked":
       return u.agent ? `Blocked · ${u.agent}` : "Blocked";
     case "comment":

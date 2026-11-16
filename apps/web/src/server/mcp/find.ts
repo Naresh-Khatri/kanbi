@@ -155,7 +155,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           .min(1)
           .optional()
           .describe(
-            "Column categories to include; omit for all. Open work = unstarted + started.",
+            "Column categories to include; omit for all. Open work = unstarted + started; review = waiting for the client to check.",
           ),
         priority: z.array(z.enum(taskPriority.enumValues)).min(1).optional(),
         label: z

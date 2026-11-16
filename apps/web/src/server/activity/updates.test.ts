@@ -35,6 +35,14 @@ describe("summarizeUpdates", () => {
     expect(u).toMatchObject({ reason: "done", agent: "Claude Code", count: 3 });
   });
 
+  it("reports a move to a review column as ready for review", () => {
+    const [u] = summarizeUpdates([
+      row("a", "comment.created", 2, { agent: "Codex" }),
+      row("a", "task.moved", 1, { toColumnCategory: "review", agent: "Codex" }),
+    ]);
+    expect(u).toMatchObject({ reason: "review", agent: "Codex" });
+  });
+
   it("a later block beats an earlier finish", () => {
     const [u] = summarizeUpdates([
       row("a", "task.moved", 1, { toColumnCategory: "completed" }),

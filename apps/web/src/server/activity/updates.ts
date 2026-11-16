@@ -1,4 +1,9 @@
-export type UpdateReason = "blocked" | "done" | "comment" | "updated";
+export type UpdateReason =
+  | "blocked"
+  | "done"
+  | "review"
+  | "comment"
+  | "updated";
 
 export type TaskUpdate = {
   taskId: string;
@@ -40,9 +45,11 @@ export function summarizeUpdates(rows: readonly ActivityRow[]): TaskUpdate[] {
         ? "blocked"
         : state?.payload?.toColumnCategory === "completed"
           ? "done"
-          : list.some((r) => r.verb === "comment.created")
-            ? "comment"
-            : "updated";
+          : state?.payload?.toColumnCategory === "review"
+            ? "review"
+            : list.some((r) => r.verb === "comment.created")
+              ? "comment"
+              : "updated";
     const agent = latest.payload?.agent;
     out.push({
       taskId,

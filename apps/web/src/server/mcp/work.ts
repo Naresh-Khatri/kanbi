@@ -46,6 +46,7 @@ import {
   agentInput,
   assertMine,
   type Caller,
+  firstColumn,
   moveToEnd,
   postAgentComment,
   readOnly,
@@ -667,7 +668,7 @@ export function registerWorkTools(
       {
         title: "Start task",
         description:
-          "Move one of the user's assigned tasks into the board's first in-progress column, as the user. Call only after confirming the problem in the code. Safe to repeat.",
+          "Move one of the user's assigned tasks into the board's first in-progress column, as the user. Also reopens a task sitting in review when the client sent it back. Call only after confirming the problem in the code. Safe to repeat.",
         inputSchema: { task: taskRefInput },
         outputSchema: {
           status: z.enum(["started", "already_started", "closed"]),
@@ -682,7 +683,12 @@ export function registerWorkTools(
           const t = await resolveTask(caller, ref);
           assertMine(t, auth.userId);
           const url = taskUrl(t.projectSlug, t.id);
-          if (t.category !== "backlog" && t.category !== "unstarted") {
+          // review = client sent it back; reopen
+          if (
+            t.category !== "backlog" &&
+            t.category !== "unstarted" &&
+            t.category !== "review"
+          ) {
             return ok({
               status: t.category === "started" ? "already_started" : "closed",
               identifier: t.identifier,
@@ -706,7 +712,7 @@ export function registerWorkTools(
       {
         title: "Finish task",
         description:
-          "Tick the checklist items actually completed, move an in-progress task to the board's first done column, and post one agent-marked comment with your summary and PR link, as the user. The comment is read by non-technical clients. Call only when the real problem is fixed and the repository's checks pass.",
+          "Tick the checklist items actually completed, move an in-progress task to the board's first review column so the client can check it (the first done column if the board has no review column), and post one agent-marked comment with your summary and PR link, as the user. The comment is read by non-technical clients. Call only when the real problem is fixed and the repository's checks pass.",
         inputSchema: {
           task: taskRefInput,
           completedChecklistItemIds: z
@@ -739,7 +745,7 @@ export function registerWorkTools(
           agent: agentInput,
         },
         outputSchema: {
-          status: z.literal("done"),
+          status: z.enum(["in_review", "done"]),
           identifier: z.string(),
           column: z.string(),
           url: z.string().url(),
@@ -781,7 +787,9 @@ export function registerWorkTools(
             );
           }
 
-          const target = await requireColumn(t.boardId, "completed");
+          const review = await firstColumn(t.boardId, "review");
+          const target =
+            review ?? (await requireColumn(t.boardId, "completed"));
           // before any write: a bad image ref should fail the call, not lose the note
           const body = await agentCommentBody(
             [
@@ -814,7 +822,7 @@ export function registerWorkTools(
           );
 
           return ok({
-            status: "done",
+            status: review ? "in_review" : "done",
             commentId,
             identifier: t.identifier,
             column: target.name,

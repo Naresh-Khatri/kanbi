@@ -245,6 +245,7 @@ export const columnCategory = pgEnum("kanbi_column_category", [
   "backlog",
   "unstarted",
   "started",
+  "review",
   "completed",
   "canceled",
 ]);

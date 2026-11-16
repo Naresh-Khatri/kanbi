@@ -59,7 +59,7 @@ const TOOLS = [
   {
     name: "finish_task",
     scope: "write",
-    purpose: "Move your task to done and post the summary.",
+    purpose: "Move your task to review (or done) and post the summary.",
   },
   {
     name: "assign_to_me",

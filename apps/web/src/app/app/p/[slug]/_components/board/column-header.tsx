@@ -8,6 +8,7 @@ import {
   CircleDashedIcon,
   CircleDotIcon,
   CircleIcon,
+  EyeIcon,
   EyeOffIcon,
   GaugeIcon,
   GripVerticalIcon,
@@ -114,6 +115,11 @@ const CATEGORY_META = {
     label: "Started",
     Icon: CircleDotIcon,
     className: "text-info-foreground",
+  },
+  review: {
+    label: "In review",
+    Icon: EyeIcon,
+    className: "text-warning-foreground",
   },
   completed: {
     label: "Completed",

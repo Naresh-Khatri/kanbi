@@ -128,8 +128,9 @@ start_task(KAN-42)    -> moves to the board's first in-progress column
     add_attachment + PUT for a screenshot, pasting its `markdown` into the
     summary ...
 finish_task(KAN-42, summary, prUrl?)
-                      -> ticks completed checklist items, moves to first done
-                         column, posts the summary as an agent comment
+                      -> ticks completed checklist items, moves to the first
+                         review column (first done column if none), posts the
+                         summary as an agent comment
 report_blocker(KAN-42, reason)
                       -> instead of finishing: posts the blocker, records
                          task.blocked, moves the task back to ready; it stays
@@ -202,7 +203,7 @@ the mutations. The `work` prompt needs both scopes.
 | `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
 | `get_task`            | read  | Trust-ordered markdown brief with images inlined.                                 |
 | `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
-| `finish_task`         | write | Tick checklist items, move to done, post the summary (and PR link) as a comment.  |
+| `finish_task`         | write | Tick checklist items, move to review (else done), post the summary as a comment.  |
 | `assign_to_me`        | write | Claim an unassigned open task; never takes one assigned to someone else.          |
 | `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.               |
 | `report_blocker`      | write | Post the blocker, move the task back to ready, park it in `waitingOnPeople`.      |
