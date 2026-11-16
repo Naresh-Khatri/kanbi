@@ -203,6 +203,7 @@ the mutations. The `work` prompt needs both scopes.
 | `get_task`            | read  | Trust-ordered markdown brief with images inlined.                                 |
 | `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
 | `finish_task`         | write | Tick checklist items, move to done, post the summary (and PR link) as a comment.  |
+| `assign_to_me`        | write | Claim an unassigned open task; never takes one assigned to someone else.          |
 | `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.               |
 | `report_blocker`      | write | Post the blocker, move the task back to ready, park it in `waitingOnPeople`.      |
 | `update_checklist`    | write | Complete, reopen, or add checklist items on your task.                            |
@@ -227,12 +228,12 @@ drafting are unavailable over MCP.
 
 ## Scopes
 
-| Scope            | Granted access                                                                                                                                                                                     |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `list_docs`, `get_doc`, `search_docs`.                                                         |
-| `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`. |
-| `openid`         | Standard identity claim (requested by default).                                                                                                                                                    |
-| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                              |
+| Scope            | Granted access                                                                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `list_docs`, `get_doc`, `search_docs`.                                                                         |
+| `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`. |
+| `openid`         | Standard identity claim (requested by default).                                                                                                                                                                    |
+| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                              |
 
 ## Managing access
 

@@ -116,9 +116,14 @@ export async function resolveTask(caller: Caller, ref: string) {
 export type ResolvedTask = Awaited<ReturnType<typeof resolveTask>>;
 
 export function assertMine(t: ResolvedTask, userId: string) {
+  if (!t.assigneeId) {
+    throw new McpUserError(
+      `${t.identifier} is unassigned. If the user asked you to work on it, call assign_to_me first.`,
+    );
+  }
   if (t.assigneeId !== userId) {
     throw new McpUserError(
-      `${t.identifier} is not assigned to the user. Leave it alone.`,
+      `${t.identifier} is assigned to someone else. Leave it alone.`,
     );
   }
 }

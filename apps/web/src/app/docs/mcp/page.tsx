@@ -62,6 +62,11 @@ const TOOLS = [
     purpose: "Move your task to done and post the summary.",
   },
   {
+    name: "assign_to_me",
+    scope: "write",
+    purpose: "Claim an unassigned task so the agent can work on it.",
+  },
+  {
     name: "comment_on_task",
     scope: "write",
     purpose: "Post an agent-marked comment on your task.",

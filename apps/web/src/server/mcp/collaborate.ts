@@ -99,6 +99,40 @@ export function registerCollaborationTools(
   }
 
   server.registerTool(
+    "assign_to_me",
+    {
+      title: "Assign task to me",
+      description:
+        "Assign an unassigned open task to the user, so the work tools can act on it. Use when the user asks you to work on or update a task nobody is assigned to. Never takes a task assigned to someone else; ask the user to reassign it in Kanbi instead. Safe to repeat.",
+      inputSchema: { task: taskRefInput },
+      outputSchema: {
+        status: z.enum(["assigned", "already_mine"]),
+        identifier: z.string(),
+        url: z.string().url(),
+      },
+      annotations: writeHints,
+    },
+    async ({ task: ref }) =>
+      run(async (caller) => {
+        const t = await resolveTask(caller, ref);
+        const url = taskUrl(t.projectSlug, t.id);
+        if (t.assigneeId === auth.userId) {
+          return ok({ status: "already_mine", identifier: t.identifier, url });
+        }
+        if (t.assigneeId) {
+          throw new McpUserError(
+            `${t.identifier} is assigned to someone else. Ask the user to reassign it in Kanbi.`,
+          );
+        }
+        assertOpen(t);
+        await caller.task
+          .update({ boardId: t.boardId, taskId: t.id, assigneeId: auth.userId })
+          .catch(userFacing);
+        return ok({ status: "assigned", identifier: t.identifier, url });
+      }),
+  );
+
+  server.registerTool(
     "comment_on_task",
     {
       title: "Comment on my task",
