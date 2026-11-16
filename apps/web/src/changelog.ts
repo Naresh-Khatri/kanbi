@@ -13,6 +13,17 @@ export type Release = {
 
 export const releases: Release[] = [
   {
+    version: "0.3.0",
+    date: "2026-11-16",
+    entries: [
+      "Open tasks in the side sheet or as a full page, with your choice remembered. Task links are now short ticket numbers, and tasks open noticeably faster",
+      "Coding agents can claim unassigned tasks, attach short videos as well as screenshots, and send finished work to a new Review column for you to check. Their comments carry an agent badge, which project owners can hide",
+      "A slash command menu in the editor, hover previews for links, tasks and people, inline video playback, and a fullscreen zoomable image viewer",
+      "Shareable invite links with a limit on how many people can join",
+      "Cards show what changed since you last looked and how long ago",
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-11-12",
     entries: [
