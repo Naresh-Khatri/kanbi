@@ -53,6 +53,7 @@ import {
   type TicketMentionItem,
 } from "./mention";
 import { createSlashExtension } from "./slash";
+import { Video } from "./video";
 
 /** Shared prose styling so the editor and the read-only renderer look identical. */
 const RICH_TEXT_PROSE = cn(
@@ -72,7 +73,7 @@ const RICH_TEXT_PROSE = cn(
 export function isRichTextEmpty(html: string): boolean {
   return (
     html
-      .replace(/<(?!img\b)[^>]*>/g, "")
+      .replace(/<(?!img\b|video\b)[^>]*>/g, "")
       .replace(/&nbsp;|&#160;/g, "")
       .trim().length === 0
   );
@@ -161,6 +162,7 @@ export function RichTextEditor({
       Placeholder.configure({ placeholder }),
       Markdown,
       createImageExtension({ allowBlob: true }),
+      Video,
       ...(enableUploads
         ? [
             FileHandler.configure({
@@ -633,6 +635,7 @@ export function RichTextContent({
         getTickets: () => ticketsRef.current,
       }),
       createImageExtension({ allowBlob: false }),
+      Video,
       createMentionRenderExtension(() => mentionsRef.current),
       createTicketRenderExtension(() => ticketsRef.current),
     ],

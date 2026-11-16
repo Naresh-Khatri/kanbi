@@ -316,6 +316,12 @@
 }
 
 /* inline images: blob src = upload in flight */
+.ProseMirror video {
+  max-height: 24rem;
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
 .ProseMirror img {
   max-height: 24rem;
   border-radius: var(--radius-md);

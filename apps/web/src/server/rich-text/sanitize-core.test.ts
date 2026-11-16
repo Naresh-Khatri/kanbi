@@ -26,3 +26,16 @@ describe("sanitizeRichText images", () => {
     ).toBe('<img src="/api/files/a" />');
   });
 });
+
+describe("sanitizeRichText videos", () => {
+  it("keeps attachment videos and drops foreign ones and extra attrs", () => {
+    expect(
+      sanitizeRichText(
+        '<video src="/api/files/abc" title="clip" autoplay onplay="x()"></video>',
+      ),
+    ).toBe('<video src="/api/files/abc" title="clip"></video>');
+    expect(
+      sanitizeRichText('<p>a</p><video src="https://evil.dev/v.mp4"></video>'),
+    ).toBe("<p>a</p>");
+  });
+});

@@ -137,7 +137,7 @@ export function registerCollaborationTools(
     {
       title: "Comment on my task",
       description:
-        "Post one agent-marked comment on a task assigned to the user, as the user. Use it for updates the reporter needs (what was wrong, what is fixed, a decision you made, a question). Readers are usually non-technical clients: plain language, no file names, code, or commands, and embed a screenshot (add_attachment markdown) when the change is visible. Do not narrate progress; finish_task and report_blocker already post their own notes. Notifies the reporter.",
+        "Post one agent-marked comment on a task assigned to the user, as the user. Use it for updates the reporter needs (what was wrong, what is fixed, a decision you made, a question). Readers are usually non-technical clients: plain language, no file names, code, or commands, and embed a screenshot or short video (add_attachment markdown) when the change is visible. Do not narrate progress; finish_task and report_blocker already post their own notes. Notifies the reporter.",
       inputSchema: {
         task: taskRefInput,
         body: commentBodyInput,
@@ -382,7 +382,7 @@ export function registerCollaborationTools(
     {
       title: "Start an attachment upload",
       description:
-        "Step 1 of 2 for attaching a file (screenshot, log) to a task assigned to the user. Returns a short-lived upload url; PUT the file bytes there with the exact Content-Type (curl command included), then call confirm_attachment. For visible changes, attach a screenshot of the fixed screen by default (and the broken one, if you have it). Only attach files that help the reporter see the fix; never attach secrets, .env files, or screens showing credentials.",
+        "Step 1 of 2 for attaching a file (screenshot, log) to a task assigned to the user. Returns a short-lived upload url; PUT the file bytes there with the exact Content-Type (curl command included), then call confirm_attachment. For visible changes, attach a screenshot of the fixed screen by default (and the broken one, if you have it); use a short mp4 or webm video instead when the fix involves motion or several steps. Embedded .mp4/.webm files play inline. Only attach files that help the reporter see the fix; never attach secrets, .env files, or screens showing credentials.",
       inputSchema: {
         task: taskRefInput,
         filename: z.string().trim().min(1).max(160),

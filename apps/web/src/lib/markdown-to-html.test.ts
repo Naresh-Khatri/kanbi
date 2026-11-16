@@ -67,4 +67,18 @@ describe("markdownToHtml", () => {
       "<img",
     );
   });
+
+  it("renders mp4/webm uploads as inline video", () => {
+    expect(
+      markdownToHtml("![drag.mp4](kanbi-upload:attachments/t/x-drag.mp4)"),
+    ).toBe(
+      '<p><video src="kanbi-upload:attachments/t/x-drag.mp4" title="drag.mp4"></video></p>',
+    );
+    expect(markdownToHtml("![clip.webm](/api/files/abc)")).toContain(
+      '<video src="/api/files/abc"',
+    );
+    expect(markdownToHtml("![v.mp4](https://evil.dev/v.mp4)")).not.toContain(
+      "<video",
+    );
+  });
 });

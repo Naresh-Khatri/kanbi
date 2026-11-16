@@ -174,7 +174,8 @@ report_blocker(KAN-42, reason)
 - **Attachments from the agent:** `add_attachment` returns a presigned R2 PUT
   URL (and a ready curl command) valid for 10 minutes, plus a `markdown` field
   (`![name](kanbi-upload:<key>)`). Pasting that into a `finish_task` summary or
-  comment body embeds the image inline; the server verifies the upload and
+  comment body embeds the image inline (`.mp4`/`.webm` files become an inline
+  video player); the server verifies the upload and
   records the attachment, so no `confirm_attachment` call is needed. To attach
   without embedding, call `confirm_attachment`, which also returns `markdown`
   and `url`. Bytes never pass through the model. Requires R2 to be configured.

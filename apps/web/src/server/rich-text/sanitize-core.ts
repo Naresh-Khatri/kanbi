@@ -27,15 +27,18 @@ const OPTIONS: sanitizeHtml.IOptions = {
     "span",
     "hr",
     "img",
+    "video",
   ],
   allowedAttributes: {
     a: ["href", "title", "rel"],
     span: ["data-type", "data-id", "data-label"],
     img: ["src", "alt", "width"],
+    video: ["src", "title"],
   },
   // only our own attachment route: no tracking pixels or hotlinks
   exclusiveFilter: (frame) =>
-    frame.tag === "img" && !FILE_SRC_RE.test(frame.attribs.src ?? ""),
+    (frame.tag === "img" || frame.tag === "video") &&
+    !FILE_SRC_RE.test(frame.attribs.src ?? ""),
   allowedSchemes: ["http", "https", "mailto"],
   allowProtocolRelative: false,
   transformTags: {

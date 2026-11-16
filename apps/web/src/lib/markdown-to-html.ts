@@ -1,6 +1,6 @@
 import { Marked } from "marked";
 
-import { isInlineImageSrc } from "./file-url";
+import { isInlineImageSrc, isVideoFilename } from "./file-url";
 
 const escape = (text: string) =>
   text
@@ -17,10 +17,13 @@ const marked = new Marked({
     // agent text is untrusted; raw html shows as text, not markup
     html: ({ text, block }) =>
       block ? `<p>${escape(text.trim())}</p>` : escape(text),
+    // upload refs carry the filename; confirmed /api/files urls only the alt
     image: ({ href, text }) =>
-      isInlineImageSrc(href)
-        ? `<img src="${escape(href)}" alt="${escape(text)}">`
-        : escape(text),
+      !isInlineImageSrc(href)
+        ? escape(text)
+        : isVideoFilename(href) || isVideoFilename(text)
+          ? `<video src="${escape(href)}" title="${escape(text)}"></video>`
+          : `<img src="${escape(href)}" alt="${escape(text)}">`,
     // editor has no task lists
     checkbox: () => "",
   },

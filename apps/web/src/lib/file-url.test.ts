@@ -17,6 +17,12 @@ describe("extractFileIds", () => {
     ).toEqual(["b2", "a1"]);
   });
 
+  it("includes inline videos", () => {
+    expect(
+      extractFileIds('<video src="/api/files/v1" title="c"></video>'),
+    ).toEqual(["v1"]);
+  });
+
   it("ignores links and foreign images", () => {
     expect(
       extractFileIds(

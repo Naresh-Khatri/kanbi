@@ -3,11 +3,13 @@ export const fileUrl = (attachmentId: string) => `/api/files/${attachmentId}`;
 
 export const FILE_SRC_RE = /^\/api\/files\/[A-Za-z0-9_-]+$/;
 
-/** Attachment ids referenced by inline images, deduped, in document order. */
+export const isVideoFilename = (name: string) => /\.(mp4|webm)$/i.test(name);
+
+/** Attachment ids referenced by inline images and videos, deduped, in document order. */
 export function extractFileIds(html: string): string[] {
   const ids = new Set<string>();
   for (const m of html.matchAll(
-    /<img\b[^>]*?\bsrc="\/api\/files\/([A-Za-z0-9_-]+)"/g,
+    /<(?:img|video)\b[^>]*?\bsrc="\/api\/files\/([A-Za-z0-9_-]+)"/g,
   )) {
     ids.add(m[1]!);
   }
