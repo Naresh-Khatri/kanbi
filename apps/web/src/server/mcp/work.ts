@@ -388,7 +388,7 @@ export function registerWorkTools(
       {
         title: "Get my work queue",
         description:
-          "Return the user's open assigned tasks for the project matching this repository: tasks already in progress, then up to 5 ready tasks ordered by priority and due date. Ready means a to-do column, or the backlog on boards without one. Finished tasks are excluded, and tasks blocked via report_blocker stay in waitingOnPeople until a person responds.",
+          "Return the user's open assigned tasks for the project matching this repository: tasks already in progress, then up to 5 ready tasks ordered by priority and due date. Ready means a to-do column, or the backlog on boards without one. Projects on hold are skipped unless passed as projectId. Finished tasks are excluded, and tasks blocked via report_blocker stay in waitingOnPeople until a person responds.",
         inputSchema: {
           repo: z
             .string()
@@ -430,15 +430,24 @@ export function registerWorkTools(
       },
       async ({ repo, projectId }) =>
         run(async (caller) => {
-          const projects = await caller.project.list();
+          const all = await caller.project.list();
+          // on hold = user paused it; only an explicit projectId reaches it
+          const projects = all.filter((p) => p.status === "active");
           const matched = projectId
-            ? projects.filter((p) => p.id === projectId)
+            ? all.filter((p) => p.id === projectId)
             : repo
               ? matchProjects(projects, repo)
               : [];
           if (projectId && matched.length === 0) {
             throw new McpUserError("Project not found or not accessible.");
           }
+          const onHold =
+            repo && !projectId && matched.length === 0
+              ? matchProjects(
+                  all.filter((p) => p.status === "on_hold"),
+                  repo,
+                )
+              : [];
           const searchIn = matched.length > 0 ? matched : projects;
 
           const todo = alias(boardColumn, "todo");
@@ -520,11 +529,13 @@ export function registerWorkTools(
               moreReady: 0,
               waitingOnPeople: [],
               note:
-                candidates.length === 0
-                  ? "No open tasks are assigned to the user."
-                  : repo && matched.length === 0
-                    ? `No project matches "${repo}". Ask the user which candidate project this repository belongs to, then call again with projectId.`
-                    : "Several projects have work. Ask the user which one, then call again with projectId.",
+                onHold.length > 0
+                  ? `"${repo}" matches ${onHold.map((p) => p.name).join(", ")}, which the user put on hold, so its tasks are skipped. Ask the user before working on it; call again with that projectId only if they say so.`
+                  : candidates.length === 0
+                    ? "No open tasks are assigned to the user."
+                    : repo && matched.length === 0
+                      ? `No project matches "${repo}". Ask the user which candidate project this repository belongs to, then call again with projectId.`
+                      : "Several projects have work. Ask the user which one, then call again with projectId.",
             });
           }
 
@@ -611,11 +622,13 @@ export function registerWorkTools(
                 url: taskUrl(chosen.slug, r.id),
               })),
             note:
-              mine.length === 0
-                ? waiting.size > 0
-                  ? "Nothing ready: every open task is waiting on a person's answer to a reported blocker."
-                  : "Nothing to do: no open tasks are assigned to the user in this project."
-                : "Call get_task for each task before working on it.",
+              chosen.status === "on_hold"
+                ? `${chosen.name} is on hold. Work on it only if the user explicitly asked for this project.`
+                : mine.length === 0
+                  ? waiting.size > 0
+                    ? "Nothing ready: every open task is waiting on a person's answer to a reported blocker."
+                    : "Nothing to do: no open tasks are assigned to the user in this project."
+                  : "Call get_task for each task before working on it.",
           });
         }),
     );

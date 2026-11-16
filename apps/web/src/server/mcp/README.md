@@ -145,6 +145,8 @@ report_blocker(KAN-42, reason)
 - **Project inference:** the repo basename (or remote) is matched to project
   slug, name, or key. Exact matches win over partial ones. If a repo hint
   matches nothing, the agent gets candidates and asks; it never guesses.
+  Projects on hold are skipped; if the repo only matches one, the agent is told
+  to ask before passing its `projectId`. Archived projects never appear.
 - **Acts as you, visibly:** every change goes through the normal tRPC
   procedures as you, so activity, notifications, and realtime updates are the
   same as in the app. Write tools take an `agent` id (`lib/agents.ts`; guessed

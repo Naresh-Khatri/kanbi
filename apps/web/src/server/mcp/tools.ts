@@ -148,7 +148,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
       {
         title: "List projects",
         description:
-          "List projects the authenticated user can use for task capture.",
+          "List the user's projects, active first. status on_hold means the user paused the project: do not create or work on tasks there unless the user names it. Archived projects are not listed.",
         inputSchema: {},
         outputSchema: listProjectsOutput,
         annotations: {
