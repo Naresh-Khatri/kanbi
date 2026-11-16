@@ -264,7 +264,11 @@ export const projectRouter = createTRPCRouter({
             eq(projectMember.userId, userId),
           ),
         )
+        // slugs are unique per owner only: pick one this user can open, own first
         .where(eq(project.slug, input.slug))
+        .orderBy(
+          sql`case when ${project.ownerId} = ${userId} then 0 when ${projectMember.userId} is not null then 1 else 2 end`,
+        )
         .limit(1);
 
       const hit = row[0];
