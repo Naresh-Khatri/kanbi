@@ -11,6 +11,7 @@ import {
   TimerIcon,
   Trash2Icon,
 } from "lucide-react";
+import { formatRelative } from "@kanbi/shared";
 import { motion } from "motion/react";
 import { memo, useCallback, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -385,6 +386,9 @@ export const TaskCard = memo(function TaskCard({
               )}
             />
             <span className="truncate">{updateLabel(update)}</span>
+            <span className="text-muted-foreground shrink-0 font-normal">
+              · {formatRelative(update.at)}
+            </span>
           </p>
         ) : null}
         <Menu>
