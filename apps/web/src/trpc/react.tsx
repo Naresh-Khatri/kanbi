@@ -63,6 +63,7 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
           false: httpBatchStreamLink({
             transformer: SuperJSON,
             url: `${getBaseUrl()}/api/trpc`,
+            fetch: guardedFetch,
             headers: () => {
               const headers = new Headers();
               headers.set("x-trpc-source", "nextjs-react");
@@ -81,6 +82,18 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
       </api.Provider>
     </QueryClientProvider>
   );
+}
+
+// proxy/gateway error pages are HTML -> tRPC would surface the raw markup as the message
+async function guardedFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const res = await fetch(input, init);
+  const type = res.headers.get("content-type") ?? "";
+  if (!type.includes("json")) {
+    throw new Error(
+      `Kanbi couldn't be reached (${res.status}). Please try again in a moment.`,
+    );
+  }
+  return res;
 }
 
 function getBaseUrl() {
