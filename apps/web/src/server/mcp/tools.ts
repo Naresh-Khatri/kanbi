@@ -369,7 +369,7 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
             .describe(
               "Unique string (e.g. a UUID) for this approved preview. A retry with the same key and tasks returns the original result for 24 hours.",
             ),
-          agent: agentInput.optional(),
+          agent: agentInput,
         },
         outputSchema: createTasksOutput,
         annotations: {

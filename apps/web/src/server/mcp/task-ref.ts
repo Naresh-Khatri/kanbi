@@ -194,8 +194,9 @@ export async function moveToEnd(
 
 export const agentInput = z
   .enum(AGENT_IDS)
+  .optional()
   .describe(
-    'Which coding agent you are, e.g. "claude-code" or "codex"; "other" if yours is not listed. Shown as a badge on what you post.',
+    'Which coding agent you are, e.g. "claude-code" or "codex"; "other" if yours is not listed. Shown as a badge on what you post. Guessed from your app name when omitted.',
   );
 
 export const commentBodyInput = z
