@@ -120,6 +120,47 @@ export function labelInlineImages(
   );
 }
 
+export type SinceRow = {
+  verb: string;
+  actor: string;
+  column: string | null;
+  createdAt: Date;
+};
+
+/**
+ * One line per kind of change made since the agent's last update, so a task
+ * sent back from review says what the person did. Only the latest move counts.
+ */
+export function describeSince(rows: readonly SinceRow[]): string[] {
+  const counts = new Map<string, { actor: string; verb: string; n: number }>();
+  let move: SinceRow | undefined;
+  for (const r of rows) {
+    if (r.verb === "task.moved") {
+      if (!move || r.createdAt >= move.createdAt) move = r;
+      continue;
+    }
+    const key = `${r.actor}\u0000${r.verb}`;
+    const hit = counts.get(key);
+    if (hit) hit.n++;
+    else counts.set(key, { actor: r.actor, verb: r.verb, n: 1 });
+  }
+  const plural = (n: number, word: string) =>
+    `${n} ${word}${n === 1 ? "" : "s"}`;
+  const lines: string[] = [];
+  if (move) {
+    lines.push(`${move.actor} moved it to ${move.column ?? "another column"}`);
+  }
+  for (const { actor, verb, n } of counts.values()) {
+    if (verb === "comment.created")
+      lines.push(`${actor} posted ${plural(n, "comment")} (marked new below)`);
+    else if (verb === "attachment.added")
+      lines.push(`${actor} attached ${plural(n, "file")}`);
+    else if (verb === "task.updated") lines.push(`${actor} edited the task`);
+    else if (verb === "task.blocked") lines.push(`${actor} reported a blocker`);
+  }
+  return lines;
+}
+
 export type BriefInput = {
   identifier: string;
   title: string;
@@ -133,7 +174,14 @@ export type BriefInput = {
   sourceText: string | null;
   description: string | null;
   checklist: { id: string; text: string; done: boolean }[];
-  comments: { author: string; createdAt: Date; body: string }[];
+  comments: {
+    author: string;
+    createdAt: Date;
+    body: string;
+    isNew?: boolean;
+  }[];
+  /** set when an agent of this user already worked on the task */
+  since?: { at: Date; changes: string[] } | null;
   olderComments?: number;
   docs?: {
     id: string;
@@ -170,6 +218,15 @@ export function buildBrief(input: BriefInput): string {
     input.url,
   );
 
+  if (input.since) {
+    out.push(
+      `## Since your last agent update (${day(input.since.at)})`,
+      input.since.changes.length > 0
+        ? input.since.changes.map((line) => `- ${line}`).join("\n")
+        : "_Nothing new from people._",
+    );
+  }
+
   out.push("## Original request (most reliable)");
   out.push(
     input.sourceText?.trim()
@@ -194,7 +251,7 @@ export function buildBrief(input: BriefInput): string {
       input.comments
         .map(
           (c) =>
-            `- **${c.author}** (${day(c.createdAt)}): ${htmlToMarkdown(c.body).replace(/\n+/g, " ")}`,
+            `- ${c.isNew ? "**NEW** " : ""}**${c.author}** (${day(c.createdAt)}): ${htmlToMarkdown(c.body).replace(/\n+/g, " ")}`,
         )
         .join("\n"),
     );

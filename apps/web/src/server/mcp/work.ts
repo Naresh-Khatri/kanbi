@@ -7,6 +7,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   inArray,
   isNull,
   ne,
@@ -59,6 +60,7 @@ import {
 import {
   buildBrief,
   compareQueue,
+  describeSince,
   inlineOrder,
   isWaitingOnPeople,
   labelInlineImages,
@@ -229,6 +231,68 @@ function imageRefLabels(attachments: Attachment[]) {
     );
   }
   return labels;
+}
+
+/** Last time one of this user's agents changed the task, and what people did since. */
+async function sinceLastAgentUpdate(
+  taskId: string,
+  viewer: Viewer & { userId: string },
+) {
+  const isAgent = sql`${activity.payload}->>'agent' is not null`;
+  const [last] = await db
+    .select({
+      at: sql<Date | null>`max(${activity.createdAt})`.mapWith(
+        activity.createdAt,
+      ),
+    })
+    .from(activity)
+    .where(
+      and(
+        eq(activity.taskId, taskId),
+        eq(activity.actorId, viewer.userId),
+        isAgent,
+      ),
+    );
+  if (!last?.at) return null;
+  const rows = await db
+    .select({
+      verb: activity.verb,
+      actorId: activity.actorId,
+      actor: userTable.name,
+      payload: activity.payload,
+      column: boardColumn.name,
+      createdAt: activity.createdAt,
+    })
+    .from(activity)
+    .innerJoin(userTable, eq(userTable.id, activity.actorId))
+    .leftJoin(
+      boardColumn,
+      eq(boardColumn.id, sql`${activity.payload}->>'toColumnId'`),
+    )
+    .where(
+      and(
+        eq(activity.taskId, taskId),
+        gt(activity.createdAt, last.at),
+        // the user's own agents are "us"; everyone else counts
+        or(ne(activity.actorId, viewer.userId), sql`not (${isAgent})`),
+      ),
+    )
+    .orderBy(asc(activity.createdAt))
+    .limit(200);
+  return {
+    at: last.at,
+    changes: describeSince(
+      rows.map((r) => ({
+        verb: r.verb,
+        actor:
+          typeof r.payload?.agent === "string" && seesAgent(viewer, r.actorId)
+            ? `${r.actor} via ${r.payload.agent} (agent)`
+            : r.actor,
+        column: r.column,
+        createdAt: r.createdAt,
+      })),
+    ),
+  };
 }
 
 /** Comments newest-first from offset, returned oldest-first for reading. */
@@ -560,7 +624,7 @@ export function registerWorkTools(
       {
         title: "Get task brief",
         description:
-          "Return a task as a markdown brief ordered by reliability (original request, images, comments, linked docs, then AI-drafted description and checklist) with the first images inlined and the latest 20 comments. Look at every image. When it says more images or older comments exist, use get_task_images / get_task_comments.",
+          "Return a task as a markdown brief ordered by reliability (original request, images, comments, linked docs, then AI-drafted description and checklist) with the first images inlined and the latest 20 comments. If one of your agents already worked on it, a section lists what people changed since, and their new comments are marked NEW. Look at every image. When it says more images or older comments exist, use get_task_images / get_task_comments.",
         inputSchema: { task: taskRefInput },
         outputSchema: {
           id: z.string(),
@@ -576,6 +640,9 @@ export function registerWorkTools(
           imagesInlined: z.number().int(),
           imageCount: z.number().int(),
           commentCount: z.number().int(),
+          sinceLastAgentUpdate: z
+            .object({ at: z.string(), changes: z.array(z.string()) })
+            .nullable(),
           linkedDocs: z.array(
             z.object({
               id: z.string(),
@@ -595,7 +662,7 @@ export function registerWorkTools(
           const reporter = alias(userTable, "reporter");
 
           const viewer = viewerOf(t, auth.userId);
-          const [labels, checklist, attachments, reporterRows, docs] =
+          const [labels, checklist, attachments, reporterRows, docs, since] =
             await Promise.all([
               db
                 .select({ name: label.name })
@@ -637,6 +704,7 @@ export function registerWorkTools(
                 )
                 .orderBy(desc(projectDocument.updatedAt))
                 .limit(LINKED_DOCS + 1),
+              sinceLastAgentUpdate(t.id, viewer),
             ]);
 
           const linkedDocs = docs.slice(0, LINKED_DOCS).map((d) => {
@@ -684,7 +752,14 @@ export function registerWorkTools(
               ? labelInlineImages(t.description, imageLabels)
               : null,
             checklist,
-            comments: ordered,
+            comments: ordered.map((c) => ({
+              ...c,
+              isNew:
+                !!since &&
+                c.createdAt > since.at &&
+                !(c.authorId === auth.userId && c.agent),
+            })),
+            since,
             olderComments: commentCount - ordered.length,
             docs: linkedDocs,
             moreDocs: docs.length > LINKED_DOCS,
@@ -705,6 +780,9 @@ export function registerWorkTools(
             imagesInlined: images.length,
             imageCount,
             commentCount,
+            sinceLastAgentUpdate: since
+              ? { at: since.at.toISOString(), changes: since.changes }
+              : null,
             linkedDocs: linkedDocs.map((d) => ({
               id: d.id,
               title: d.title,

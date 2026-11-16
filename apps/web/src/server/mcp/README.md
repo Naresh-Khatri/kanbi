@@ -166,6 +166,10 @@ report_blocker(KAN-42, reason)
   `source_text` stores the raw input to the AI drafter and to Enhance. It is
   MCP-only and kept out of board and public share payloads
   (`server/tasks/columns.ts`).
+- **Since last update:** once one of your agents has changed a task, `get_task`
+  opens with what people did after that (latest move, comments, edits,
+  attachments) and marks their newer comments `NEW`, so a task sent back from
+  review shows the feedback first.
 - **Images:** up to 4 png/jpeg/gif/webp attachments of up to about 3.75 MB each
   are inlined as image content: the reporter's first task screenshot, then
   people's images newest first, then agent uploads. Images embedded in the

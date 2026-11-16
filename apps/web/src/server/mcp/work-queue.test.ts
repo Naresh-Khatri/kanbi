@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBrief,
+  describeSince,
   compareQueue,
   inlineOrder,
   isWaitingOnPeople,
@@ -230,5 +231,71 @@ describe("labelInlineImages", () => {
     ).toBe(
       "<p>See</p> [image 1 below: &lt;shot&gt;.png]  [image from another task, not attached] ",
     );
+  });
+});
+
+describe("describeSince", () => {
+  const at = (n: number) => new Date(Date.UTC(2026, 0, n));
+  const row = (
+    verb: string,
+    actor: string,
+    n: number,
+    column = null as string | null,
+  ) => ({
+    verb,
+    actor,
+    column,
+    createdAt: at(n),
+  });
+
+  it("keeps the latest move and groups the rest by person", () => {
+    expect(
+      describeSince([
+        row("task.moved", "Asha", 1, "Review"),
+        row("comment.created", "Asha", 2),
+        row("comment.created", "Asha", 3),
+        row("task.moved", "Asha", 4, "Todo"),
+        row("attachment.added", "Ravi", 5),
+      ]),
+    ).toEqual([
+      "Asha moved it to Todo",
+      "Asha posted 2 comments (marked new below)",
+      "Ravi attached 1 file",
+    ]);
+  });
+});
+
+describe("buildBrief since section", () => {
+  it("lists changes and marks new comments", () => {
+    const brief = buildBrief({
+      identifier: "KAN-1",
+      title: "t",
+      url: "https://kanbi.test",
+      projectName: "Kanbi",
+      columnName: "Todo",
+      priority: "none",
+      dueAt: null,
+      reporterName: null,
+      labels: [],
+      sourceText: null,
+      description: null,
+      checklist: [],
+      comments: [
+        {
+          author: "Asha",
+          createdAt: new Date("2026-01-03"),
+          body: "<p>still broken</p>",
+          isNew: true,
+        },
+      ],
+      since: { at: new Date("2026-01-02"), changes: ["Asha moved it to Todo"] },
+      images: [],
+      files: [],
+      guidance: null,
+    });
+    expect(brief).toContain(
+      "## Since your last agent update (2026-01-02)\n\n- Asha moved it to Todo",
+    );
+    expect(brief).toContain("- **NEW** **Asha** (2026-01-03): still broken");
   });
 });
