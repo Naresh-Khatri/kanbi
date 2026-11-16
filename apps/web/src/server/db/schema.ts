@@ -738,6 +738,8 @@ export type DigestHighlight = {
   action: string;
   task: string | null;
   taskId: string | null;
+  // absent on digests saved before number links
+  taskNumber?: number | null;
   category: DigestCategory;
 };
 

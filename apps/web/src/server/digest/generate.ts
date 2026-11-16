@@ -61,6 +61,7 @@ export async function generateBoardDigest(
       actorName: userTable.name,
       taskId: activity.taskId,
       taskTitle: task.title,
+      taskNumber: task.number,
     })
     .from(activity)
     .innerJoin(userTable, eq(userTable.id, activity.actorId))
@@ -81,17 +82,23 @@ export async function generateBoardDigest(
   const contributors = new Map<string, string>();
   const events: DigestEvent[] = [];
   // Resolve a highlight's task title back to an id so the UI can deep-link.
-  const taskIdByTitle = new Map<string, string>();
+  const taskByTitle = new Map<string, { id: string; number: number }>();
   const daily = new Array<number>(DIGEST_DAYS).fill(0);
 
   for (const r of rows) {
     contributors.set(r.actorId, r.actorName);
-    if (r.taskId && r.taskTitle) {
-      taskIdByTitle.set(r.taskTitle.trim().toLowerCase(), r.taskId);
+    if (r.taskId && r.taskTitle && r.taskNumber != null) {
+      taskByTitle.set(r.taskTitle.trim().toLowerCase(), {
+        id: r.taskId,
+        number: r.taskNumber,
+      });
     }
     const dayIndex = Math.min(
       DIGEST_DAYS - 1,
-      Math.max(0, Math.floor((r.createdAt.getTime() - since.getTime()) / DAY_MS)),
+      Math.max(
+        0,
+        Math.floor((r.createdAt.getTime() - since.getTime()) / DAY_MS),
+      ),
     );
     daily[dayIndex] = (daily[dayIndex] ?? 0) + 1;
     const payload = (r.payload ?? {}) as Record<string, unknown>;
@@ -152,15 +159,17 @@ export async function generateBoardDigest(
     events,
   });
 
-  const highlights: DigestHighlight[] = draft.highlights.map((h) => ({
-    actor: h.actor,
-    action: h.action,
-    task: h.task,
-    taskId: h.task
-      ? (taskIdByTitle.get(h.task.trim().toLowerCase()) ?? null)
-      : null,
-    category: h.category,
-  }));
+  const highlights: DigestHighlight[] = draft.highlights.map((h) => {
+    const t = h.task ? taskByTitle.get(h.task.trim().toLowerCase()) : null;
+    return {
+      actor: h.actor,
+      action: h.action,
+      task: h.task,
+      taskId: t?.id ?? null,
+      taskNumber: t?.number ?? null,
+      category: h.category,
+    };
+  });
 
   const content: DigestContent = {
     headline: draft.headline,

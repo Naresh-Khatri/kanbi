@@ -23,6 +23,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import { taskBoardHref } from "@/lib/task-link";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 
@@ -54,8 +55,8 @@ function describe(n: NotificationRow): {
   const columnName =
     typeof data.columnName === "string" ? data.columnName : "Done";
   const taskHref =
-    n.projectSlug && n.taskId
-      ? `/app/p/${n.projectSlug}?task=${n.taskId}`
+    n.projectSlug && n.taskNumber != null
+      ? taskBoardHref(n.projectSlug, n.taskNumber)
       : n.projectSlug
         ? `/app/p/${n.projectSlug}`
         : null;

@@ -34,6 +34,7 @@ export const notificationRouter = createTRPCRouter({
           actorName: userTable.name,
           actorImage: userTable.image,
           taskTitle: task.title,
+          taskNumber: task.number,
           projectSlug: project.slug,
           projectName: project.name,
         })

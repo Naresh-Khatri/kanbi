@@ -30,6 +30,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { taskBoardHref } from "@/lib/task-link";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
 
@@ -168,7 +169,7 @@ export function CommandPalette() {
           label: t.title,
           keywords: "",
           icon: <ListTodoIcon />,
-          run: push(`/app/p/${t.projectSlug}?task=${t.id}`),
+          run: push(taskBoardHref(t.projectSlug, t.number)),
           remote: true,
           prefix: `${t.projectKey}-${t.number}`,
           meta: t.projectName,

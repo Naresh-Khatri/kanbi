@@ -73,6 +73,7 @@ type DigestHighlightLine = {
   action: string;
   task: string | null;
   taskId?: string | null;
+  taskNumber?: number | null;
 };
 
 function highlightToText(h: DigestHighlightLine) {
@@ -83,8 +84,8 @@ function highlightToText(h: DigestHighlightLine) {
 
 function highlightToHtml(h: DigestHighlightLine, boardUrl: string) {
   const task = h.task
-    ? h.taskId
-      ? `<a href="${esc(`${boardUrl}?task=${encodeURIComponent(h.taskId)}`)}" class="k-fg k-link" style="color:${tokens.fg};font-weight:500;text-decoration:underline;text-decoration-color:${tokens.muted};text-underline-offset:3px;">${esc(h.task)}</a>`
+    ? (h.taskNumber ?? h.taskId) != null
+      ? `<a href="${esc(`${boardUrl}?task=${encodeURIComponent(String(h.taskNumber ?? h.taskId))}`)}" class="k-fg k-link" style="color:${tokens.fg};font-weight:500;text-decoration:underline;text-decoration-color:${tokens.muted};text-underline-offset:3px;">${esc(h.task)}</a>`
       : `<span class="k-fg" style="color:${tokens.fg};font-weight:500;">${esc(h.task)}</span>`
     : null;
   const parts = [

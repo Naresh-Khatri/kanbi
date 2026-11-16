@@ -10,15 +10,27 @@ import * as React from "react";
 import { HoverCard, LinkCard, TaskCard } from "./hover-card";
 import type { TicketMentionItem } from "./mention";
 
-// task urls are /app/p/<slug>?task=<id>
-const taskIdOf = (href: string) => {
+const projectOf = (path: string) => /^\/app\/p\/[^/]+/.exec(path)?.[0];
+
+// task urls: /app/p/<slug>?task=<number|KEY-n|id>
+function findLinkedTicket(href: string, tickets: TicketMentionItem[]) {
+  let url: URL;
   try {
-    const url = new URL(href, location.origin);
-    return url.origin === location.origin ? url.searchParams.get("task") : null;
+    url = new URL(href, location.origin);
   } catch {
-    return null;
+    return undefined;
   }
-};
+  if (url.origin !== location.origin) return undefined;
+  const param = url.searchParams.get("task");
+  if (!param) return undefined;
+  const byId = tickets.find((t) => t.id === param);
+  if (byId) return byId;
+  // bare numbers only resolve against the project we're in
+  const n = /^(?:[A-Za-z0-9]+-)?(\d+)$/.exec(param)?.[1];
+  if (!n || projectOf(url.pathname) !== projectOf(location.pathname))
+    return undefined;
+  return tickets.find((t) => t.label.endsWith(`-${n}`));
+}
 
 /** Link mark with a hover card: page preview, or the task card for links to a known task. */
 export function createLinkExtension(opts: {
@@ -85,8 +97,7 @@ function LinkContent({
   getTickets: () => TicketMentionItem[];
   onRemove?: () => void;
 }) {
-  const taskId = taskIdOf(href);
-  const task = taskId ? getTickets().find((t) => t.id === taskId) : undefined;
+  const task = findLinkedTicket(href, getTickets());
   if (task) return <TaskCard item={task} />;
   return <LinkCard href={href} onRemove={onRemove} />;
 }
