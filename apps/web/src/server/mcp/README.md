@@ -202,7 +202,9 @@ the mutations. The `work` prompt needs both scopes.
 | `create_tasks`        | write | Immediately create only the exact task set the user has approved; non-idempotent. |
 | `find_tasks`          | read  | Ad-hoc questions: who added what, when, status, assignee, label, priority, text.  |
 | `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
-| `get_task`            | read  | Trust-ordered markdown brief with images inlined.                                 |
+| `get_task`            | read  | Trust-ordered brief: first 4 images inlined, latest 20 comments.                  |
+| `get_task_comments`   | read  | Page older comments (`offset` back from newest, up to 50 per call).               |
+| `get_task_images`     | read  | Inline the next 4 images from the `offset` `get_task` gives.                      |
 | `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
 | `finish_task`         | write | Tick checklist items, move to review (else done), post the summary as a comment.  |
 | `assign_to_me`        | write | Claim an unassigned open task; never takes one assigned to someone else.          |
@@ -215,7 +217,7 @@ the mutations. The `work` prompt needs both scopes.
 | `edit_comment`        | write | Edit a comment this agent client posted.                                          |
 | `delete_comment`      | write | Delete a comment this agent client posted.                                        |
 | `list_docs`           | read  | A project's doc pages as a tree.                                                  |
-| `get_doc`             | read  | One doc page as markdown.                                                         |
+| `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.            |
 | `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                            |
 
 Use `get_project_context` to obtain canonical column, label, and member IDs.
@@ -232,7 +234,7 @@ drafting are unavailable over MCP.
 
 | Scope            | Granted access                                                                                                                                                                                                     |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `list_docs`, `get_doc`, `search_docs`.                                                                         |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                 |
 | `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`. |
 | `openid`         | Standard identity claim (requested by default).                                                                                                                                                                    |
 | `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                              |

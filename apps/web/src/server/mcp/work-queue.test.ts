@@ -32,9 +32,9 @@ describe("matchProjects", () => {
     expect(matchProjects(projects, "marketing").map((p) => p.id)).toEqual([
       "2",
     ]);
-    expect(matchProjects(projects, "kanbi-mobile-app").map((p) => p.id)).toEqual(
-      ["1", "3"],
-    );
+    expect(
+      matchProjects(projects, "kanbi-mobile-app").map((p) => p.id),
+    ).toEqual(["1", "3"]);
   });
 
   it("returns nothing for unrelated or tiny hints", () => {
@@ -47,11 +47,36 @@ describe("compareQueue", () => {
   const at = (iso: string) => new Date(iso);
   it("orders by priority, due date, then age", () => {
     const tasks = [
-      { id: "low", priority: "low" as const, dueAt: null, createdAt: at("2026-01-01") },
-      { id: "high-late", priority: "high" as const, dueAt: at("2026-12-01"), createdAt: at("2026-01-01") },
-      { id: "high-soon", priority: "high" as const, dueAt: at("2026-11-10"), createdAt: at("2026-01-02") },
-      { id: "high-undated", priority: "high" as const, dueAt: null, createdAt: at("2026-01-01") },
-      { id: "urgent", priority: "urgent" as const, dueAt: null, createdAt: at("2026-03-01") },
+      {
+        id: "low",
+        priority: "low" as const,
+        dueAt: null,
+        createdAt: at("2026-01-01"),
+      },
+      {
+        id: "high-late",
+        priority: "high" as const,
+        dueAt: at("2026-12-01"),
+        createdAt: at("2026-01-01"),
+      },
+      {
+        id: "high-soon",
+        priority: "high" as const,
+        dueAt: at("2026-11-10"),
+        createdAt: at("2026-01-02"),
+      },
+      {
+        id: "high-undated",
+        priority: "high" as const,
+        dueAt: null,
+        createdAt: at("2026-01-01"),
+      },
+      {
+        id: "urgent",
+        priority: "urgent" as const,
+        dueAt: null,
+        createdAt: at("2026-03-01"),
+      },
     ];
     expect([...tasks].sort(compareQueue).map((t) => t.id)).toEqual([
       "urgent",
@@ -111,6 +136,28 @@ describe("buildBrief", () => {
     expect(brief).toContain("## Description\n\nWritten by hand.");
     expect(brief).not.toContain("AI-drafted");
   });
+
+  it("points at get_task_comments when older comments are hidden", () => {
+    const brief = buildBrief({
+      ...base,
+      sourceText: null,
+      description: null,
+      comments: [
+        {
+          author: "Asha",
+          createdAt: new Date("2026-01-02"),
+          body: "<p>hi</p>",
+        },
+      ],
+      olderComments: 7,
+    });
+    expect(brief).toContain(
+      "_7 older comments not shown; call get_task_comments with offset 1._",
+    );
+    expect(
+      buildBrief({ ...base, sourceText: null, description: null }),
+    ).not.toContain("get_task_comments");
+  });
 });
 
 describe("isWaitingOnPeople", () => {
@@ -140,7 +187,11 @@ describe("inlineOrder", () => {
   const item = (
     id: string,
     day: number,
-    extra: Partial<{ commentId: string; viaAgent: string; isImage: boolean }> = {},
+    extra: Partial<{
+      commentId: string;
+      viaAgent: string;
+      isImage: boolean;
+    }> = {},
   ) => ({
     id,
     commentId: extra.commentId ?? null,

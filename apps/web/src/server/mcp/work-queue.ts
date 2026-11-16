@@ -134,6 +134,7 @@ export type BriefInput = {
   description: string | null;
   checklist: { id: string; text: string; done: boolean }[];
   comments: { author: string; createdAt: Date; body: string }[];
+  olderComments?: number;
   docs?: {
     id: string;
     title: string;
@@ -196,6 +197,11 @@ export function buildBrief(input: BriefInput): string {
             `- **${c.author}** (${day(c.createdAt)}): ${htmlToMarkdown(c.body).replace(/\n+/g, " ")}`,
         )
         .join("\n"),
+    );
+  }
+  if (input.olderComments) {
+    out.push(
+      `_${input.olderComments} older comment${input.olderComments === 1 ? "" : "s"} not shown; call get_task_comments with offset ${input.comments.length}._`,
     );
   }
 
