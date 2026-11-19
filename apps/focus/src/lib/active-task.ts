@@ -8,15 +8,15 @@ const DOING_HINTS = [
   "active",
   "working",
 ];
-const TODO_HINTS = ["todo", "to do", "to-do", "backlog", "next", "ready"];
+// ordered by preference: backlog only when there's no todo-like column
+const TODO_HINTS = ["todo", "to do", "to-do", "next", "ready", "backlog"];
 
 function findColumn(columns: FocusColumn[], hints: string[]) {
-  return (
-    columns.find((c) => {
-      const name = c.name.toLowerCase();
-      return hints.some((h) => name.includes(h));
-    }) ?? null
-  );
+  for (const h of hints) {
+    const hit = columns.find((c) => c.name.toLowerCase().includes(h));
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /**
