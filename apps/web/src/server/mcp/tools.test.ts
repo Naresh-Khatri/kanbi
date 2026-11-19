@@ -67,8 +67,12 @@ describe("registerTools", () => {
       collect(authorization(["kanbi:write"])).map((tool) => tool.name),
     ).toEqual([
       "create_tasks",
+      "create_project",
+      "add_column",
+      "update_column",
       "start_task",
       "finish_task",
+      "move_task",
       "assign_to_me",
       "comment_on_task",
       "report_blocker",
@@ -90,6 +94,9 @@ describe("registerTools", () => {
       "get_project_context",
       "search_tasks",
       "create_tasks",
+      "create_project",
+      "add_column",
+      "update_column",
       "find_tasks",
       "get_work_queue",
       "get_task",
@@ -97,6 +104,7 @@ describe("registerTools", () => {
       "get_task_images",
       "start_task",
       "finish_task",
+      "move_task",
       "assign_to_me",
       "comment_on_task",
       "report_blocker",
@@ -122,8 +130,12 @@ describe("registerTools", () => {
     const tools = collect(authorization(["kanbi:read", "kanbi:write"]));
     const writes = [
       "create_tasks",
+      "create_project",
+      "add_column",
+      "update_column",
       "start_task",
       "finish_task",
+      "move_task",
       "assign_to_me",
       "comment_on_task",
       "report_blocker",
@@ -138,6 +150,10 @@ describe("registerTools", () => {
       tools.find((tool) => tool.name === name)?.config.annotations;
     expect(hints("create_tasks")?.idempotentHint).toBe(false);
     expect(hints("start_task")?.idempotentHint).toBe(true);
+    expect(hints("move_task")?.idempotentHint).toBe(true);
+    expect(hints("update_column")?.idempotentHint).toBe(true);
+    expect(hints("create_project")?.idempotentHint).toBe(false);
+    expect(hints("add_column")?.idempotentHint).toBe(false);
     for (const tool of tools) {
       expect(tool.config.annotations?.readOnlyHint).toBe(
         !writes.includes(tool.name),

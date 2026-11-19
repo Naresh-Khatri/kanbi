@@ -37,6 +37,21 @@ const TOOLS = [
     purpose: "Create only the exact task set the user approved.",
   },
   {
+    name: "create_project",
+    scope: "write",
+    purpose: "Create an approved project with the default board.",
+  },
+  {
+    name: "add_column",
+    scope: "write",
+    purpose: "Owner only: add an approved column to the board.",
+  },
+  {
+    name: "update_column",
+    scope: "write",
+    purpose: "Owner only: rename, recategorize, or reorder a column.",
+  },
+  {
     name: "find_tasks",
     scope: "read",
     purpose: "Answer who added what, when, status, and assignee questions.",
@@ -60,6 +75,11 @@ const TOOLS = [
     name: "finish_task",
     scope: "write",
     purpose: "Move your task to review (or done) and post the summary.",
+  },
+  {
+    name: "move_task",
+    scope: "write",
+    purpose: "Move your task to another open column when you ask.",
   },
   {
     name: "assign_to_me",
@@ -252,7 +272,9 @@ export default function McpDocsPage() {
           second model call. The agent searches for likely duplicates, shows the
           exact project, column, title, description, checklist, priority,
           labels, assignee, and due date, then waits for your explicit approval
-          before it creates anything.
+          before it creates anything. New projects and board columns follow the
+          same rule: the agent shows the exact name, key, or column placement
+          first, and only project owners can change columns.
         </p>
         <Card>
           <CardPanel className="px-4 py-3">

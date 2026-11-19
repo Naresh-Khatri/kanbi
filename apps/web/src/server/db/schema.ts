@@ -667,7 +667,7 @@ export const activity = createTable(
   ],
 );
 
-// create_tasks retry key -> first result; a repeat returns it instead of duplicating
+// mcp create retry key -> first result; a repeat returns it instead of duplicating
 export const mcpRequest = createTable(
   "mcp_request",
   {

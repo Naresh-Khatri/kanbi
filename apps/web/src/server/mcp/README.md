@@ -103,7 +103,11 @@ User and agent finish a feature decision
 ```
 
 Before creation, the agent must show the exact project, column, title,
-description, checklist, priority, labels, assignee, and due date. One useful
+description, checklist, priority, labels, assignee, and due date. The same rule
+covers projects and columns: `create_project` needs an approved name, key,
+description, default columns (Backlog, Todo, In Progress, In Review, Done), and
+default labels; `add_column` and `update_column` need an approved name,
+category, and position. One useful
 task with a description and checklist is the default. Split work only when each
 item is independently deliverable, and show the full split before asking for
 approval.
@@ -124,6 +128,9 @@ get_work_queue(repo)  -> project matched from the repo name; in-progress first,
                          blocked tasks listed separately as waitingOnPeople
 get_task(KAN-42)      -> brief + inlined images + up to 3 linked docs
 start_task(KAN-42)    -> moves to the board's first in-progress column
+move_task(KAN-42, "In Review")
+                      -> only when the user asks; any open column, by name
+                         (case-insensitive) or id; never done or canceled
 ... agent fixes the problem, runs the repo's checks, maybe update_checklist /
     add_attachment + PUT for a screenshot, pasting its `markdown` into the
     summary ...
@@ -157,10 +164,11 @@ report_blocker(KAN-42, reason)
   agent can edit or delete only comments its own OAuth client posted
   (`comment.agent_client_id`), never ones you typed. Identical comments
   retried within 10 minutes are deduplicated.
-- **Write scope:** every write tool except `create_tasks` acts only on tasks
-  assigned to you. Agents never edit a task's title or description, archive,
-  delete, or reassign.
-- **Races:** `start_task` and `finish_task` move with a compare-and-swap on the
+- **Write scope:** every task write tool acts only on tasks assigned to you
+  (`create_tasks` and the project and column tools are capture tools, not task
+  writes). Agents never edit a task's title or description, archive, delete, or
+  reassign.
+- **Races:** `start_task`, `move_task`, and `finish_task` move with a compare-and-swap on the
   current column (`task.move` `expectedColumnId`). If someone moved the card
   meanwhile, the call fails and the agent re-reads the queue.
 - **Trust order:** the brief puts the original request (`task.source_text`)
@@ -205,31 +213,35 @@ Each tool wraps the same tRPC procedures and access checks the web app uses.
 Read-only grants discover only the read tools; write-only grants discover only
 the mutations. The `work` prompt needs both scopes.
 
-| Tool                  | Scope | Purpose                                                                          |
-| --------------------- | ----- | -------------------------------------------------------------------------------- |
-| `list_projects`       | read  | Resolve the target project when the discussion does not make it unambiguous.     |
-| `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.     |
-| `search_tasks`        | read  | Title search for duplicates, or lookup by identifier (`KAN-42`); shows assignee. |
-| `create_tasks`        | write | Create only the exact approved task set; retry-safe with `requestKey`.           |
-| `find_tasks`          | read  | Ad-hoc questions: who, when, status, assignee, label, priority; pages by offset. |
-| `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                      |
-| `get_task`            | read  | Trust-ordered brief: first 4 images inlined, latest 20 comments.                 |
-| `get_task_comments`   | read  | Page older comments (`offset` back from newest, up to 50 per call).              |
-| `get_task_images`     | read  | Inline the next 4 images from the `offset` `get_task` gives.                     |
-| `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                     |
-| `finish_task`         | write | Tick checklist items, move to review (else done), post the summary as a comment. |
-| `assign_to_me`        | write | Claim an unassigned open task; never takes one assigned to someone else.         |
-| `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.              |
-| `report_blocker`      | write | Post the blocker, move the task back to ready, park it in `waitingOnPeople`.     |
-| `update_checklist`    | write | Complete, reopen, or add checklist items on your task.                           |
-| `set_task_labels`     | write | Add/remove existing board labels by name; never creates labels.                  |
-| `add_attachment`      | write | Get a presigned upload URL (max 25 MB) and `markdown` to embed the image inline. |
-| `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                   |
-| `edit_comment`        | write | Edit a comment this agent client posted.                                         |
-| `delete_comment`      | write | Delete a comment this agent client posted.                                       |
-| `list_docs`           | read  | A project's doc pages as a tree.                                                 |
-| `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.           |
-| `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                           |
+| Tool                  | Scope | Purpose                                                                           |
+| --------------------- | ----- | --------------------------------------------------------------------------------- |
+| `list_projects`       | read  | Resolve the target project when the discussion does not make it unambiguous.      |
+| `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.      |
+| `search_tasks`        | read  | Title search for duplicates, or lookup by identifier (`KAN-42`); shows assignee.  |
+| `create_tasks`        | write | Create only the exact approved task set; retry-safe with `requestKey`.            |
+| `create_project`      | write | Create an approved project with default columns; returns its context and URL.     |
+| `add_column`          | write | Owner only: add an approved column; default spot is the end of its category.      |
+| `update_column`       | write | Owner only: rename, recategorize, or reorder; keeps the last done column.         |
+| `find_tasks`          | read  | Ad-hoc questions: who, when, status, assignee, label, priority; pages by offset.  |
+| `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
+| `get_task`            | read  | Trust-ordered brief: first 4 images inlined, latest 20 comments.                  |
+| `get_task_comments`   | read  | Page older comments (`offset` back from newest, up to 50 per call).               |
+| `get_task_images`     | read  | Inline the next 4 images from the `offset` `get_task` gives.                      |
+| `start_task`          | write | Move your task to the first in-progress column; repeat-safe.                      |
+| `move_task`           | write | Move your task to another open column by name or id; done goes via `finish_task`. |
+| `finish_task`         | write | Tick checklist items, move to review (else done), post the summary as a comment.  |
+| `assign_to_me`        | write | Claim an unassigned open task; never takes one assigned to someone else.          |
+| `comment_on_task`     | write | Post a marked comment: a result, blocker, or question. Markdown in.               |
+| `report_blocker`      | write | Post the blocker, move the task back to ready, park it in `waitingOnPeople`.      |
+| `update_checklist`    | write | Complete, reopen, or add checklist items on your task.                            |
+| `set_task_labels`     | write | Add/remove existing board labels by name; never creates labels.                   |
+| `add_attachment`      | write | Get a presigned upload URL (max 25 MB) and `markdown` to embed the image inline.  |
+| `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                    |
+| `edit_comment`        | write | Edit a comment this agent client posted.                                          |
+| `delete_comment`      | write | Delete a comment this agent client posted.                                        |
+| `list_docs`           | read  | A project's doc pages as a tree.                                                  |
+| `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.            |
+| `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                            |
 
 Use `get_project_context` to obtain canonical column, label, and member IDs.
 `search_tasks` matches titles (and exact identifiers) only, and a duplicate
@@ -237,22 +249,29 @@ match is a guardrail, not a blocker. After `create_tasks`, report every
 returned ticket identifier and link. Pass a `requestKey` (one per approved
 preview): a retry with the same key and tasks returns the first result for 24
 hours instead of creating duplicates (`kanbi_mcp_request`). Reusing a key for
-different tasks is rejected.
+different tasks is rejected. `create_project` and `add_column` take a required
+`requestKey` the same way.
+`create_project` sends its key explicitly (derived from the name's initials
+when omitted), so a taken key fails with a suggested alternative instead of
+silently becoming `KEY2`. Column tools resolve names case-insensitively, refuse
+duplicate names, and place columns with fractional positions (`lib/position.ts`);
+they never renumber, and refuse when there is no room left between two columns.
 `create_tasks` takes an optional `followUpOf` task: each new description links
 back to it, and if that task is yours, it gets a comment listing the follow-ups.
 
 Editing task titles or descriptions, writing to other people's tasks, archiving
-or deleting tasks, project administration, writing docs, and backend AI
-drafting are unavailable over MCP.
+or deleting anything (tasks, columns, projects), creating labels, project
+settings and membership, writing docs, and backend AI drafting are unavailable
+over MCP.
 
 ## Scopes
 
-| Scope            | Granted access                                                                                                                                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                 |
-| `kanbi:write`    | `create_tasks`, `start_task`, `finish_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`. |
-| `openid`         | Standard identity claim (requested by default).                                                                                                                                                                    |
-| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                              |
+| Scope            | Granted access                                                                                                                                                                                                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                                                                               |
+| `kanbi:write`    | `create_tasks`, `create_project`, `add_column`, `update_column`, `start_task`, `finish_task`, `move_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`. |
+| `openid`         | Standard identity claim (requested by default).                                                                                                                                                                                                                                  |
+| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                                                                                            |
 
 ## Managing access
 
@@ -295,6 +314,8 @@ the configured origin.
   and scope catalog.
 - `tools.ts` - registers only tools permitted by the narrowed grant, returns
   structured output, and adds host instructions for capture and work.
+  `project-context.ts` loads the `get_project_context` shape; `columns.ts`
+  holds column lookup, placement, and the owner and last-done-column guards.
 - `work.ts` - work-mode tools and the `work` prompt; `work-queue.ts` holds the
   pure repo matching, ordering, and brief building.
 - `find.ts` - `find_tasks`, read-only ad-hoc task lookup.
