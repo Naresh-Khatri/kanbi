@@ -8,26 +8,41 @@ import {
   boardProcedure,
   createTRPCRouter,
 } from "@/server/api/trpc";
-import { boardColumn, task } from "@/server/db/schema";
+import { boardColumn, columnCategory, task } from "@/server/db/schema";
 import { bus } from "@/server/realtime/bus";
 
 export const columnRouter = createTRPCRouter({
   create: boardProcedure
-    .input(z.object({ name: z.string().min(1).max(80) }))
+    .input(
+      z.object({
+        name: z.string().min(1).max(80),
+        category: z.enum(columnCategory.enumValues).optional(),
+        // neighbour positions like reorder; omitted = end of board
+        before: z.number().nullable().optional(),
+        after: z.number().nullable().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
-      const existing = await ctx.db
-        .select({ position: boardColumn.position })
-        .from(boardColumn)
-        .where(eq(boardColumn.boardId, input.boardId))
-        .orderBy(asc(boardColumn.position));
+      let position: number;
+      if (input.before !== undefined || input.after !== undefined) {
+        position = positionBetween(input.before, input.after);
+      } else {
+        const existing = await ctx.db
+          .select({ position: boardColumn.position })
+          .from(boardColumn)
+          .where(eq(boardColumn.boardId, input.boardId))
+          .orderBy(asc(boardColumn.position));
+        position = positionAtEnd(existing);
+      }
 
       const [row] = await ctx.db
         .insert(boardColumn)
         .values({
           boardId: input.boardId,
           name: input.name,
-          position: positionAtEnd(existing),
+          category: input.category,
+          position,
         })
         .returning();
       bus.emitBoard(input.boardId, {

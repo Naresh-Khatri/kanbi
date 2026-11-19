@@ -16,6 +16,7 @@ import { z } from "zod";
 import {
   deriveProjectKey,
   normalizeProjectKey,
+  PROJECT_KEY_PATTERN,
   shareToken,
   slugify,
   slugSuffix,
@@ -288,12 +289,22 @@ export const projectRouter = createTRPCRouter({
         systemPrompt: z.string().max(4000).optional(),
         color: z.string().optional(),
         icon: z.string().optional(),
+        // explicit key is used as-is or refused; never suffixed
+        key: z.string().min(2).max(10).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const base = slugify(input.name) || "project";
       const baseKey = deriveProjectKey(input.name);
+      const wantedKey =
+        input.key === undefined ? undefined : normalizeProjectKey(input.key);
+      if (wantedKey !== undefined && !PROJECT_KEY_PATTERN.test(wantedKey)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Key must be 2–10 letters or digits and start with a letter",
+        });
+      }
 
       return ctx.db.transaction(async (tx) => {
         let slug = base;
@@ -309,15 +320,25 @@ export const projectRouter = createTRPCRouter({
 
         // Ticket key is unique per owner; suffix a counter on collision (e.g.
         // MAR, MAR2, MAR3) the same way slugs disambiguate.
-        let key = baseKey;
-        for (let i = 2; i < 50; i++) {
-          const exists = await tx
-            .select({ id: project.id })
-            .from(project)
-            .where(and(eq(project.ownerId, userId), eq(project.key, key)))
-            .limit(1);
-          if (exists.length === 0) break;
-          key = `${baseKey}${i}`;
+        const freeKey = async (from: string) => {
+          let key = from;
+          for (let i = 2; i < 50; i++) {
+            const exists = await tx
+              .select({ id: project.id })
+              .from(project)
+              .where(and(eq(project.ownerId, userId), eq(project.key, key)))
+              .limit(1);
+            if (exists.length === 0) break;
+            key = `${from.slice(0, 10 - String(i).length)}${i}`;
+          }
+          return key;
+        };
+        const key = await freeKey(wantedKey ?? baseKey);
+        if (wantedKey !== undefined && key !== wantedKey) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `Key ${wantedKey} is already used by another of your projects. Try ${key}, or pick another key.`,
+          });
         }
 
         const [row] = await tx
@@ -438,7 +459,7 @@ export const projectRouter = createTRPCRouter({
           });
         }
         normalizedKey = normalizeProjectKey(key);
-        if (!/^[A-Z][A-Z0-9]{1,9}$/.test(normalizedKey)) {
+        if (!PROJECT_KEY_PATTERN.test(normalizedKey)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message:

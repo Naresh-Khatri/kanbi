@@ -23,6 +23,8 @@ export function slugify(name: string) {
     .slice(0, 48);
 }
 
+export const PROJECT_KEY_PATTERN = /^[A-Z][A-Z0-9]{1,9}$/;
+
 /** Shape a user-typed project key into the canonical `^[A-Z][A-Z0-9]{1,9}$` form. */
 export function normalizeProjectKey(input: string): string {
   return input
