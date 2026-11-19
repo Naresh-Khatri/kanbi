@@ -20,6 +20,7 @@ import {
   slugify,
   slugSuffix,
 } from "@/lib/ids";
+import { DEFAULT_COLUMNS } from "@/lib/default-board";
 import { DEFAULT_LABELS } from "@/lib/palette";
 import {
   assertCanAdmin,
@@ -346,46 +347,23 @@ export const projectRouter = createTRPCRouter({
           acceptedAt: new Date(),
         });
 
-        const [backlog, inProgress] = await tx
+        const columns = await tx
           .insert(boardColumn)
-          .values([
-            {
-              boardId: boardRow.id,
-              name: "Backlog",
-              category: "backlog",
-              position: 1,
-            },
-            {
-              boardId: boardRow.id,
-              name: "In Progress",
-              category: "started",
-              position: 2,
-            },
-            {
-              boardId: boardRow.id,
-              name: "In Review",
-              category: "review",
-              position: 3,
-            },
-            {
-              boardId: boardRow.id,
-              name: "Done",
-              category: "completed",
-              position: 4,
-            },
-          ])
+          .values(DEFAULT_COLUMNS.map((c) => ({ boardId: boardRow.id, ...c })))
           .returning();
+        const todo = columns.find((c) => c.category === "unstarted");
+        const inProgress = columns.find((c) => c.category === "started");
 
         await tx
           .insert(label)
           .values(DEFAULT_LABELS.map((l) => ({ boardId: boardRow.id, ...l })));
 
-        if (backlog && inProgress) {
+        if (todo && inProgress) {
           // Seed tickets take the first numbers; keep the counter in sync.
           const seedTasks = [
             {
               boardId: boardRow.id,
-              columnId: backlog.id,
+              columnId: todo.id,
               number: 1,
               title: "Welcome to your new board",
               description:
@@ -396,7 +374,7 @@ export const projectRouter = createTRPCRouter({
             },
             {
               boardId: boardRow.id,
-              columnId: backlog.id,
+              columnId: todo.id,
               number: 2,
               title: "Invite your team",
               description:

@@ -107,7 +107,7 @@ const CATEGORY_META = {
     className: "text-muted-foreground opacity-64",
   },
   unstarted: {
-    label: "Unstarted",
+    label: "Todo",
     Icon: CircleIcon,
     className: "text-muted-foreground",
   },

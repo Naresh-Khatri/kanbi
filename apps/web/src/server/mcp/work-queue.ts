@@ -55,6 +55,15 @@ export function compareQueue(
   );
 }
 
+/** Ready = todo + started; backlog stands in for todo only on boards without one. */
+export function isQueueColumn(
+  category: string,
+  boardHasTodo: boolean,
+): boolean {
+  if (category === "backlog") return !boardHasTodo;
+  return category === "unstarted" || category === "started";
+}
+
 /**
  * report_blocker parks a task until a person reacts: any activity not made by
  * an agent after the latest block clears it.

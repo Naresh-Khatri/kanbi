@@ -7,11 +7,11 @@ import {
   asc,
   desc,
   eq,
+  exists,
   gt,
   inArray,
   isNull,
   ne,
-  notExists,
   or,
   sql,
 } from "drizzle-orm";
@@ -64,6 +64,7 @@ import {
   compareQueue,
   describeSince,
   inlineOrder,
+  isQueueColumn,
   isWaitingOnPeople,
   labelInlineImages,
   matchProjects,
@@ -452,7 +453,7 @@ export function registerWorkTools(
           const searchIn = matched.length > 0 ? matched : projects;
 
           const todo = alias(boardColumn, "todo");
-          const rows =
+          const rows = (
             searchIn.length === 0
               ? []
               : await db
@@ -466,6 +467,17 @@ export function registerWorkTools(
                     columnName: boardColumn.name,
                     category: boardColumn.category,
                     projectId: project.id,
+                    boardHasTodo: sql<boolean>`${exists(
+                      db
+                        .select({ id: todo.id })
+                        .from(todo)
+                        .where(
+                          and(
+                            eq(todo.boardId, task.boardId),
+                            eq(todo.category, "unstarted"),
+                          ),
+                        ),
+                    )}`,
                   })
                   .from(task)
                   .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
@@ -480,27 +492,13 @@ export function registerWorkTools(
                         "unstarted",
                         "started",
                       ]),
-                      // default boards ship without a todo column -> backlog is the queue there
-                      or(
-                        ne(boardColumn.category, "backlog"),
-                        notExists(
-                          db
-                            .select({ id: todo.id })
-                            .from(todo)
-                            .where(
-                              and(
-                                eq(todo.boardId, task.boardId),
-                                eq(todo.category, "unstarted"),
-                              ),
-                            ),
-                        ),
-                      ),
                       inArray(
                         project.id,
                         searchIn.map((p) => p.id),
                       ),
                     ),
-                  );
+                  )
+          ).filter((r) => isQueueColumn(r.category, r.boardHasTodo));
 
           const counts = new Map<string, number>();
           for (const r of rows) {

@@ -24,9 +24,21 @@ const LABEL_COLOR = Object.fromEntries(
   DEFAULT_LABELS.map((l) => [l.name, l.color]),
 ) as Record<Label, string>;
 
-const COLUMNS: { name: string; cards: FakeCard[] }[] = [
+const COLUMNS: { name: string; cards: FakeCard[]; className?: string }[] = [
   {
     name: "Backlog",
+    className: "max-lg:hidden",
+    cards: [
+      {
+        id: "KB-17",
+        title: "Dark mode for emails",
+        priority: "none",
+        label: "Design",
+      },
+    ],
+  },
+  {
+    name: "Todo",
     cards: [
       {
         id: "KB-14",
@@ -35,10 +47,10 @@ const COLUMNS: { name: string; cards: FakeCard[] }[] = [
         label: "Feature",
       },
       {
-        id: "KB-17",
-        title: "Dark mode for emails",
-        priority: "none",
-        label: "Design",
+        id: "KB-18",
+        title: "Due date reminders",
+        priority: "medium",
+        label: "Improvement",
       },
     ],
   },
@@ -69,6 +81,7 @@ const COLUMNS: { name: string; cards: FakeCard[] }[] = [
   },
   {
     name: "Done",
+    className: "max-sm:hidden",
     cards: [
       {
         id: "KB-3",
@@ -95,11 +108,11 @@ export function BoardPreview() {
           New task <Kbd>C</Kbd>
         </span>
       </FrameHeader>
-      <FramePanel className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:gap-3 sm:p-3">
-        {COLUMNS.map((col, i) => (
+      <FramePanel className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:gap-3 sm:p-3 lg:grid-cols-4">
+        {COLUMNS.map((col) => (
           <div
-            // 2 cols on phones so titles fit
-            className={cn("flex min-w-0 flex-col gap-2", i === 2 && "max-sm:hidden")}
+            // fewer cols on narrow screens so titles fit
+            className={cn("flex min-w-0 flex-col gap-2", col.className)}
             key={col.name}
           >
             <div className="flex items-center gap-2 px-1 py-0.5 font-medium text-xs">

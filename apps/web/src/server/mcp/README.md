@@ -139,9 +139,10 @@ report_blocker(KAN-42, reason)
 ```
 
 - **Scope:** only tasks assigned to you, in `unstarted` or `started` columns.
-  Backlog counts as ready only on boards with no `unstarted` column (the
-  default board). Archived and closed tasks never appear. The board itself is the
-  state: there is no cursor, lease, or repo config file.
+  Backlog counts as ready only on boards with no `unstarted` column (e.g.
+  boards created before Todo became a default column). Archived and closed
+  tasks never appear. The board itself is the state: there is no cursor,
+  lease, or repo config file.
 - **Project inference:** the repo basename (or remote) is matched to project
   slug, name, or key. Exact matches win over partial ones. If a repo hint
   matches nothing, the agent gets candidates and asks; it never guesses.

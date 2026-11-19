@@ -164,7 +164,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           .min(1)
           .optional()
           .describe(
-            "Column categories to include; omit for all. Open work = backlog + unstarted + started (backlog is the to-do column on default boards); review = waiting for the client to check.",
+            "Column categories to include; omit for all. Open work = backlog + unstarted + started (backlog doubles as to-do on boards without an unstarted column); review = waiting for the client to check.",
           ),
         priority: z.array(z.enum(taskPriority.enumValues)).min(1).optional(),
         label: z

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_COLUMNS } from "@/lib/default-board";
+
 import {
   buildBrief,
   describeSince,
   compareQueue,
   inlineOrder,
+  isQueueColumn,
   isWaitingOnPeople,
   labelInlineImages,
   matchProjects,
@@ -41,6 +44,27 @@ describe("matchProjects", () => {
   it("returns nothing for unrelated or tiny hints", () => {
     expect(matchProjects(projects, "dotfiles")).toEqual([]);
     expect(matchProjects(projects, "ka")).toEqual([]);
+  });
+});
+
+describe("isQueueColumn", () => {
+  const queueColumns = (
+    columns: readonly { name: string; category: string }[],
+  ) => {
+    const hasTodo = columns.some((c) => c.category === "unstarted");
+    return columns
+      .filter((c) => isQueueColumn(c.category, hasTodo))
+      .map((c) => c.name);
+  };
+
+  it("reads todo, not backlog, as ready on a new board", () => {
+    expect(queueColumns(DEFAULT_COLUMNS)).toEqual(["Todo", "In Progress"]);
+  });
+
+  it("falls back to backlog on boards without a todo column", () => {
+    expect(
+      queueColumns(DEFAULT_COLUMNS.filter((c) => c.category !== "unstarted")),
+    ).toEqual(["Backlog", "In Progress"]);
   });
 });
 
