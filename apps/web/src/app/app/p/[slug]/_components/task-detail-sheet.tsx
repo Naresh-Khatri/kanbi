@@ -256,6 +256,13 @@ export function TaskDetail({
   const { Header, Title, Description, Panel } =
     variant === "page" ? PAGE_PARTS : SHEET_PARTS;
   const utils = api.useUtils();
+  // badges render only for owner/actor when off, so off = hidden from the rest
+  const project = api.project.bySlug.useQuery({ slug: projectSlug }).data;
+  const agentsHidden = project?.discloseAgents === false;
+  const agentSettingsHref =
+    project?.role === "owner"
+      ? `/app/p/${projectSlug}/settings#agents`
+      : undefined;
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const latestDescription = useRef(description);
@@ -553,13 +560,20 @@ export function TaskDetail({
               taskId={task.id}
             />
             <CommentsPanel
+              agentSettingsHref={agentSettingsHref}
+              agentsHidden={agentsHidden}
               boardId={boardId}
               canWrite={canWrite}
               mentions={mentionItems}
               taskId={task.id}
               tickets={tickets}
             />
-            <ActivityPanel boardId={boardId} taskId={task.id} />
+            <ActivityPanel
+              agentSettingsHref={agentSettingsHref}
+              agentsHidden={agentsHidden}
+              boardId={boardId}
+              taskId={task.id}
+            />
           </>
         ) : (
           <BodySkeleton />
@@ -1644,12 +1658,16 @@ function formatBytes(n: number) {
 }
 
 function CommentsPanel({
+  agentSettingsHref,
+  agentsHidden,
   boardId,
   taskId,
   canWrite,
   mentions,
   tickets,
 }: {
+  agentSettingsHref: string | undefined;
+  agentsHidden: boolean;
   boardId: string;
   taskId: string;
   canWrite: boolean;
@@ -1681,6 +1699,8 @@ function CommentsPanel({
         <ul className="flex flex-col gap-4 text-sm">
           {comments.map((c) => (
             <CommentItem
+              agentSettingsHref={agentSettingsHref}
+              agentsHidden={agentsHidden}
               boardId={boardId}
               canManage={canWrite && me.data?.id === c.authorId}
               comment={c}
@@ -1728,6 +1748,8 @@ function CommentsPanel({
 }
 
 function CommentItem({
+  agentSettingsHref,
+  agentsHidden,
   comment: c,
   boardId,
   taskId,
@@ -1735,6 +1757,8 @@ function CommentItem({
   mentions,
   tickets,
 }: {
+  agentSettingsHref: string | undefined;
+  agentsHidden: boolean;
   comment: RouterOutputs["comment"]["list"][number];
   boardId: string;
   taskId: string;
@@ -1775,6 +1799,8 @@ function CommentItem({
           {c.agent ? (
             <AgentBadge
               agent={c.agent}
+              hiddenFromTeam={agentsHidden}
+              settingsHref={agentSettingsHref}
               tooltip={`Posted by an agent on ${c.authorName}'s behalf`}
             />
           ) : null}
@@ -1891,9 +1917,13 @@ function CommentItem({
 }
 
 function ActivityPanel({
+  agentSettingsHref,
+  agentsHidden,
   boardId,
   taskId,
 }: {
+  agentSettingsHref: string | undefined;
+  agentsHidden: boolean;
   boardId: string;
   taskId: string;
 }) {
@@ -1920,6 +1950,8 @@ function ActivityPanel({
                     ? a.payload.agentKind
                     : agentFromClientName(a.payload.agent)
                 }
+                hiddenFromTeam={agentsHidden}
+                settingsHref={agentSettingsHref}
                 tooltip={`Done via ${a.payload.agent} on ${a.actorName}'s behalf`}
               />
             ) : null}

@@ -1,5 +1,7 @@
 "use client";
 
+import { EyeOffIcon } from "lucide-react";
+import Link from "next/link";
 import type React from "react";
 
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,10 +12,16 @@ import { cn } from "@/lib/utils";
 export function AgentBadge({
   agent,
   tooltip,
+  hiddenFromTeam = false,
+  settingsHref,
   className,
 }: {
   agent: string;
   tooltip: React.ReactNode;
+  /** disclosure off -> only the owner and whoever ran the agent see this */
+  hiddenFromTeam?: boolean;
+  /** owner only: eye-off icon links to the disclosure setting */
+  settingsHref?: string;
   className?: string;
 }) {
   const { id, label, color, mono } = agentMeta(agent);
@@ -41,8 +49,35 @@ export function AgentBadge({
           style={mono ? { maskImage: src } : { backgroundImage: src }}
         />
         {label}
+        {hiddenFromTeam && settingsHref ? (
+          <Link
+            aria-label="Hidden from teammates. Open agent disclosure settings"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -m-0.5 rounded-full p-0.5 outline-none focus-visible:ring-2"
+            href={settingsHref}
+          >
+            <EyeOffIcon aria-hidden="true" className="size-3" />
+          </Link>
+        ) : hiddenFromTeam ? (
+          <EyeOffIcon
+            aria-label="Hidden from teammates"
+            className="text-muted-foreground size-3 shrink-0"
+          />
+        ) : null}
       </TooltipTrigger>
-      <TooltipPopup>{tooltip}</TooltipPopup>
+      <TooltipPopup>
+        {hiddenFromTeam ? (
+          <span className="flex max-w-64 flex-col gap-1">
+            <span>{tooltip}</span>
+            <span className="text-muted-foreground">
+              Hidden from teammates. Agent disclosure is off, so they see this
+              as regular work.
+              {settingsHref ? " Click the eye to change it." : null}
+            </span>
+          </span>
+        ) : (
+          tooltip
+        )}
+      </TooltipPopup>
     </Tooltip>
   );
 }

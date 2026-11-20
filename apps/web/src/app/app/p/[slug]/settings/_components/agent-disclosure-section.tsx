@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { CardPanel } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +22,11 @@ export function AgentDisclosureSection({
     onSuccess: () => utils.project.bySlug.invalidate({ slug }),
     onError: (err) => toastManager.add({ type: "error", title: err.message }),
   });
+  // section mounts after the query -> browser hash scroll already missed it
+  useEffect(() => {
+    if (project && window.location.hash === "#agents")
+      document.getElementById("agents")?.scrollIntoView({ block: "start" });
+  }, [project]);
   if (!project) return null;
 
   const checked =
