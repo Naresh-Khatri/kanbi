@@ -1,11 +1,27 @@
 import {
   defaultShouldDehydrateQuery,
+  MutationCache,
+  QueryCache,
   QueryClient,
 } from "@tanstack/react-query";
 import SuperJSON from "superjson";
 
-export const createQueryClient = () =>
+type AuthHooks = {
+  onError: (error: unknown, source: "query" | "mutation") => void;
+  onSuccess: () => void;
+};
+
+// hooks injected by the browser provider; server.ts imports this too
+export const createQueryClient = (auth?: AuthHooks) =>
   new QueryClient({
+    queryCache: new QueryCache({
+      onError: (e) => auth?.onError(e, "query"),
+      onSuccess: () => auth?.onSuccess(),
+    }),
+    mutationCache: new MutationCache({
+      onError: (e) => auth?.onError(e, "mutation"),
+      onSuccess: () => auth?.onSuccess(),
+    }),
     defaultOptions: {
       queries: {
         // With SSR, we usually want to set some default staleTime

@@ -24,6 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
 import { taskBoardHref } from "@/lib/task-link";
+import { isUnauthorized, onSessionExpired } from "@/lib/session-expiry";
 import { cn } from "@/lib/utils";
 import { api, type RouterOutputs } from "@/trpc/react";
 
@@ -149,7 +150,12 @@ export function NotificationBell() {
     void utils.notification.unreadCount.invalidate();
   };
 
-  api.notification.onChange.useSubscription(undefined, { onData: refresh });
+  api.notification.onChange.useSubscription(undefined, {
+    onData: refresh,
+    onError: (error) => {
+      if (isUnauthorized(error)) onSessionExpired("query");
+    },
+  });
 
   const markRead = api.notification.markRead.useMutation({
     onSuccess: refresh,

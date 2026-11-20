@@ -56,6 +56,7 @@ import { toastManager } from "@/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
 import { cn } from "@/lib/utils";
+import { useUnsavedWork } from "@/lib/session-expiry";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { ColumnPicker } from "./column-picker";
 import type { Priority } from "./priority";
@@ -193,6 +194,7 @@ export function QuickAddTaskDialog({
       dueAt !== ""
     );
   }
+  useUnsavedWork(open && isDirty());
 
   function discard() {
     setConfirmDiscard(false);

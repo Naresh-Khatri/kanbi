@@ -54,6 +54,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { toastManager } from "@/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { useUnsavedWork } from "@/lib/session-expiry";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { HistoryDrawer } from "./history-drawer";
 import { documentBreadcrumbs, type DocumentList } from "./tree";
@@ -112,6 +113,7 @@ export function DocumentView({
   const dirty =
     !!document.data &&
     (title !== document.data.title || body !== document.data.body);
+  useUnsavedWork(dirty);
 
   const save = api.document.update.useMutation({
     onSuccess: async () => {

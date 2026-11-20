@@ -45,6 +45,7 @@ import { toastManager } from "@/components/ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useUnsavedWork } from "@/lib/session-expiry";
 import { api, type RouterOutputs } from "@/trpc/react";
 import { ColumnPicker } from "./column-picker";
 import type { Priority } from "./priority";
@@ -180,6 +181,7 @@ export function AiDraftDialog({
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
   const isDirty = message.trim().length > 0 || (issues?.length ?? 0) > 0;
+  useUnsavedWork(open && isDirty);
 
   // guards esc/backdrop/x; successful create calls onOpenChange directly
   function requestOpenChange(next: boolean) {

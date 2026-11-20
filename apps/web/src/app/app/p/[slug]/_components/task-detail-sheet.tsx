@@ -101,6 +101,7 @@ import { ColorSwatchGroup } from "@/components/color-swatch-group";
 import { extractFileIds } from "@/lib/file-url";
 import { LABEL_COLORS } from "@/lib/palette";
 import { cn } from "@/lib/utils";
+import { useUnsavedWork } from "@/lib/session-expiry";
 import { api, type RouterOutputs } from "@/trpc/react";
 import {
   BRANCH_TYPES,
@@ -1679,6 +1680,7 @@ function CommentsPanel({
   const list = api.comment.list.useQuery({ boardId, taskId });
   const [body, setBody] = useState("");
   const [uploading, setUploading] = useState(0);
+  useUnsavedWork(!isRichTextEmpty(body));
   const uploadImage = useInlineImageUpload(boardId, taskId);
   const create = api.comment.create.useMutation({
     onSuccess: async () => {
@@ -1771,6 +1773,7 @@ function CommentItem({
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState(c.body);
   const [uploading, setUploading] = useState(0);
+  useUnsavedWork(editing && draft !== c.body);
   const uploadImage = useInlineImageUpload(boardId, taskId);
 
   const edit = api.comment.edit.useMutation({

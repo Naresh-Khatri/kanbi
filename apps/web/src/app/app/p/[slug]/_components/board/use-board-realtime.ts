@@ -1,6 +1,7 @@
 "use client";
 
 import { invalidateProjectLifecycle } from "@/app/app/_components/invalidate-project-lifecycle";
+import { isUnauthorized, onSessionExpired } from "@/lib/session-expiry";
 import { api } from "@/trpc/react";
 
 export function useBoardRealtime(boardId: string) {
@@ -8,6 +9,9 @@ export function useBoardRealtime(boardId: string) {
   api.realtime.onBoardChange.useSubscription(
     { boardId },
     {
+      onError: (error) => {
+        if (isUnauthorized(error)) onSessionExpired("query");
+      },
       onData: (evt) => {
         if (evt.scope === "presence") {
           // Keeps the header team/presence popover live while the board is open.

@@ -2,6 +2,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { SessionWatcher } from "@/app/app/_components/session-watcher";
 import { KeybindProvider } from "@/components/keybinds/keybind-provider";
 import { loginUrl, RETURN_URL_HEADER } from "@/lib/return-url";
 import { getSession } from "@/server/better-auth/server";
@@ -23,6 +24,7 @@ export default async function AppLayout({
     <div className="flex h-svh min-w-0 flex-col">
       {children}
       <KeybindProvider />
+      <SessionWatcher />
     </div>
   );
 }

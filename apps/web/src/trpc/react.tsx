@@ -12,8 +12,20 @@ import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { useState } from "react";
 import SuperJSON from "superjson";
 
+import {
+  isUnauthorized,
+  onSessionExpired,
+  onSessionOk,
+} from "@/lib/session-expiry";
 import type { AppRouter } from "@/server/api/root";
 import { createQueryClient } from "./query-client";
+
+const authHooks = {
+  onError: (error: unknown, source: "query" | "mutation") => {
+    if (isUnauthorized(error)) onSessionExpired(source);
+  },
+  onSuccess: onSessionOk,
+};
 
 let clientQueryClientSingleton: QueryClient | undefined;
 const getQueryClient = () => {
@@ -22,7 +34,7 @@ const getQueryClient = () => {
     return createQueryClient();
   }
   // Browser: use singleton pattern to keep the same query client
-  clientQueryClientSingleton ??= createQueryClient();
+  clientQueryClientSingleton ??= createQueryClient(authHooks);
 
   return clientQueryClientSingleton;
 };
