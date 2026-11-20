@@ -3,6 +3,7 @@
 import { LastUsedBadge, type LastUsedProvider } from "@/components/auth/last-used";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { socialCallbackUrl } from "@/lib/return-url";
 import { authClient } from "@/server/better-auth/client";
 
 const SOCIAL = [
@@ -34,7 +35,10 @@ export function SocialAuth({
 
   async function onSocial(provider: (typeof SOCIAL)[number]["id"]) {
     mark(provider);
-    await authClient.signIn.social({ provider, callbackURL });
+    await authClient.signIn.social({
+      provider,
+      callbackURL: socialCallbackUrl(callbackURL),
+    });
   }
 
   return (

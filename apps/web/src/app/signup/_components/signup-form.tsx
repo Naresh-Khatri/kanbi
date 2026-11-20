@@ -33,6 +33,7 @@ import { toastManager } from "@/components/ui/toast";
 import { UserAvatar } from "@/components/user-avatar";
 import { buildAvatarUrl } from "@/lib/avatar";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
+import { RETURN_URL_PARAM, safeReturnUrl } from "@/lib/return-url";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
 
@@ -57,7 +58,9 @@ export function SignupForm({
   const { lastUsed, mark } = useLastUsedAuth();
 
   const providerNames = socialProviderNames(providers);
-  const afterAuth = invite ? inviteReturnPath(invite) : "/app";
+  const afterAuth = invite
+    ? inviteReturnPath(invite)
+    : safeReturnUrl(searchParams.get(RETURN_URL_PARAM));
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,7 +91,7 @@ export function SignupForm({
       window.location.assign(afterAuth);
       return;
     }
-    router.replace("/app");
+    router.replace(afterAuth);
     router.refresh();
   }
 

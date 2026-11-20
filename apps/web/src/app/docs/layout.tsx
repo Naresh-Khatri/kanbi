@@ -1,7 +1,7 @@
 import Link from "next/link";
 
+import { SignInButton } from "@/components/auth/sign-in-button";
 import { Wordmark } from "@/components/brand/logo";
-import { Button } from "@/components/ui/button";
 
 /** public getting-started pages: marketing dialect, left-aligned reading column */
 export default function DocsLayout({
@@ -19,9 +19,7 @@ export default function DocsLayout({
         <Link aria-label="Kanbi home" className="rounded-md" href="/">
           <Wordmark size="sm" />
         </Link>
-        <Button render={<Link href="/login" />} variant="ghost">
-          Sign in
-        </Button>
+        <SignInButton />
       </header>
       <main className="mx-auto max-w-2xl px-6 pt-10 pb-24 [&_p_code]:rounded-sm [&_p_code]:bg-muted [&_p_code]:px-1 [&_p_code]:py-0.5 [&_p_code]:font-mono [&_p_code]:text-[0.8125rem] [&_p_code]:text-foreground">
         {children}

@@ -26,6 +26,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toastManager } from "@/components/ui/toast";
+import { loginUrl, RETURN_URL_PARAM, withReturnUrl } from "@/lib/return-url";
 import { authClient } from "@/server/better-auth/client";
 
 export default function ResetPasswordPage() {
@@ -41,6 +42,7 @@ function ResetPasswordForm() {
   const params = useSearchParams();
   const token = params.get("token") ?? "";
   const error = params.get("error");
+  const returnUrl = params.get(RETURN_URL_PARAM);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [pending, setPending] = useState(false);
@@ -69,7 +71,7 @@ function ResetPasswordForm() {
       title: "Password updated",
       description: "Please sign in with your new password.",
     });
-    router.push("/login");
+    router.push(loginUrl(returnUrl));
   }
 
   if (!token || error) {
@@ -87,7 +89,12 @@ function ResetPasswordForm() {
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button render={<Link href="/forgot-password" />} variant="outline">
+              <Button
+                render={
+                  <Link href={withReturnUrl("/forgot-password", returnUrl)} />
+                }
+                variant="outline"
+              >
                 Send a new link
               </Button>
             </EmptyContent>

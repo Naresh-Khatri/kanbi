@@ -25,6 +25,12 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toastManager } from "@/components/ui/toast";
 import { oauthResumeUrl, preserveOAuthQuery } from "@/lib/oauth-flow";
+import {
+  EXPIRED_PARAM,
+  RETURN_URL_PARAM,
+  safeReturnUrl,
+  withReturnUrl,
+} from "@/lib/return-url";
 import { authClient } from "@/server/better-auth/client";
 import type { AuthInvite } from "@/server/invites";
 
@@ -44,7 +50,10 @@ export function LoginForm({
   const { lastUsed, mark } = useLastUsedAuth();
 
   const providerNames = socialProviderNames(providers);
-  const afterAuth = invite ? inviteReturnPath(invite) : "/app";
+  const afterAuth = invite
+    ? inviteReturnPath(invite)
+    : safeReturnUrl(searchParams.get(RETURN_URL_PARAM));
+  const expired = !invite && searchParams.get(EXPIRED_PARAM) === "1";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,7 +84,7 @@ export function LoginForm({
       window.location.assign(afterAuth);
       return;
     }
-    router.replace("/app");
+    router.replace(afterAuth);
     router.refresh();
   }
 
@@ -89,14 +98,18 @@ export function LoginForm({
                 ? invite.email
                   ? "Sign in to accept"
                   : "Sign in to join"
-                : "Welcome back"}
+                : expired
+                  ? "Session expired"
+                  : "Welcome back"}
             </CardTitle>
             <CardDescription>
               {invite
                 ? invite.email
                   ? "Sign in with the invited account, then confirm joining."
                   : "Sign in with any account, then confirm joining."
-                : "Sign in to your Kanbi account."}
+                : expired
+                  ? "Sign in again to pick up where you left off."
+                  : "Sign in to your Kanbi account."}
             </CardDescription>
           </CardHeader>
           <CardPanel className="flex flex-col gap-6">
@@ -131,7 +144,10 @@ export function LoginForm({
                   <FieldLabel>Password</FieldLabel>
                   <Link
                     className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
-                    href="/forgot-password"
+                    href={withReturnUrl(
+                      "/forgot-password",
+                      searchParams.get(RETURN_URL_PARAM),
+                    )}
                   >
                     Forgot password?
                   </Link>

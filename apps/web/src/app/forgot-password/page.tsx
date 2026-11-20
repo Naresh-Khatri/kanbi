@@ -2,7 +2,8 @@
 
 import { MailCheckIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -18,9 +19,19 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toastManager } from "@/components/ui/toast";
+import { loginUrl, RETURN_URL_PARAM, withReturnUrl } from "@/lib/return-url";
 import { authClient } from "@/server/better-auth/client";
 
 export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ForgotPasswordForm />
+    </Suspense>
+  );
+}
+
+function ForgotPasswordForm() {
+  const returnUrl = useSearchParams().get(RETURN_URL_PARAM);
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -30,7 +41,7 @@ export default function ForgotPasswordPage() {
     setPending(true);
     const res = await authClient.requestPasswordReset({
       email,
-      redirectTo: "/reset-password",
+      redirectTo: withReturnUrl("/reset-password", returnUrl),
     });
     setPending(false);
     if (res.error) {
@@ -86,7 +97,7 @@ export default function ForgotPasswordPage() {
         <p className="text-center text-muted-foreground text-sm">
           <Link
             className="font-medium text-foreground underline-offset-4 hover:underline"
-            href="/login"
+            href={loginUrl(returnUrl)}
           >
             Back to sign in
           </Link>
