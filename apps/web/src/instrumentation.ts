@@ -1,14 +1,15 @@
 // runs once on server boot (Next instrumentation hook)
 export async function register() {
-  // nodejs runtime only -> skip edge; scheduler needs long-lived process + pg
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
   // prod only -> don't fire jobs (emails, ai) from dev servers
   if (process.env.NODE_ENV !== "production") return;
 
-  // throws -> boot fails; never serve against a stale schema
-  const { runMigrations } = await import("@/server/db/migrate");
-  await runMigrations();
+  // imports inside the if, not after an early return -> webpack drops the block from the edge bundle
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    // throws -> boot fails; never serve against a stale schema
+    const { runMigrations } = await import("@/server/db/migrate");
+    await runMigrations();
 
-  const { startCronJobs } = await import("@/server/cron/scheduler");
-  startCronJobs();
+    const { startCronJobs } = await import("@/server/cron/scheduler");
+    startCronJobs();
+  }
 }
