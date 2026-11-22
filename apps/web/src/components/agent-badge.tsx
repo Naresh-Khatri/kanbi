@@ -4,6 +4,7 @@ import { EyeOffIcon } from "lucide-react";
 import Link from "next/link";
 import type React from "react";
 
+import { AgentLogo } from "@/components/agent-logo";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { agentMeta } from "@/lib/agents";
 import { cn } from "@/lib/utils";
@@ -24,8 +25,7 @@ export function AgentBadge({
   settingsHref?: string;
   className?: string;
 }) {
-  const { id, label, color, mono } = agentMeta(agent);
-  const src = `url(/agents/${id}.svg)`;
+  const { id, label, color } = agentMeta(agent);
   return (
     <Tooltip>
       <TooltipTrigger
@@ -39,15 +39,7 @@ export function AgentBadge({
           />
         }
       >
-        <span
-          aria-hidden="true"
-          className={cn(
-            "size-3 shrink-0 bg-contain bg-center bg-no-repeat",
-            // single-color svgs take the agent color via mask
-            mono && "bg-(--agent) mask-contain mask-center mask-no-repeat",
-          )}
-          style={mono ? { maskImage: src } : { backgroundImage: src }}
-        />
+        <AgentLogo agent={id} />
         {label}
         {hiddenFromTeam && settingsHref ? (
           <Link

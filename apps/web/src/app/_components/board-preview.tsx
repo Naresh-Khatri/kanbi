@@ -1,13 +1,16 @@
 import { PlusIcon } from "lucide-react";
+import type React from "react";
 
 import {
   type Priority,
   PriorityIcon,
 } from "@/app/app/p/[slug]/_components/priority";
+import { AgentLogo } from "@/components/agent-logo";
 import { Logo } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { Frame, FrameHeader, FramePanel } from "@/components/ui/frame";
 import { Kbd } from "@/components/ui/kbd";
+import { type AgentId, agentMeta } from "@/lib/agents";
 import { DEFAULT_LABELS } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +21,7 @@ type FakeCard = {
   priority: Priority;
   label?: Label;
   initials?: string;
+  agent?: AgentId;
 };
 
 const LABEL_COLOR = Object.fromEntries(
@@ -66,10 +70,11 @@ const COLUMNS: { name: string; cards: FakeCard[]; className?: string }[] = [
       },
       {
         id: "KB-12",
-        title: "Keyboard shortcut help",
+        title: "Retry failed webhooks",
         priority: "medium",
         label: "Improvement",
         initials: "GH",
+        agent: "claude-code",
       },
       {
         id: "KB-15",
@@ -89,7 +94,12 @@ const COLUMNS: { name: string; cards: FakeCard[]; className?: string }[] = [
         priority: "medium",
         initials: "AL",
       },
-      { id: "KB-6", title: "Add task labels", priority: "low", label: "Design" },
+      {
+        id: "KB-6",
+        title: "Add task labels",
+        priority: "low",
+        label: "Design",
+      },
     ],
   },
 ];
@@ -97,14 +107,17 @@ const COLUMNS: { name: string; cards: FakeCard[]; className?: string }[] = [
 /** decorative only: static fake data, hidden from assistive tech */
 export function BoardPreview() {
   return (
-    <Frame aria-hidden="true" className="w-full max-w-4xl select-none text-left">
+    <Frame
+      aria-hidden="true"
+      className="w-full max-w-4xl text-left select-none"
+    >
       <FrameHeader className="flex-row items-center gap-2 px-4 py-2.5">
-        <span className="flex size-5 items-center justify-center rounded-md bg-project-default text-white">
+        <span className="bg-project-default flex size-5 items-center justify-center rounded-md text-white">
           <Logo className="size-3.5" />
         </span>
-        <span className="font-medium text-sm">Kanbi</span>
+        <span className="text-sm font-medium">Kanbi</span>
         <span className="text-muted-foreground text-sm">/ Board</span>
-        <span className="ms-auto hidden items-center gap-1.5 text-muted-foreground text-xs sm:flex">
+        <span className="text-muted-foreground ms-auto hidden items-center gap-1.5 text-xs sm:flex">
           New task <Kbd>C</Kbd>
         </span>
       </FrameHeader>
@@ -115,26 +128,30 @@ export function BoardPreview() {
             className={cn("flex min-w-0 flex-col gap-2", col.className)}
             key={col.name}
           >
-            <div className="flex items-center gap-2 px-1 py-0.5 font-medium text-xs">
+            <div className="flex items-center gap-2 px-1 py-0.5 text-xs font-medium">
               {col.name}
               <span className="text-muted-foreground tabular-nums">
                 {col.cards.length}
               </span>
               <PlusIcon
                 aria-hidden="true"
-                className="ms-auto size-3.5 text-muted-foreground"
+                className="text-muted-foreground ms-auto size-3.5"
               />
             </div>
             {col.cards.map((c) => (
               <div
-                className="flex flex-col gap-2 rounded-lg border bg-card p-2.5 shadow-xs/5"
+                className="bg-card flex flex-col gap-2 rounded-lg border p-2.5 shadow-xs/5"
                 key={c.id}
               >
                 <span className="line-clamp-2 text-xs leading-snug">
                   {c.title}
                 </span>
-                <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-                  <PriorityIcon className="size-3.5 shrink-0" priority={c.priority} />
+                {c.agent ? <AgentWorking agent={c.agent} /> : null}
+                <span className="text-muted-foreground flex items-center gap-1.5 text-[0.6875rem]">
+                  <PriorityIcon
+                    className="size-3.5 shrink-0"
+                    priority={c.priority}
+                  />
                   <span className="tabular-nums">{c.id}</span>
                   {c.label ? (
                     <Badge
@@ -150,7 +167,7 @@ export function BoardPreview() {
                     </Badge>
                   ) : null}
                   {c.initials ? (
-                    <span className="ms-auto flex size-4 items-center justify-center rounded-full bg-muted font-medium text-[0.5rem] text-foreground">
+                    <span className="bg-muted text-foreground ms-auto flex size-4 items-center justify-center rounded-full text-[0.5rem] font-medium">
                       {c.initials}
                     </span>
                   ) : null}
@@ -161,5 +178,19 @@ export function BoardPreview() {
         ))}
       </FramePanel>
     </Frame>
+  );
+}
+
+function AgentWorking({ agent }: { agent: AgentId }) {
+  const { label, color } = agentMeta(agent);
+  return (
+    <span
+      className="text-foreground flex w-fit items-center gap-1.5 rounded-full border border-(--agent)/30 bg-(--agent)/10 px-1.5 py-0.5 text-[0.6875rem]"
+      style={{ "--agent": color } as React.CSSProperties}
+    >
+      <AgentLogo agent={agent} />
+      {label} is working
+      <span className="size-1.5 animate-pulse rounded-full bg-(--agent) motion-reduce:animate-none" />
+    </span>
   );
 }
