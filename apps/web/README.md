@@ -1,11 +1,12 @@
 # Kanbi
 
-Kanbi is a super simple kanban-based project tracking tool — think Linear, but for personal use.
+Kanbi is a kanban project tracker built for working alongside AI agents. You plan and assign; coding agents connect over MCP, pick up their tasks, and report back on the card.
 
-It borrows the parts of Linear that make it pleasant to live in day-to-day, while staying small enough to actually own and tweak yourself.
+It stays small enough to actually own and tweak yourself.
 
 ## Features
 
+- MCP server for AI agents — capture tasks from a conversation, then let the agent work its queue and hand off for review
 - Linear-inspired UX and UI — keyboard-friendly, fast, and out of the way
 - Kanban boards with columns, drag-and-drop reordering, labels, priorities, due dates, and rich-text descriptions
 - Board sharing and member invites with proper roles

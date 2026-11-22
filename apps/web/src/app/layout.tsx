@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     process.env.BETTER_AUTH_URL || "http://kanbi.localhost:3333",
   ),
   title: "Kanbi",
-  description: "A fast, keyboard-first kanban.",
+  description: "The kanban your AI agents work from.",
 };
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });

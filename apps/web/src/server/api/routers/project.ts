@@ -408,9 +408,9 @@ export const projectRouter = createTRPCRouter({
               boardId: boardRow.id,
               columnId: inProgress.id,
               number: 3,
-              title: "Try the keyboard shortcuts",
+              title: "Connect an AI agent",
               description:
-                "Press `C` anywhere to quick-add a task. More shortcuts live in the command menu.",
+                "Add Kanbi to Claude Code, Codex or any MCP client (see /docs/mcp), assign yourself a task, and let the agent pick it up. Press `C` anywhere to quick-add a task by hand.",
               priority: "none" as const,
               position: 1,
               reporterId: userId,

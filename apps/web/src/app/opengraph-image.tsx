@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Kanbi — a fast, keyboard-first kanban";
+export const alt = "Kanbi — the kanban your AI agents work from";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

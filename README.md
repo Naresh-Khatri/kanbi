@@ -1,9 +1,9 @@
 # Kanbi
 
-A super simple kanban-based project tracker. Think Linear, but small enough to
-own and tweak yourself. It keeps the parts of Linear that make it pleasant to
-live in day to day (keyboard-first, fast, realtime) without the enterprise
-sprawl.
+A kanban project tracker built for working alongside AI agents. You plan and
+assign; coding agents (Claude Code, Codex, opencode, Grok) connect over MCP,
+pick up their tasks, ship the fix and report back on the card. Small enough to
+own and tweak yourself, still fast and realtime when you drive it by hand.
 
 This is a pnpm + Turborepo monorepo:
 
@@ -24,7 +24,7 @@ kanbi/
 - **Comments** on tasks, with mentions that notify project members.
 - **Realtime** updates and online presence over SSE; the UI is optimistic and
   deletes are undoable.
-- **Keyboard-first** with a command palette and shortcuts throughout.
+- **Fast by hand**: command palette and keyboard shortcuts throughout.
 - **Projects** with member invites, roles, and per-project settings; plus
   public read-only shared boards via a share link.
 - **AI task drafting** (optional): paste a client message and let an LLM (Groq gpt-oss-20b, OpenRouter free fallback) extract
@@ -32,7 +32,9 @@ kanbi/
 - **Focus app**: an Expo companion that pairs to your account over a QR code and
   authenticates with per-device tokens.
 - **MCP server**: connect AI agents (Claude Code, Codex, opencode, Grok) over
-  OAuth to capture approved tasks from finished discussions. See
+  OAuth. They capture approved tasks from finished discussions, then work their
+  assigned tasks end to end: read the brief, start, comment, attach
+  screenshots, report blockers, and hand off for review. See
   [`apps/web/src/server/mcp/README.md`](apps/web/src/server/mcp/README.md).
 - **Auth**: email/password plus Google and GitHub OAuth, via Better Auth.
 

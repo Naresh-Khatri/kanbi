@@ -12,7 +12,7 @@ import { DocsHero, DocsSection } from "../_components/docs-page";
 export const metadata: Metadata = {
   title: "Connect an AI agent · Kanbi",
   description:
-    "Connect an AI agent to capture reviewed Kanbi tasks over OAuth.",
+    "Connect an AI agent to capture, work, and close Kanbi tasks over OAuth.",
 };
 
 const TOOLS = [
@@ -172,9 +172,9 @@ export default function McpDocsPage() {
       <DocsHero eyebrow="MCP server" title="Connect an AI agent">
         Kanbi exposes a Model Context Protocol server so coding agents — Codex,
         Claude Code, Grok Build, opencode, or another MCP client — can turn a
-        finished discussion into reviewed Kanbi tasks from your editor or
-        terminal. Auth is OAuth with a browser consent screen; there are no API
-        keys to copy.
+        finished discussion into reviewed tasks, then pick up the tasks assigned
+        to you, fix them, and report back on the card. Auth is OAuth with a
+        browser consent screen; there are no API keys to copy.
       </DocsHero>
 
       <Card className="mt-8">
@@ -293,8 +293,7 @@ export default function McpDocsPage() {
         <p>
           One useful task with a description and checklist is the default. Work
           is split only when each item can be delivered independently, and the
-          full split is shown before approval. Task management after creation is
-          not available over MCP.
+          full split is shown before approval.
         </p>
       </DocsSection>
 
