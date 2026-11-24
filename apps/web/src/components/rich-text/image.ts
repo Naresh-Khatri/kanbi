@@ -1,5 +1,6 @@
 import type { Editor } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
+import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 
 import { toastManager } from "@/components/ui/toast";
 import { FILE_SRC_RE } from "@/lib/file-url";
@@ -85,7 +86,17 @@ export function insertImages(
     (pos === undefined || i > 0
       ? chain.insertContent(node)
       : chain.insertContentAt(pos, node)
-    ).run();
+    )
+      // insert leaves image node-selected -> next keystroke would replace it
+      .command(({ tr }) => {
+        if (!(tr.selection instanceof NodeSelection)) return true;
+        const after = tr.selection.to;
+        if (!tr.doc.resolve(after).nodeAfter?.isTextblock)
+          tr.insert(after, tr.doc.type.schema.nodes.paragraph!.create());
+        tr.setSelection(TextSelection.create(tr.doc, after + 1));
+        return true;
+      })
+      .run();
     track(1);
     upload(file)
       .then((url) => patchImage(editor, blob, url))
