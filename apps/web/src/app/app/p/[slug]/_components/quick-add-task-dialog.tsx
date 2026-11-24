@@ -20,11 +20,20 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   GripVerticalIcon,
   PaperclipIcon,
+  PencilIcon,
   SparklesIcon,
   XIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ClipboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { ImageAnnotator, type Shape } from "@/components/image-annotator";
 import { isRichTextEmpty, RichTextEditor } from "@/components/rich-text/editor";
+import { imageFiles } from "@/components/rich-text/image";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -78,6 +87,13 @@ type StagedFile = {
   id: string;
   file: File;
   previewUrl: string | null;
+  // pre-markup image, kept so marks stay editable
+  source?: { file: File; url: string; shapes: Shape[] };
+};
+
+const revokeStaged = (s: StagedFile) => {
+  if (s.previewUrl) URL.revokeObjectURL(s.previewUrl);
+  if (s.source) URL.revokeObjectURL(s.source.url);
 };
 
 type StagedChecklistItem = { id: string; text: string };
@@ -128,6 +144,7 @@ export function QuickAddTaskDialog({
   // pre-enhance wording; first enhance wins so re-enhancing keeps the original
   const [sourceText, setSourceText] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [annotatingId, setAnnotatingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -140,18 +157,13 @@ export function QuickAddTaskDialog({
     if (open) setColumnId(defaultColumnId);
   }, [open, defaultColumnId]);
 
-  useEffect(() => {
-    return () => {
-      for (const s of staged) {
-        if (s.previewUrl) URL.revokeObjectURL(s.previewUrl);
-      }
-    };
-  }, [staged]);
+  // unmount only: a [staged] cleanup would revoke urls still on screen
+  const stagedRef = useRef(staged);
+  stagedRef.current = staged;
+  useEffect(() => () => stagedRef.current.forEach(revokeStaged), []);
 
   function resetForm() {
-    for (const s of staged) {
-      if (s.previewUrl) URL.revokeObjectURL(s.previewUrl);
-    }
+    staged.forEach(revokeStaged);
     setStaged([]);
     setChecklist([]);
     setChecklistText("");
@@ -368,7 +380,7 @@ export function QuickAddTaskDialog({
     }
   }
 
-  function onFilesChosen(files: FileList | null) {
+  function onFilesChosen(files: FileList | File[] | null) {
     if (!files) return;
     const next: StagedFile[] = Array.from(files).map((f) => ({
       id: randomId(`${f.name}-${f.size}`),
@@ -382,10 +394,53 @@ export function QuickAddTaskDialog({
   function removeStaged(id: string) {
     setStaged((prev) => {
       const found = prev.find((s) => s.id === id);
-      if (found?.previewUrl) URL.revokeObjectURL(found.previewUrl);
+      if (found) revokeStaged(found);
       return prev.filter((s) => s.id !== id);
     });
   }
+
+  function onPaste(e: ClipboardEvent) {
+    const images = imageFiles(e.clipboardData.files);
+    // office apps put a picture next to the text; let those paste as text
+    if (images.length === 0 || e.clipboardData.getData("text/plain")) return;
+    // capture phase + preventDefault keeps prosemirror from also handling it
+    e.preventDefault();
+    e.stopPropagation();
+    const stamp = Date.now();
+    onFilesChosen(
+      images.map((f, i) =>
+        // screenshots all arrive as "image.png"
+        f.name === "image.png"
+          ? new File([f], `pasted-${stamp}${i ? `-${i}` : ""}.png`, {
+              type: f.type,
+            })
+          : f,
+      ),
+    );
+  }
+
+  function saveAnnotation(id: string, blob: Blob, shapes: Shape[]) {
+    setStaged((prev) =>
+      prev.map((s) => {
+        if (s.id !== id || !s.previewUrl) return s;
+        const source = s.source ?? {
+          file: s.file,
+          url: s.previewUrl,
+          shapes: [],
+        };
+        if (s.source) URL.revokeObjectURL(s.previewUrl);
+        const name = source.file.name.replace(/\.[^.]+$/, "") + ".png";
+        return {
+          ...s,
+          file: new File([blob], name, { type: "image/png" }),
+          previewUrl: URL.createObjectURL(blob),
+          source: { ...source, shapes },
+        };
+      }),
+    );
+  }
+
+  const annotating = staged.find((s) => s.id === annotatingId);
 
   const selectedLabels = labels.filter((l) => selectedLabelIds.has(l.id));
   const canSubmit = Boolean(title.trim() && columnId);
@@ -396,6 +451,7 @@ export function QuickAddTaskDialog({
         <DialogPopup className="max-w-xl" initialFocus={titleInputRef}>
           <Form
             className="flex min-h-0 flex-1 flex-col"
+            onPasteCapture={onPaste}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
@@ -528,11 +584,21 @@ export function QuickAddTaskDialog({
                       key={s.id}
                     >
                       {s.previewUrl ? (
-                        <img
-                          alt={s.file.name}
-                          className="size-full object-cover"
-                          src={s.previewUrl}
-                        />
+                        <button
+                          aria-label={`Mark up ${s.file.name}`}
+                          className="size-full cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                          onClick={() => setAnnotatingId(s.id)}
+                          type="button"
+                        >
+                          <img
+                            alt={s.file.name}
+                            className="size-full object-cover"
+                            src={s.previewUrl}
+                          />
+                          <span className="absolute start-1 bottom-1 flex size-6 items-center justify-center rounded-md bg-background/80 text-foreground opacity-0 backdrop-blur-sm group-hover/file:opacity-100 pointer-coarse:opacity-100">
+                            <PencilIcon aria-hidden="true" className="size-3.5" />
+                          </span>
+                        </button>
                       ) : (
                         <div className="flex size-full flex-col items-center justify-center gap-1 p-2 text-muted-foreground">
                           <PaperclipIcon aria-hidden="true" className="size-4" />
@@ -640,6 +706,21 @@ export function QuickAddTaskDialog({
               </div>
             </DialogFooter>
           </Form>
+          <ImageAnnotator
+            initialShapes={annotating?.source?.shapes}
+            onOpenChange={(o) => {
+              if (!o) setAnnotatingId(null);
+            }}
+            onSave={(blob, shapes) => {
+              if (annotatingId) saveAnnotation(annotatingId, blob, shapes);
+            }}
+            open={annotating !== undefined}
+            src={
+              annotating
+                ? (annotating.source?.url ?? annotating.previewUrl)
+                : null
+            }
+          />
         </DialogPopup>
       </Dialog>
 
