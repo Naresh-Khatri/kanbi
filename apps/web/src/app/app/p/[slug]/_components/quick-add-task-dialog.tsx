@@ -52,6 +52,7 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toastManager } from "@/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
@@ -128,7 +129,7 @@ export function QuickAddTaskDialog({
   const [sourceText, setSourceText] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
 
   const members = api.project.members.useQuery(
     { projectId },
@@ -447,8 +448,8 @@ export function QuickAddTaskDialog({
             <DialogPanel className="flex flex-col gap-4">
               <Field>
                 <FieldLabel className="sr-only">Title</FieldLabel>
-                <Input
-                  className="[&_input]:h-auto [&_input]:px-0 [&_input]:font-semibold [&_input]:text-lg [&_input]:leading-snug"
+                <Textarea
+                  className="[&_textarea]:min-h-0 [&_textarea]:resize-none [&_textarea]:px-0 [&_textarea]:py-0 [&_textarea]:font-semibold [&_textarea]:text-lg [&_textarea]:leading-snug"
                   onChange={(e) => setTitle(e.target.value)}
                   onKeyDown={(e) => {
                     // plain enter must not submit; mod+enter is handled on the form
@@ -458,6 +459,7 @@ export function QuickAddTaskDialog({
                   }}
                   placeholder="Task title"
                   ref={titleInputRef}
+                  rows={1}
                   unstyled
                   value={title}
                 />
