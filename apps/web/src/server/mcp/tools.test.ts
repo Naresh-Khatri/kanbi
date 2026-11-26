@@ -82,6 +82,9 @@ describe("registerTools", () => {
       "confirm_attachment",
       "edit_comment",
       "delete_comment",
+      "create_doc",
+      "update_doc",
+      "move_doc",
     ]);
   });
 
@@ -117,6 +120,9 @@ describe("registerTools", () => {
       "list_docs",
       "get_doc",
       "search_docs",
+      "create_doc",
+      "update_doc",
+      "move_doc",
     ]);
     expect(prompts).toEqual(["work"]);
   });
@@ -145,6 +151,9 @@ describe("registerTools", () => {
       "confirm_attachment",
       "edit_comment",
       "delete_comment",
+      "create_doc",
+      "update_doc",
+      "move_doc",
     ];
     const hints = (name: string) =>
       tools.find((tool) => tool.name === name)?.config.annotations;
@@ -154,6 +163,9 @@ describe("registerTools", () => {
     expect(hints("update_column")?.idempotentHint).toBe(true);
     expect(hints("create_project")?.idempotentHint).toBe(false);
     expect(hints("add_column")?.idempotentHint).toBe(false);
+    expect(hints("create_doc")?.idempotentHint).toBe(false);
+    expect(hints("update_doc")?.idempotentHint).toBe(false);
+    expect(hints("move_doc")?.idempotentHint).toBe(true);
     for (const tool of tools) {
       expect(tool.config.annotations?.readOnlyHint).toBe(
         !writes.includes(tool.name),

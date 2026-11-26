@@ -571,5 +571,8 @@ export function registerTools(server: McpServer, auth: McpAuthorization) {
   if (auth.scopes.includes(SCOPE_WRITE)) {
     registerCollaborationTools(server, auth);
   }
-  if (auth.scopes.includes(SCOPE_READ)) registerDocTools(server, auth);
+  registerDocTools(server, auth, {
+    read: auth.scopes.includes(SCOPE_READ),
+    write: auth.scopes.includes(SCOPE_WRITE),
+  });
 }

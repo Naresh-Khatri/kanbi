@@ -200,12 +200,19 @@ report_blocker(KAN-42, reason)
 - **Seen in the app:** changes made by agents (activity `payload.agent`) and
   others show up on the board as highlighted cards and an Updates filter until
   the user opens the task or marks the board as seen.
-- **Docs:** read-only. `get_task` inlines up to 3 docs linked to the task
-  (4,000 chars each); `list_docs`, `get_doc`, and `search_docs` (keyword,
-  ranked) cover the rest. Images pasted into a doc come back as 1-hour
-  presigned urls, since the agent has no session cookie for `/api/files`. Docs
-  are presented as possibly outdated reference data. There is no doc writing
-  and no `ask_docs` (that would be a second model call).
+- **Docs:** `get_task` inlines up to 3 docs linked to the task (4,000 chars
+  each); `list_docs`, `get_doc`, and `search_docs` (keyword, ranked) cover the
+  rest. Images pasted into a doc come back as 1-hour presigned urls, since the
+  agent has no session cookie for `/api/files`. Docs are presented as possibly
+  outdated reference data. With `kanbi:write`, `create_doc`, `update_doc`, and
+  `move_doc` edit pages through the same `document` procedures as the editor
+  (editor role, revisions, `expectedVersion` compare-and-swap). Agent markdown
+  is converted to editor HTML: presigned image urls from `get_doc` are mapped
+  back to `/api/files/<id>`, and `KEY-123` text becomes ticket mentions so task
+  backlinks work. `update_doc` appends by default; `replace` rewrites the page
+  and drops formatting markdown can't carry (underline). No doc deletes, no new
+  image uploads into docs, and no `ask_docs` (that would be a second model
+  call).
 
 ## What an agent can do
 
@@ -242,6 +249,9 @@ the mutations. The `work` prompt needs both scopes.
 | `list_docs`           | read  | A project's doc pages as a tree.                                                  |
 | `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.            |
 | `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                            |
+| `create_doc`          | write | Create a page from markdown, top level or under `parentId`; retry-safe.           |
+| `update_doc`          | write | Rename, append, or replace a page; needs `expectedVersion` from `get_doc`.        |
+| `move_doc`            | write | Move a page in the tree (`parentId`, optional sibling anchors).                   |
 
 Use `get_project_context` to obtain canonical column, label, and member IDs.
 `search_tasks` matches titles (and exact identifiers) only, and a duplicate
@@ -261,17 +271,17 @@ back to it, and if that task is yours, it gets a comment listing the follow-ups.
 
 Editing task titles or descriptions, writing to other people's tasks, archiving
 or deleting anything (tasks, columns, projects), creating labels, project
-settings and membership, writing docs, and backend AI drafting are unavailable
+settings and membership, deleting docs, and backend AI drafting are unavailable
 over MCP.
 
 ## Scopes
 
-| Scope            | Granted access                                                                                                                                                                                                                                                                   |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                                                                               |
-| `kanbi:write`    | `create_tasks`, `create_project`, `add_column`, `update_column`, `start_task`, `finish_task`, `move_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`. |
-| `openid`         | Standard identity claim (requested by default).                                                                                                                                                                                                                                  |
-| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                                                                                            |
+| Scope            | Granted access                                                                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                                                                                                                       |
+| `kanbi:write`    | `create_tasks`, `create_project`, `add_column`, `update_column`, `start_task`, `finish_task`, `move_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`, `create_doc`, `update_doc`, `move_doc`. |
+| `openid`         | Standard identity claim (requested by default).                                                                                                                                                                                                                                                                          |
+| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                                                                                                                                    |
 
 ## Managing access
 
@@ -322,7 +332,7 @@ the configured origin.
 - `collaborate.ts` - comments, blockers, checklist, labels, attachments on the
   user's assigned tasks; `task-ref.ts` holds the shared task resolution, column
   moves, and agent comment posting.
-- `docs.ts` - read-only doc tools.
+- `docs.ts` - doc tools: reads, plus create/update/move with markdown -> editor HTML.
 - `result.ts` - shared tool results; `McpUserError` messages reach the agent
   verbatim, everything else is logged and genericized.
 - `caller.ts` - synthesizes a session from the OAuth subject so existing tRPC

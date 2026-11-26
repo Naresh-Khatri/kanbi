@@ -141,6 +141,21 @@ const TOOLS = [
     scope: "read",
     purpose: "Keyword search across docs.",
   },
+  {
+    name: "create_doc",
+    scope: "write",
+    purpose: "Create a doc page from markdown, top level or nested.",
+  },
+  {
+    name: "update_doc",
+    scope: "write",
+    purpose: "Rename a page, append to it, or rewrite it.",
+  },
+  {
+    name: "move_doc",
+    scope: "write",
+    purpose: "Move a page in the docs tree.",
+  },
 ] as const;
 
 const LINK =

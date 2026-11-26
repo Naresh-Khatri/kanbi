@@ -6,8 +6,9 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
-import { extractFileIds } from "@/lib/file-url";
+import { extractFileIds, fileUrl } from "@/lib/file-url";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
+import { markdownToHtml } from "@/lib/markdown-to-html";
 import { presignDownload } from "@/lib/r2";
 import { db } from "@/server/db";
 import {
@@ -24,8 +25,9 @@ import {
 
 import type { McpAuthorization } from "./authorization";
 import { createMcpCaller } from "./caller";
+import { runOnce } from "./request-key";
 import { McpUserError, ok, toFailure } from "./result";
-import { type Caller, docUrl, readOnly } from "./task-ref";
+import { type Caller, docUrl, readOnly, writeHints } from "./task-ref";
 
 const DEFAULT_DOC_CHARS = 20_000;
 const MAX_DOC_CHARS = 60_000;
@@ -104,6 +106,124 @@ export function flattenTree<
   return out;
 }
 
+/** attachments/... key inside a presigned or public R2 url, else null. */
+export function attachmentKeyFromUrl(url: string): string | null {
+  let path: string;
+  try {
+    path = decodeURIComponent(new URL(url).pathname);
+  } catch {
+    return null;
+  }
+  const at = path.indexOf("/attachments/");
+  return at === -1 ? null : path.slice(at + 1);
+}
+
+const MD_IMAGE = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+const MD_VIDEO = /(?<!!)\[video\]\((https?:\/\/[^)\s]+)\)/g;
+
+/**
+ * Swap the presigned urls get_doc hands out back to /api/files/<id>, so a
+ * read -> edit -> replace round trip keeps the page's images and videos.
+ */
+export function restoreFileRefs(
+  markdown: string,
+  files: ReadonlyMap<string, { id: string; filename: string }>,
+): string {
+  return markdown
+    .replace(MD_IMAGE, (match, alt: string, url: string) => {
+      const file = files.get(attachmentKeyFromUrl(url) ?? "");
+      return file ? `![${alt}](${fileUrl(file.id)})` : match;
+    })
+    .replace(MD_VIDEO, (match, url: string) => {
+      const file = files.get(attachmentKeyFromUrl(url) ?? "");
+      // filename as alt -> markdownToHtml sees .mp4/.webm and emits <video>
+      return file ? `![${file.filename}](${fileUrl(file.id)})` : match;
+    });
+}
+
+/**
+ * Turn bare KEY-123 text into ticket mention spans so the task gets a
+ * backlink, skipping code and existing links.
+ */
+export function linkTickets(
+  html: string,
+  key: string,
+  ids: ReadonlyMap<number, string>,
+): string {
+  if (ids.size === 0) return html;
+  const ref = new RegExp(`\\b${key}-(\\d+)\\b`, "g");
+  let skip = 0;
+  return html
+    .split(/(<[^>]+>)/)
+    .map((part) => {
+      const tag = /^<(\/?)(a|code|pre)\b/i.exec(part);
+      if (tag) {
+        skip = Math.max(0, skip + (tag[1] ? -1 : 1));
+        return part;
+      }
+      if (part.startsWith("<") || skip > 0) return part;
+      return part.replace(ref, (match, n: string) => {
+        const id = ids.get(Number(n));
+        return id
+          ? `<span data-type="ticket" data-id="${id}" data-label="${match}">${match}</span>`
+          : match;
+      });
+    })
+    .join("");
+}
+
+/** Agent markdown -> doc body html (router still sanitizes). */
+async function docBodyFromMarkdown(
+  markdown: string,
+  project: { id: string; key: string },
+  projectIds: readonly string[],
+): Promise<string> {
+  const keys = [...markdown.matchAll(MD_IMAGE)]
+    .map((m) => m[2]!)
+    .concat([...markdown.matchAll(MD_VIDEO)].map((m) => m[1]!))
+    .map(attachmentKeyFromUrl)
+    .filter((k): k is string => !!k);
+  const files = new Map<string, { id: string; filename: string }>();
+  if (keys.length > 0 && projectIds.length > 0) {
+    const rows = await db
+      .select({
+        id: taskAttachment.id,
+        key: taskAttachment.key,
+        filename: taskAttachment.filename,
+      })
+      .from(taskAttachment)
+      .innerJoin(task, eq(task.id, taskAttachment.taskId))
+      .innerJoin(board, eq(board.id, task.boardId))
+      .where(
+        and(
+          inArray(taskAttachment.key, [...new Set(keys)]),
+          inArray(board.projectId, [...projectIds]),
+        ),
+      );
+    for (const r of rows) files.set(r.key, r);
+  }
+  const html = markdownToHtml(restoreFileRefs(markdown, files));
+
+  const numbers = [
+    ...new Set(
+      [...html.matchAll(new RegExp(`\\b${project.key}-(\\d+)\\b`, "g"))].map(
+        (m) => Number(m[1]),
+      ),
+    ),
+  ].filter((n) => Number.isSafeInteger(n));
+  if (numbers.length === 0) return html;
+  const tickets = await db
+    .select({ id: task.id, number: task.number })
+    .from(task)
+    .innerJoin(board, eq(board.id, task.boardId))
+    .where(and(eq(board.projectId, project.id), inArray(task.number, numbers)));
+  return linkTickets(
+    html,
+    project.key,
+    new Map(tickets.map((t) => [t.number, t.id])),
+  );
+}
+
 async function accessibleProjects(caller: Caller, projectId?: string) {
   const projects = (await caller.project.list()).filter(
     (p) => p.status !== "archived",
@@ -116,8 +236,42 @@ async function accessibleProjects(caller: Caller, projectId?: string) {
   return match;
 }
 
-/** Read-only access to the project's docs as a knowledge base. */
-export function registerDocTools(server: McpServer, auth: McpAuthorization) {
+/** Project + accessible project ids for a doc the user can see. */
+async function locateDoc(caller: Caller, documentId: string) {
+  const projects = await accessibleProjects(caller);
+  const [loc] = await db
+    .select({ projectId: projectDocument.projectId })
+    .from(projectDocument)
+    .where(
+      and(
+        eq(projectDocument.id, documentId),
+        inArray(
+          projectDocument.projectId,
+          projects.map((p) => p.id),
+        ),
+      ),
+    )
+    .limit(1);
+  if (!loc) throw new McpUserError("Doc not found or not accessible.");
+  return {
+    project: projects.find((p) => p.id === loc.projectId)!,
+    projectIds: projects.map((p) => p.id),
+  };
+}
+
+const markdownInput = z
+  .string()
+  .max(200_000)
+  .describe(
+    "Markdown (GFM). Raw HTML shows as text. Ticket ids like KAN-42 become linked tickets. Images: keep the urls get_doc returned; new uploads are not supported.",
+  );
+
+/** Docs as a project knowledge base: read with kanbi:read, edit with kanbi:write. */
+export function registerDocTools(
+  server: McpServer,
+  auth: McpAuthorization,
+  scopes: { read: boolean; write: boolean },
+) {
   async function run(
     fn: (caller: Caller) => Promise<CallToolResult>,
   ): Promise<CallToolResult> {
@@ -131,6 +285,15 @@ export function registerDocTools(server: McpServer, auth: McpAuthorization) {
     }
   }
 
+  if (scopes.read) registerDocReadTools(server, run);
+  if (scopes.write) registerDocWriteTools(server, auth, run);
+}
+
+type Run = (
+  fn: (caller: Caller) => Promise<CallToolResult>,
+) => Promise<CallToolResult>;
+
+function registerDocReadTools(server: McpServer, run: Run) {
   server.registerTool(
     "list_docs",
     {
@@ -198,6 +361,11 @@ export function registerDocTools(server: McpServer, auth: McpAuthorization) {
         id: z.string(),
         title: z.string(),
         projectId: z.string(),
+        parentId: z.string().nullable(),
+        version: z
+          .number()
+          .int()
+          .describe("Pass as expectedVersion to update_doc."),
         url: z.string().url(),
         updatedAt: z.string().nullable(),
         updatedBy: z.string(),
@@ -211,38 +379,21 @@ export function registerDocTools(server: McpServer, auth: McpAuthorization) {
     },
     async ({ documentId, maxChars = DEFAULT_DOC_CHARS, offset = 0 }) =>
       run(async (caller) => {
-        const projects = await accessibleProjects(caller);
-        const [loc] = await db
-          .select({ projectId: projectDocument.projectId })
-          .from(projectDocument)
-          .where(
-            and(
-              eq(projectDocument.id, documentId),
-              inArray(
-                projectDocument.projectId,
-                projects.map((p) => p.id),
-              ),
-            ),
-          )
-          .limit(1);
-        if (!loc) throw new McpUserError("Doc not found or not accessible.");
-
+        const { project, projectIds } = await locateDoc(caller, documentId);
         const doc = await caller.document.get({
-          projectId: loc.projectId,
+          projectId: project.id,
           documentId,
         });
-        const markdown = await docMarkdown(
-          doc.body,
-          projects.map((p) => p.id),
-        );
+        const markdown = await docMarkdown(doc.body, projectIds);
         const end = offset + maxChars;
         const truncated = markdown.length > end;
-        const slug = projects.find((p) => p.id === loc.projectId)!.slug;
         return ok({
           id: doc.id,
           title: doc.title,
           projectId: doc.projectId,
-          url: docUrl(slug, doc.id),
+          parentId: doc.parentId,
+          version: doc.version,
+          url: docUrl(project.slug, doc.id),
           updatedAt: doc.updatedAt?.toISOString() ?? null,
           updatedBy: doc.updatedByName,
           markdown: `${markdown.slice(offset, end)}${truncated ? "…" : ""}`,
@@ -347,6 +498,205 @@ export function registerDocTools(server: McpServer, auth: McpAuthorization) {
             };
           });
         return ok({ docs });
+      }),
+  );
+}
+
+const docWriteOutput = {
+  id: z.string(),
+  title: z.string(),
+  projectId: z.string(),
+  version: z.number().int(),
+  url: z.string().url(),
+};
+
+function registerDocWriteTools(
+  server: McpServer,
+  auth: McpAuthorization,
+  run: Run,
+) {
+  server.registerTool(
+    "create_doc",
+    {
+      title: "Create a doc page",
+      description:
+        "Create a doc page in a project, optionally nested under parentId (from list_docs). Goes at the end of its siblings. Create docs only when the user asks; docs are the team's shared knowledge base, not scratch notes. Needs editor access to the project.",
+      inputSchema: {
+        projectId: z
+          .string()
+          .min(1)
+          .describe("From get_work_queue or list_projects."),
+        title: z.string().trim().min(1).max(160),
+        parentId: z.string().min(1).optional(),
+        markdown: markdownInput.optional(),
+        requestKey: z
+          .string()
+          .trim()
+          .min(8)
+          .max(100)
+          .optional()
+          .describe(
+            "Unique string (e.g. a UUID). A retry with the same key and input returns the original page instead of a duplicate.",
+          ),
+      },
+      outputSchema: docWriteOutput,
+      annotations: { ...writeHints, idempotentHint: false },
+    },
+    async ({ projectId, title, parentId, markdown, requestKey }) =>
+      run(async (caller) =>
+        ok(
+          await runOnce(
+            auth,
+            requestKey,
+            { tool: "create_doc", projectId, title, parentId, markdown },
+            async () => {
+              const projects = await accessibleProjects(caller);
+              const project = projects.find((p) => p.id === projectId);
+              if (!project) {
+                throw new McpUserError("Project not found or not accessible.");
+              }
+              // convert first: a bad body shouldn't leave an empty page behind
+              const body = markdown?.trim()
+                ? await docBodyFromMarkdown(
+                    markdown,
+                    project,
+                    projects.map((p) => p.id),
+                  )
+                : null;
+              const created = await caller.document.create({
+                projectId,
+                parentId: parentId ?? null,
+                title,
+              });
+              const saved = body
+                ? await caller.document.update({
+                    projectId,
+                    documentId: created.id,
+                    expectedVersion: created.version,
+                    title,
+                    body,
+                  })
+                : created;
+              return {
+                id: saved.id,
+                title,
+                projectId,
+                version: saved.version,
+                url: docUrl(project.slug, saved.id),
+              };
+            },
+          ),
+        ),
+      ),
+  );
+
+  server.registerTool(
+    "update_doc",
+    {
+      title: "Edit a doc page",
+      description:
+        'Rename a doc page and/or change its text, as the user. Edit only when the user asks. Pass expectedVersion from get_doc; if someone saved meanwhile the call fails and you must get_doc again. mode "append" (default) adds your markdown to the end and leaves the rest untouched. mode "replace" rewrites the whole page from your markdown: read every chunk with get_doc first, and know that formatting markdown cannot express (underline, highlights) is lost. Every save is a revision people can restore in the page history.',
+      inputSchema: {
+        documentId: z.string().min(1),
+        expectedVersion: z.number().int().positive(),
+        title: z.string().trim().min(1).max(160).optional(),
+        markdown: markdownInput.optional(),
+        mode: z.enum(["append", "replace"]).optional(),
+      },
+      outputSchema: docWriteOutput,
+      annotations: { ...writeHints, idempotentHint: false },
+    },
+    async ({ documentId, expectedVersion, title, markdown, mode = "append" }) =>
+      run(async (caller) => {
+        if (title === undefined && markdown === undefined) {
+          throw new McpUserError("Pass title, markdown, or both.");
+        }
+        const { project, projectIds } = await locateDoc(caller, documentId);
+        const doc = await caller.document.get({
+          projectId: project.id,
+          documentId,
+        });
+        if (doc.version !== expectedVersion) {
+          throw new McpUserError(
+            `The page changed since you read it (now version ${doc.version}). Call get_doc again and redo your edit on the current text.`,
+          );
+        }
+        let body = doc.body;
+        if (markdown !== undefined) {
+          const html = await docBodyFromMarkdown(markdown, project, projectIds);
+          body =
+            mode === "replace"
+              ? html
+              : doc.body.replace(/(<p><\/p>)+$/, "") + html;
+        }
+        try {
+          const saved = await caller.document.update({
+            projectId: project.id,
+            documentId,
+            expectedVersion,
+            title: title ?? doc.title,
+            body,
+          });
+          return ok({
+            id: saved.id,
+            title: title ?? doc.title,
+            projectId: project.id,
+            version: saved.version,
+            url: docUrl(project.slug, saved.id),
+          });
+        } catch (err) {
+          if (err instanceof TRPCError && err.code === "CONFLICT") {
+            throw new McpUserError(
+              "The page changed since you read it. Call get_doc again and redo your edit on the current text.",
+            );
+          }
+          throw err;
+        }
+      }),
+  );
+
+  server.registerTool(
+    "move_doc",
+    {
+      title: "Move a doc page",
+      description:
+        "Move a doc page in the tree, as the user. parentId null = top level. Without beforeId/afterId it goes last among its new siblings; beforeId/afterId must be siblings under that parent (ids from list_docs). A page cannot move inside itself. Move only when the user asks.",
+      inputSchema: {
+        documentId: z.string().min(1),
+        parentId: z.string().min(1).nullable(),
+        beforeId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Sibling the page should come right after."),
+        afterId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Sibling the page should come right before."),
+      },
+      outputSchema: {
+        id: z.string(),
+        parentId: z.string().nullable(),
+        url: z.string().url(),
+      },
+      annotations: writeHints,
+    },
+    async ({ documentId, parentId, beforeId, afterId }) =>
+      run(async (caller) => {
+        const { project } = await locateDoc(caller, documentId);
+        await caller.document.move({
+          projectId: project.id,
+          documentId,
+          parentId,
+          beforeId,
+          afterId,
+        });
+        return ok({
+          id: documentId,
+          parentId,
+          url: docUrl(project.slug, documentId),
+        });
       }),
   );
 }
