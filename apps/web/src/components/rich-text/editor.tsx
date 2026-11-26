@@ -216,10 +216,15 @@ export function RichTextEditor({
         style: `min-height: ${minHeight};`,
       },
       // read-only: click opens; editable: click selects, double-click opens
-      handleClickOn: (view, pos, node) =>
-        !view.editable && node.type.name === "image" && gallery.open(view, pos),
-      handleDoubleClickOn: (view, pos, node) =>
-        view.editable && node.type.name === "image" && gallery.open(view, pos),
+      // nodePos, not click pos: right-half clicks resolve to after the image
+      handleClickOn: (view, _pos, node, nodePos) =>
+        !view.editable &&
+        node.type.name === "image" &&
+        gallery.open(view, nodePos),
+      handleDoubleClickOn: (view, _pos, node, nodePos) =>
+        view.editable &&
+        node.type.name === "image" &&
+        gallery.open(view, nodePos),
       // text-only clipboard (editors, terminals, READMEs) = markdown, like GitHub; shift-paste stays plain
       clipboardTextParser: (text, $context, plain, view) => {
         const { schema } = view.state;
@@ -649,8 +654,8 @@ export function RichTextContent({
     immediatelyRender: false,
     editorProps: {
       attributes: { class: cn(RICH_TEXT_PROSE, className) },
-      handleClickOn: (view, pos, node) =>
-        node.type.name === "image" && gallery.open(view, pos),
+      handleClickOn: (view, _pos, node, nodePos) =>
+        node.type.name === "image" && gallery.open(view, nodePos),
     },
   });
 
