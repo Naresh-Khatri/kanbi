@@ -15,6 +15,16 @@ export type Release = {
 
 export const releases: Release[] = [
   {
+    version: "0.4.0",
+    date: "2026-11-27",
+    entries: [
+      "Group tasks into milestones for a release, launch or client review. Filter the board to one, move tasks with m, ⌘K or the bulk bar, and close it to carry unfinished work into the next. Closed milestones stay in project settings as history",
+      "Coding agents can now move tasks between columns, update and archive tasks, start projects, adjust columns, write project docs and manage milestones",
+      "Paste screenshots straight into the new task dialog and mark them up before saving",
+      "If your session expires while the app is open, you can sign back in without losing what you were writing",
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-11-16",
     entries: [
