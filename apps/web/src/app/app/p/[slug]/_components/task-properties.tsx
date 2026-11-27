@@ -194,7 +194,7 @@ export function AssigneePicker({
   onChange: (id: string | null) => void;
   size?: PropertySize;
   disabled?: boolean;
-  // shows "Assign to me" when set and not already the assignee
+  // "Assign to me" option, and trigger reads "You" when self is assignee
   selfId?: string | null;
 }) {
   const current = members.find((m) => m.userId === value);
@@ -240,7 +240,13 @@ export function AssigneePicker({
           <UserIcon aria-hidden="true" />
         )}
         <PropertyText placeholder={!current}>
-          {current ? current.name : size === "row" ? "Unassigned" : "Assignee"}
+          {current
+            ? current.userId === selfId
+              ? "You"
+              : current.name
+            : size === "row"
+              ? "Unassigned"
+              : "Assignee"}
         </PropertyText>
       </ComboboxTrigger>
       {/* coss popup defaults anchor to chipsRef (null w/o chips) -> pin to trigger */}
@@ -404,7 +410,7 @@ export function LabelsChip({
             <span className="flex items-center -space-x-0.5">
               {active.slice(0, 3).map((l) => (
                 <LabelSwatch
-                  className="ring-2 ring-popover"
+                  className="ring-popover ring-2"
                   color={l.color}
                   key={l.id}
                 />

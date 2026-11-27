@@ -463,7 +463,9 @@ export function TaskDetail({
                   name={reporter.name}
                   size={20}
                 />
-                <span className="truncate">{reporter.name}</span>
+                <span className="truncate">
+                  {reporter.userId === me.data?.id ? "You" : reporter.name}
+                </span>
               </span>
             </PropertyRow>
           ) : null}
