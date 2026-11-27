@@ -323,6 +323,9 @@ export function TaskDetail({
     [members.data],
   );
 
+  // read-only; hidden if reporter left the project
+  const reporter = members.data?.find((m) => m.userId === task.reporterId);
+
   const activeLabelIds = new Set(taskLabels.map((tl) => tl.labelId));
   const activeLabelNames = labels
     .filter((l) => activeLabelIds.has(l.id))
@@ -452,6 +455,18 @@ export function TaskDetail({
               </Button>
             ) : null}
           </PropertyRow>
+          {reporter ? (
+            <PropertyRow label="Reporter">
+              <span className="flex h-8 min-w-0 items-center gap-1.5 px-[calc(--spacing(2.5)-1px)] text-base font-medium sm:h-7 sm:text-sm">
+                <UserAvatar
+                  image={reporter.image}
+                  name={reporter.name}
+                  size={20}
+                />
+                <span className="truncate">{reporter.name}</span>
+              </span>
+            </PropertyRow>
+          ) : null}
           <PropertyRow label="Labels">
             <LabelsPicker
               activeLabelIds={activeLabelIds}
