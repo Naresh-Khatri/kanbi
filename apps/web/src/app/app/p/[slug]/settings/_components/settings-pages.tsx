@@ -9,6 +9,7 @@ import { DangerZoneSection } from "./danger-zone-section";
 import { GeneralSection } from "./general-section";
 import { InviteLinksSection } from "./invite-links-section";
 import { MembersSection } from "./members-section";
+import { MilestonesSection } from "./milestones-section";
 import { NotificationsSection } from "./notifications-section";
 import { SharingSection } from "./sharing-section";
 
@@ -52,6 +53,19 @@ export function AccessSettings({ slug }: { slug: string }) {
       {isOwner ? <InviteLinksSection projectId={project.id} /> : null}
       <SharingSection boardId={project.boardId} isOwner={isOwner} />
     </>
+  );
+}
+
+export function MilestoneSettings({ slug }: { slug: string }) {
+  const project = useProject(slug);
+  if (!project) return null;
+
+  return (
+    <MilestonesSection
+      boardId={project.boardId}
+      canWrite={project.role === "owner" || project.role === "editor"}
+      slug={slug}
+    />
   );
 }
 

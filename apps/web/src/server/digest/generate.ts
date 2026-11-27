@@ -137,6 +137,23 @@ export async function generateBoardDigest(
       case "comment.created":
         stats.comments += 1;
         break;
+      case "task.milestone":
+        detail =
+          typeof payload.milestoneName === "string"
+            ? `added to milestone ${payload.milestoneName}`
+            : "removed from its milestone";
+        break;
+      case "milestone.closed": {
+        const name = typeof payload.name === "string" ? payload.name : "";
+        const finished = Number(payload.finished ?? 0);
+        const carried = Number(payload.carried ?? 0);
+        detail = `closed milestone ${name}: ${finished} finished${
+          carried > 0
+            ? `, ${carried} carried to ${typeof payload.carriedTo === "string" ? payload.carriedTo : "no milestone"}`
+            : ""
+        }`;
+        break;
+      }
     }
 
     events.push({

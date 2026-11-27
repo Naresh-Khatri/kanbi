@@ -250,6 +250,12 @@ export const columnCategory = pgEnum("kanbi_column_category", [
   "canceled",
 ]);
 
+export const milestoneStatus = pgEnum("kanbi_milestone_status", [
+  "upcoming",
+  "active",
+  "closed",
+]);
+
 export const projectStatus = pgEnum("kanbi_project_status", [
   "active",
   "on_hold",
@@ -424,9 +430,30 @@ export const boardViewPreference = createTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
     defaultColumnId: text("default_column_id"),
+    // null = all tasks, "none" = tasks without a milestone, else a milestone id
+    milestoneFilter: text("milestone_filter"),
     updatedAt: updatedAt(),
   },
   (t) => [primaryKey({ columns: [t.boardId, t.userId] })],
+);
+
+export const milestone = createTable(
+  "milestone",
+  {
+    id: id(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    targetAt: timestamp("target_at", { withTimezone: true }),
+    status: milestoneStatus("status").notNull().default("upcoming"),
+    position: real("position").notNull(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("milestone_board_position_idx").on(t.boardId, t.position)],
 );
 
 export const task = createTable(
@@ -453,6 +480,9 @@ export const task = createTable(
       onDelete: "set null",
     }),
     dueAt: timestamp("due_at", { withTimezone: true }),
+    milestoneId: text("milestone_id").references(() => milestone.id, {
+      onDelete: "set null",
+    }),
     // 25-min focus blocks; null = unestimated. AI drafter proposes 1-8, manual entry allows up to 16.
     estimatePomodoros: integer("estimate_pomodoros"),
     // raw request before AI drafting/enhance; MCP-only, kept out of board + share reads
@@ -465,6 +495,7 @@ export const task = createTable(
     index("task_column_position_idx").on(t.columnId, t.position),
     index("task_board_idx").on(t.boardId),
     index("task_assignee_idx").on(t.assigneeId),
+    index("task_milestone_idx").on(t.milestoneId),
     uniqueIndex("task_board_number_uq").on(t.boardId, t.number),
   ],
 );
@@ -935,6 +966,7 @@ export const boardRelations = relations(board, ({ one, many }) => ({
   columns: many(boardColumn),
   tasks: many(task),
   labels: many(label),
+  milestones: many(milestone),
   shares: many(boardShare),
 }));
 
@@ -958,6 +990,10 @@ export const taskRelations = relations(task, ({ one, many }) => ({
     fields: [task.assigneeId],
     references: [user.id],
     relationName: "task_assignee",
+  }),
+  milestone: one(milestone, {
+    fields: [task.milestoneId],
+    references: [milestone.id],
   }),
   labels: many(taskLabel),
   checklist: many(checklistItem),
@@ -1021,6 +1057,11 @@ export const documentTaskLinkRelations = relations(
     }),
   }),
 );
+
+export const milestoneRelations = relations(milestone, ({ one, many }) => ({
+  board: one(board, { fields: [milestone.boardId], references: [board.id] }),
+  tasks: many(task),
+}));
 
 export const labelRelations = relations(label, ({ one, many }) => ({
   board: one(board, { fields: [label.boardId], references: [board.id] }),

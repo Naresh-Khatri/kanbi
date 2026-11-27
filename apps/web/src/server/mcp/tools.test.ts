@@ -56,6 +56,8 @@ describe("registerTools", () => {
       "get_task",
       "get_task_comments",
       "get_task_images",
+      "list_milestones",
+      "get_milestone",
       "list_docs",
       "get_doc",
       "search_docs",
@@ -84,6 +86,10 @@ describe("registerTools", () => {
       "delete_comment",
       "update_task",
       "delete_task",
+      "create_milestone",
+      "update_milestone",
+      "close_milestone",
+      "set_task_milestone",
       "create_doc",
       "update_doc",
       "move_doc",
@@ -121,6 +127,12 @@ describe("registerTools", () => {
       "delete_comment",
       "update_task",
       "delete_task",
+      "list_milestones",
+      "get_milestone",
+      "create_milestone",
+      "update_milestone",
+      "close_milestone",
+      "set_task_milestone",
       "list_docs",
       "get_doc",
       "search_docs",
@@ -157,6 +169,10 @@ describe("registerTools", () => {
       "delete_comment",
       "update_task",
       "delete_task",
+      "create_milestone",
+      "update_milestone",
+      "close_milestone",
+      "set_task_milestone",
       "create_doc",
       "update_doc",
       "move_doc",
@@ -173,12 +189,17 @@ describe("registerTools", () => {
     expect(hints("update_doc")?.idempotentHint).toBe(false);
     expect(hints("move_doc")?.idempotentHint).toBe(true);
     expect(hints("update_task")?.idempotentHint).toBe(false);
+    expect(hints("create_milestone")?.idempotentHint).toBe(false);
+    expect(hints("close_milestone")?.idempotentHint).toBe(false);
+    expect(hints("set_task_milestone")?.idempotentHint).toBe(true);
     for (const tool of tools) {
       expect(tool.config.annotations?.readOnlyHint).toBe(
         !writes.includes(tool.name),
       );
       expect(tool.config.annotations?.destructiveHint).toBe(
-        tool.name === "delete_comment" || tool.name === "delete_task",
+        ["delete_comment", "delete_task", "close_milestone"].includes(
+          tool.name,
+        ),
       );
     }
     expect(tools.every((tool) => tool.config.outputSchema)).toBe(true);

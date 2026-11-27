@@ -22,6 +22,7 @@ import {
   boardColumn,
   columnCategory,
   label,
+  milestone,
   project,
   projectMember,
   task,
@@ -174,6 +175,15 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
           .max(100)
           .optional()
           .describe("Label name, case-insensitive."),
+        milestone: z
+          .string()
+          .trim()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            'Milestone name (case-insensitive) or id; "none" for tasks in no milestone.',
+          ),
         limit: z.number().int().min(1).max(100).optional(),
         offset: z
           .number()
@@ -204,6 +214,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
             createdBy: z.string(),
             assignee: z.string().nullable(),
             labels: z.array(z.string()),
+            milestone: z.string().nullable(),
             createdAt: z.string(),
             updatedAt: z.string(),
             dueAt: z.string().nullable(),
@@ -258,6 +269,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
 
         const reporter = alias(userTable, "reporter");
         const assigneeUser = alias(userTable, "assignee_user");
+        const noMilestone = input.milestone?.toLowerCase() === "none";
         const term = input.text ? `%${escapeLike(input.text)}%` : null;
 
         const rows =
@@ -280,6 +292,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
                   projectName: project.name,
                   createdBy: reporter.name,
                   assignee: assigneeUser.name,
+                  milestone: milestone.name,
                 })
                 .from(task)
                 .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
@@ -287,6 +300,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
                 .innerJoin(project, eq(project.id, board.projectId))
                 .innerJoin(reporter, eq(reporter.id, task.reporterId))
                 .leftJoin(assigneeUser, eq(assigneeUser.id, task.assigneeId))
+                .leftJoin(milestone, eq(milestone.id, task.milestoneId))
                 .where(
                   and(
                     inArray(project.id, projectIds),
@@ -320,6 +334,13 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
                             .where(
                               sql`lower(${label.name}) = ${input.label.toLowerCase()}`,
                             ),
+                        )
+                      : undefined,
+                    noMilestone ? isNull(task.milestoneId) : undefined,
+                    input.milestone && !noMilestone
+                      ? or(
+                          eq(milestone.id, input.milestone),
+                          sql`lower(${milestone.name}) = ${input.milestone.toLowerCase()}`,
                         )
                       : undefined,
                   ),
@@ -366,6 +387,7 @@ export function registerFindTools(server: McpServer, auth: McpAuthorization) {
             createdBy: r.createdBy,
             assignee: r.assignee,
             labels: labelsByTask.get(r.id) ?? [],
+            milestone: r.milestone,
             createdAt: r.createdAt.toISOString(),
             updatedAt: (r.updatedAt ?? r.createdAt).toISOString(),
             dueAt: r.dueAt ? day(r.dueAt) : null,

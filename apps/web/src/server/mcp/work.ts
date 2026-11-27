@@ -31,6 +31,7 @@ import {
   comment,
   documentTaskLink,
   label,
+  milestone,
   project,
   projectDocument,
   task,
@@ -96,6 +97,7 @@ const queueItemSchema = z.object({
   dueAt: z.string().nullable(),
   column: z.string(),
   imageCount: z.number().int(),
+  milestone: z.string().nullable(),
   url: z.string().url(),
 });
 
@@ -406,6 +408,12 @@ export function registerWorkTools(
             .min(1)
             .optional()
             .describe("Exact project id when the repo match was ambiguous."),
+          activeMilestonesOnly: z
+            .boolean()
+            .optional()
+            .describe(
+              "Only tasks in an active milestone. Use when the user wants to focus on what's shipping now.",
+            ),
         },
         outputSchema: {
           project: projectRefSchema.nullable(),
@@ -431,7 +439,7 @@ export function registerWorkTools(
         },
         annotations: readOnly,
       },
-      async ({ repo, projectId }) =>
+      async ({ repo, projectId, activeMilestonesOnly = false }) =>
         run(async (caller) => {
           const all = await caller.project.list();
           // on hold = user paused it; only an explicit projectId reaches it
@@ -468,6 +476,7 @@ export function registerWorkTools(
                     columnName: boardColumn.name,
                     category: boardColumn.category,
                     projectId: project.id,
+                    milestone: milestone.name,
                     boardHasTodo: sql<boolean>`${exists(
                       db
                         .select({ id: todo.id })
@@ -484,10 +493,14 @@ export function registerWorkTools(
                   .innerJoin(boardColumn, eq(boardColumn.id, task.columnId))
                   .innerJoin(board, eq(board.id, task.boardId))
                   .innerJoin(project, eq(project.id, board.projectId))
+                  .leftJoin(milestone, eq(milestone.id, task.milestoneId))
                   .where(
                     and(
                       eq(task.assigneeId, auth.userId),
                       isNull(task.archivedAt),
+                      activeMilestonesOnly
+                        ? eq(milestone.status, "active")
+                        : undefined,
                       inArray(boardColumn.category, [
                         "backlog",
                         "unstarted",
@@ -532,7 +545,9 @@ export function registerWorkTools(
                 onHold.length > 0
                   ? `"${repo}" matches ${onHold.map((p) => p.name).join(", ")}, which the user put on hold, so its tasks are skipped. Ask the user before working on it; call again with that projectId only if they say so.`
                   : candidates.length === 0
-                    ? "No open tasks are assigned to the user."
+                    ? activeMilestonesOnly
+                      ? "No open tasks assigned to the user are in an active milestone."
+                      : "No open tasks are assigned to the user."
                     : repo && matched.length === 0
                       ? `No project matches "${repo}". Ask the user which candidate project this repository belongs to, then call again with projectId.`
                       : "Several projects have work. Ask the user which one, then call again with projectId.",
@@ -602,6 +617,7 @@ export function registerWorkTools(
             dueAt: r.dueAt ? r.dueAt.toISOString().slice(0, 10) : null,
             column: r.columnName,
             imageCount: imageCounts.get(r.id) ?? 0,
+            milestone: r.milestone,
             url: taskUrl(chosen.slug, r.number),
           });
           const inProgress = mine.filter((r) => r.category === "started");

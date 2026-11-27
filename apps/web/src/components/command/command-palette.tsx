@@ -4,6 +4,7 @@ import {
   ArrowRightIcon,
   BotIcon,
   FileTextIcon,
+  FlagIcon,
   ListTodoIcon,
   PlusIcon,
   SparklesIcon,
@@ -64,6 +65,8 @@ export function CommandPalette() {
     requestCreateTask,
     requestCreateProject,
     requestAiImport,
+    requestMilestoneMove,
+    milestoneMoveAvailable,
   } = useAppShell();
   const [query, setQuery] = useState("");
 
@@ -126,6 +129,17 @@ export function CommandPalette() {
         icon: <PlusIcon />,
         run: go(requestCreateTask),
       },
+      ...(milestoneMoveAvailable
+        ? [
+            {
+              id: "move-milestone",
+              label: "Move to milestone…",
+              keywords: "milestone release version sprint task",
+              icon: <FlagIcon />,
+              run: go(requestMilestoneMove),
+            },
+          ]
+        : []),
       {
         id: "ai-import",
         label: "Draft tasks from a message",
@@ -205,6 +219,8 @@ export function CommandPalette() {
     requestCreateProject,
     requestCreateTask,
     requestAiImport,
+    requestMilestoneMove,
+    milestoneMoveAvailable,
   ]);
 
   const filtered = useMemo(() => {

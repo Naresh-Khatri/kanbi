@@ -14,7 +14,7 @@ import {
   UserRoundXIcon,
   XIcon,
 } from "lucide-react";
-import { forwardRef } from "react";
+import { forwardRef, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -179,6 +179,8 @@ export const BoardToolbar = forwardRef<
     /** mobile only: filter row is collapsed behind the filters button */
     expanded: boolean;
     onExpandedChange: (expanded: boolean) => void;
+    /** milestone scope picker; scopes the board, so it sits before search */
+    milestoneMenu?: ReactNode;
   }
 >(function BoardToolbar(
   {
@@ -195,6 +197,7 @@ export const BoardToolbar = forwardRef<
     onMarkAllSeen,
     expanded,
     onExpandedChange,
+    milestoneMenu,
   },
   searchRef,
 ) {
@@ -213,6 +216,7 @@ export const BoardToolbar = forwardRef<
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 border-b px-4 py-2 sm:px-6">
+      {milestoneMenu}
       <InputGroup className="w-full sm:w-60">
         <InputGroupInput
           aria-label="Search tasks"

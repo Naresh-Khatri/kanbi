@@ -5,6 +5,7 @@ export type BoardEventScope =
   | "column"
   | "board"
   | "label"
+  | "milestone"
   | "comment"
   | "checklist"
   | "attachment"

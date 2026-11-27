@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import {
   CalendarClockIcon,
   ChevronRightIcon,
+  FlagIcon,
   ImageIcon,
   SquareCheckIcon,
 } from "lucide-react";
@@ -22,12 +23,15 @@ export function PublicTaskCard({
   onOpen,
   compact = false,
   index = 0,
+  showMilestone = true,
 }: {
   view: TaskView;
   onOpen: () => void;
   compact?: boolean;
   /** position in its column -> entrance stagger */
   index?: number;
+  /** off when the board is already filtered to one */
+  showMilestone?: boolean;
 }) {
   const { task, labels, assignee, checklist, images, done, overdue } = view;
   const checked = checklist.filter((c) => c.done).length;
@@ -100,6 +104,12 @@ export function PublicTaskCard({
           : null}
         {!compact && labels.length > MAX_LABELS ? (
           <span>+{labels.length - MAX_LABELS}</span>
+        ) : null}
+        {!compact && showMilestone && view.milestone ? (
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <FlagIcon aria-hidden="true" className="size-3 shrink-0" />
+            <span className="max-w-24 truncate">{view.milestone}</span>
+          </span>
         ) : null}
         {task.dueAt ? (
           <span

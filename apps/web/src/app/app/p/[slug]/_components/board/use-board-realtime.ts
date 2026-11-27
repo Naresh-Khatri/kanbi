@@ -40,6 +40,9 @@ export function useBoardRealtime(boardId: string) {
           utils.board.updates.invalidate({ boardId });
           return;
         }
+        if (evt.scope === "milestone") {
+          utils.milestone.list.invalidate({ boardId });
+        }
         utils.board.get.invalidate({ boardId });
       },
     },

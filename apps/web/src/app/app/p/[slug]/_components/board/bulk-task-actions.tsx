@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveIcon, ChevronDownIcon, XIcon } from "lucide-react";
+import { ArchiveIcon, ChevronDownIcon, FlagIcon, XIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -23,6 +23,7 @@ export function BulkTaskActions({
   onClear,
   onMove,
   onPriorityChange,
+  onMilestone,
 }: {
   columns: ColumnRow[];
   count: number;
@@ -30,6 +31,8 @@ export function BulkTaskActions({
   onClear: () => void;
   onMove: (columnId: string) => void;
   onPriorityChange: (priority: Priority) => void;
+  /** undefined = board has no open milestones */
+  onMilestone?: () => void;
 }) {
   return (
     <motion.div
@@ -85,6 +88,15 @@ export function BulkTaskActions({
               ))}
             </MenuPopup>
           </Menu>
+          {onMilestone ? (
+            <ToolbarButton
+              onClick={onMilestone}
+              render={<Button size="sm" variant="ghost" />}
+            >
+              <FlagIcon aria-hidden="true" />
+              Milestone
+            </ToolbarButton>
+          ) : null}
           <ToolbarButton
             onClick={onArchive}
             render={<Button size="sm" variant="ghost" />}

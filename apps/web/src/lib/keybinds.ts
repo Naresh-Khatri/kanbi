@@ -32,6 +32,7 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
       { keys: "Shift + arrows", description: "Extend card selection" },
       { keys: "Enter / e", description: "Open focused card" },
       { keys: "x", description: "Select focused card" },
+      { keys: "m", description: "Move to milestone" },
       { keys: "Esc", description: "Clear card selection" },
     ],
   },

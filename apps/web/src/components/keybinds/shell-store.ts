@@ -17,6 +17,12 @@ type AppShellState = {
   requestCreateProject: () => void;
   requestCreateTask: () => void;
   requestAiImport: () => void;
+  /** bump to open "move to milestone" for the focused/selected tasks */
+  milestoneMoveToken: number;
+  /** set by the board; hides the palette command elsewhere */
+  milestoneMoveAvailable: boolean;
+  requestMilestoneMove: () => void;
+  setMilestoneMoveAvailable: (available: boolean) => void;
   setAiDraftOpen: (open: boolean) => void;
 };
 
@@ -26,6 +32,8 @@ export const useAppShell = create<AppShellState>((set) => ({
   createProjectToken: 0,
   createTaskToken: 0,
   aiDraftOpen: false,
+  milestoneMoveToken: 0,
+  milestoneMoveAvailable: false,
   setPaletteOpen: (open) => set({ paletteOpen: open }),
   setCheatsheetOpen: (open) => set({ cheatsheetOpen: open }),
   requestCreateProject: () =>
@@ -33,5 +41,9 @@ export const useAppShell = create<AppShellState>((set) => ({
   requestCreateTask: () =>
     set((s) => ({ createTaskToken: s.createTaskToken + 1 })),
   requestAiImport: () => set({ aiDraftOpen: true }),
+  requestMilestoneMove: () =>
+    set((s) => ({ milestoneMoveToken: s.milestoneMoveToken + 1 })),
+  setMilestoneMoveAvailable: (available) =>
+    set({ milestoneMoveAvailable: available }),
   setAiDraftOpen: (open) => set({ aiDraftOpen: open }),
 }));

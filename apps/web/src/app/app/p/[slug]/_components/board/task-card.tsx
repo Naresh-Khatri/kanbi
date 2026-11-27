@@ -4,6 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArchiveIcon,
+  FlagIcon,
   GitBranchIcon,
   Link2Icon,
   MoreHorizontalIcon,
@@ -52,6 +53,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   onOpenTask,
   assignee,
   labels,
+  milestone = null,
   showDropIndicatorBefore,
   focused,
   projectKey,
@@ -69,6 +71,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
   onOpenTask: (taskId: string) => void;
   assignee: MemberInfo | null;
   labels: LabelInfo[];
+  milestone?: string | null;
   showDropIndicatorBefore: boolean;
   focused: boolean;
   projectKey: string;
@@ -111,6 +114,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
           completed={completed}
           focused={focused}
           labels={labels}
+          milestone={milestone}
           onOpen={onOpen}
           onToggleSelection={
             onToggleSelection
@@ -175,11 +179,13 @@ function CardBody({
   task,
   assignee,
   labels,
+  milestone = null,
   projectKey,
 }: {
   task: TaskRow;
   assignee: MemberInfo | null;
   labels: LabelInfo[];
+  milestone?: string | null;
   projectKey: string;
 }) {
   const visibleLabels = labels.slice(0, MAX_VISIBLE_LABELS);
@@ -204,6 +210,12 @@ function CardBody({
       ))}
       {overflowCount > 0 ? (
         <span className="text-muted-foreground">+{overflowCount}</span>
+      ) : null}
+      {milestone ? (
+        <span className="text-muted-foreground inline-flex min-w-0 items-center gap-1">
+          <FlagIcon aria-hidden="true" className="size-3 shrink-0" />
+          <span className="max-w-24 truncate">{milestone}</span>
+        </span>
       ) : null}
       {task.estimatePomodoros != null ? (
         <span className="text-muted-foreground inline-flex items-center gap-1">
@@ -276,6 +288,7 @@ export const TaskCard = memo(function TaskCard({
   onOpen,
   assignee,
   labels,
+  milestone = null,
   focused = false,
   projectKey,
   selected = false,
@@ -289,6 +302,7 @@ export const TaskCard = memo(function TaskCard({
   onOpen: () => void;
   assignee: MemberInfo | null;
   labels: LabelInfo[];
+  milestone?: string | null;
   focused?: boolean;
   projectKey: string;
   selected?: boolean;
@@ -419,6 +433,7 @@ export const TaskCard = memo(function TaskCard({
         <CardBody
           assignee={assignee}
           labels={labels}
+          milestone={milestone}
           projectKey={projectKey}
           task={task}
         />

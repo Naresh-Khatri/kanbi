@@ -10,6 +10,7 @@ import {
   boardSeen,
   boardViewPreference,
   label,
+  milestone,
   task,
   taskLabel,
   taskSeen,
@@ -26,6 +27,7 @@ const viewPreferencesSchema = z.object({
   hiddenColumnIds: z.array(z.string()),
   collapsedColumnIds: z.array(z.string()),
   defaultColumnId: z.string().nullable(),
+  milestoneFilter: z.string().nullable().default(null),
 });
 
 const UPDATES_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -36,11 +38,12 @@ const DEFAULT_VIEW_PREFERENCES: z.infer<typeof viewPreferencesSchema> = {
   hiddenColumnIds: [],
   collapsedColumnIds: [],
   defaultColumnId: null,
+  milestoneFilter: null,
 };
 
 export const boardRouter = createTRPCRouter({
   get: boardProcedure.query(async ({ ctx, input }) => {
-    const [columns, tasks, labels, taskLabels, viewPreferences] =
+    const [columns, tasks, labels, taskLabels, viewPreferences, milestones] =
       await Promise.all([
         ctx.db
           .select()
@@ -64,6 +67,7 @@ export const boardRouter = createTRPCRouter({
             hiddenColumnIds: boardViewPreference.hiddenColumnIds,
             collapsedColumnIds: boardViewPreference.collapsedColumnIds,
             defaultColumnId: boardViewPreference.defaultColumnId,
+            milestoneFilter: boardViewPreference.milestoneFilter,
           })
           .from(boardViewPreference)
           .where(
@@ -73,6 +77,11 @@ export const boardRouter = createTRPCRouter({
             ),
           )
           .limit(1),
+        ctx.db
+          .select()
+          .from(milestone)
+          .where(eq(milestone.boardId, input.boardId))
+          .orderBy(asc(milestone.position)),
       ]);
 
     return {
@@ -80,6 +89,7 @@ export const boardRouter = createTRPCRouter({
       tasks,
       labels,
       taskLabels,
+      milestones,
       viewPreferences: viewPreferences[0] ?? DEFAULT_VIEW_PREFERENCES,
       access: ctx.access,
     };
@@ -93,6 +103,7 @@ export const boardRouter = createTRPCRouter({
         hiddenColumnIds: [...new Set(input.hiddenColumnIds)],
         collapsedColumnIds: [...new Set(input.collapsedColumnIds)],
         defaultColumnId: input.defaultColumnId,
+        milestoneFilter: input.milestoneFilter,
       };
       await ctx.db
         .insert(boardViewPreference)

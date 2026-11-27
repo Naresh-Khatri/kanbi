@@ -10,6 +10,7 @@ import { documentRouter } from "@/server/api/routers/document";
 import { focusRouter } from "@/server/api/routers/focus";
 import { labelRouter } from "@/server/api/routers/label";
 import { linkRouter } from "@/server/api/routers/link";
+import { milestoneRouter } from "@/server/api/routers/milestone";
 import { notificationRouter } from "@/server/api/routers/notification";
 import { projectRouter } from "@/server/api/routers/project";
 import { realtimeRouter } from "@/server/api/routers/realtime";
@@ -30,6 +31,7 @@ export const appRouter = createTRPCRouter({
   column: columnRouter,
   task: taskRouter,
   label: labelRouter,
+  milestone: milestoneRouter,
   checklist: checklistRouter,
   attachment: attachmentRouter,
   comment: commentRouter,

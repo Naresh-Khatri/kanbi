@@ -47,6 +47,7 @@ export const SortableColumn = memo(function SortableColumn({
   onAddTask,
   membersById,
   labelsByTask,
+  milestoneNameById,
   focusedTaskId,
   projectKey,
   sortBlocked,
@@ -76,6 +77,8 @@ export const SortableColumn = memo(function SortableColumn({
   onAddTask: (columnId: string) => void;
   membersById: Map<string, MemberInfo>;
   labelsByTask: Map<string, LabelInfo[]>;
+  /** null -> board is filtered to one milestone, badge is noise */
+  milestoneNameById: Map<string, string> | null;
   focusedTaskId: string | null;
   projectKey: string;
   sortBlocked: boolean;
@@ -216,6 +219,11 @@ export const SortableColumn = memo(function SortableColumn({
                 focused={focusedTaskId === t.id}
                 key={t.id}
                 labels={labelsByTask.get(t.id) ?? EMPTY_LABELS}
+                milestone={
+                  t.milestoneId
+                    ? (milestoneNameById?.get(t.milestoneId) ?? null)
+                    : null
+                }
                 onOpenTask={onOpenTask}
                 projectKey={projectKey}
                 selected={selectedTaskIds.has(t.id)}

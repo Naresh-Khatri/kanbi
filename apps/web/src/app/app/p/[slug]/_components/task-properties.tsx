@@ -3,6 +3,8 @@
 import { formatDate } from "@kanbi/shared";
 import {
   CalendarDaysIcon,
+  CircleDashedIcon,
+  FlagIcon,
   PlusIcon,
   TagIcon,
   UserIcon,
@@ -27,6 +29,7 @@ import {
   SelectPopup,
   SelectPrimitive,
 } from "@/components/ui/select";
+import { MilestoneTarget } from "@/components/milestone/milestone-target";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import type { RouterOutputs } from "@/trpc/react";
@@ -493,5 +496,118 @@ export function DueDatePicker({
         </Button>
       ) : null}
     </span>
+  );
+}
+
+export type MilestonePickerOption = {
+  id: string;
+  name: string;
+  status: "upcoming" | "active" | "closed";
+  targetAt: Date | null;
+};
+
+type MilestoneEntry = {
+  key: string;
+  id: string | null;
+  label: string;
+  targetAt: Date | null;
+};
+
+const NO_MILESTONE_ENTRY: MilestoneEntry = {
+  key: "none",
+  id: null,
+  label: "No milestone",
+  targetAt: null,
+};
+
+export function MilestonePicker({
+  value,
+  milestones,
+  onChange,
+  size = "chip",
+  disabled,
+  open,
+  onOpenChange,
+}: {
+  value: string | null;
+  /** all board milestones; closed ones only show when already assigned */
+  milestones: MilestonePickerOption[];
+  onChange: (id: string | null) => void;
+  size?: PropertySize;
+  disabled?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const current = milestones.find((m) => m.id === value) ?? null;
+  const options = useMemo<MilestoneEntry[]>(
+    () => [
+      NO_MILESTONE_ENTRY,
+      ...milestones
+        .filter((m) => m.status !== "closed" || m.id === value)
+        .map((m) => ({
+          key: m.id,
+          id: m.id,
+          label: m.name,
+          targetAt: m.targetAt,
+        })),
+    ],
+    [milestones, value],
+  );
+  const selected = options.find((o) => o.id === value) ?? NO_MILESTONE_ENTRY;
+  const anchorRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <Combobox
+      autoHighlight
+      disabled={disabled}
+      isItemEqualToValue={(a, b) => a.key === b.key}
+      itemToStringLabel={(o) => o.label}
+      items={options}
+      onOpenChange={onOpenChange}
+      onValueChange={(o) => {
+        if (o) onChange(o.id);
+      }}
+      open={open}
+      value={selected}
+    >
+      <ComboboxTrigger
+        aria-label="Milestone"
+        ref={anchorRef}
+        render={propertyButton(size)}
+      >
+        <FlagIcon aria-hidden="true" />
+        <PropertyText placeholder={!current}>
+          {current ? current.name : size === "row" ? "None" : "Milestone"}
+        </PropertyText>
+        {current && current.status !== "closed" ? (
+          <MilestoneTarget className="text-xs" targetAt={current.targetAt} />
+        ) : null}
+      </ComboboxTrigger>
+      <ComboboxPopup anchor={anchorRef} className="w-64">
+        <PopupSearch placeholder="Move to milestone…" />
+        <ComboboxEmpty>No milestones found.</ComboboxEmpty>
+        <ComboboxList>
+          {(o: MilestoneEntry) => (
+            <ComboboxItem key={o.key} value={o}>
+              <span className="flex min-w-0 items-center gap-2">
+                {o.id ? (
+                  <FlagIcon
+                    aria-hidden="true"
+                    className="text-muted-foreground"
+                  />
+                ) : (
+                  <CircleDashedIcon
+                    aria-hidden="true"
+                    className="text-muted-foreground"
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                <MilestoneTarget className="text-xs" targetAt={o.targetAt} />
+              </span>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxPopup>
+    </Combobox>
   );
 }

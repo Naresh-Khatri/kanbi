@@ -115,6 +115,7 @@ import { copyTaskLink, copyText } from "./copy-task-link";
 import type { Priority } from "./priority";
 import {
   AssigneePicker,
+  MilestonePicker,
   DueDatePicker,
   LabelSwatch,
   LabelsCombobox,
@@ -308,6 +309,7 @@ export function TaskDetail({
   };
   const remove = useUndoableBoardDelete(boardId);
   const me = api.user.me.useQuery();
+  const milestones = api.board.get.useQuery({ boardId }).data?.milestones ?? [];
   const members = api.project.members.useQuery(
     { projectId },
     { enabled: canWrite },
@@ -478,6 +480,19 @@ export function TaskDetail({
               taskId={task.id}
             />
           </PropertyRow>
+          {milestones.some((m) => m.status !== "closed") || task.milestoneId ? (
+            <PropertyRow label="Milestone">
+              <MilestonePicker
+                disabled={!canWrite}
+                milestones={milestones}
+                onChange={(id) =>
+                  update.mutate({ boardId, taskId: task.id, milestoneId: id })
+                }
+                size="row"
+                value={task.milestoneId}
+              />
+            </PropertyRow>
+          ) : null}
           {hasDue ? (
             <PropertyRow label="Due">
               <DueControl
@@ -2000,6 +2015,10 @@ function formatVerb(verb: string, payload: Record<string, unknown> | null) {
       return "reported a blocker";
     case "task.archived":
       return "archived the task";
+    case "task.milestone":
+      return typeof payload?.milestoneName === "string"
+        ? `added it to ${payload.milestoneName}`
+        : "removed it from its milestone";
     case "comment.created":
       return "commented";
     case "attachment.added":

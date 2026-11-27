@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { shareToken } from "@/lib/ids";
@@ -16,6 +16,7 @@ import {
   boardShare,
   checklistItem,
   label,
+  milestone,
   project,
   task,
   taskAttachment,
@@ -114,6 +115,7 @@ export const shareRouter = createTRPCRouter({
         checklist,
         assignees,
         attachments,
+        milestones,
       ] = await Promise.all([
         ctx.db
           .select({
@@ -135,6 +137,7 @@ export const shareRouter = createTRPCRouter({
             priority: task.priority,
             assigneeId: task.assigneeId,
             dueAt: task.dueAt,
+            milestoneId: task.milestoneId,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt,
           })
@@ -185,6 +188,22 @@ export const shareRouter = createTRPCRouter({
             ),
           )
           .orderBy(asc(taskAttachment.createdAt)),
+        // closed ones only hold archived work -> nothing to show
+        ctx.db
+          .select({
+            id: milestone.id,
+            name: milestone.name,
+            status: milestone.status,
+            targetAt: milestone.targetAt,
+          })
+          .from(milestone)
+          .where(
+            and(
+              eq(milestone.boardId, hit.boardId),
+              ne(milestone.status, "closed"),
+            ),
+          )
+          .orderBy(asc(milestone.position)),
       ]);
 
       // non-images never leave the server; only a per-task count does
@@ -228,6 +247,7 @@ export const shareRouter = createTRPCRouter({
         })),
         labels,
         taskLabels,
+        milestones,
         checklist,
         images,
         hiddenFiles: [...hiddenFiles].map(([taskId, count]) => ({

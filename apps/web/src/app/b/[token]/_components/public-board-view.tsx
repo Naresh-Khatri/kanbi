@@ -44,6 +44,15 @@ import { UserAvatar } from "@/components/user-avatar";
 import { DEFAULT_PROJECT_COLOR } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
+import {
+  MilestoneMenu,
+  type MilestoneOption,
+} from "@/app/app/p/[slug]/_components/board/milestone-menu";
+import {
+  type MilestoneFilter,
+  milestoneProgress,
+  taskMatchesMilestone,
+} from "@/lib/milestone";
 import { PublicTaskCard } from "./public-task-card";
 import { PublicTaskSheet } from "./public-task-sheet";
 import {
@@ -81,6 +90,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [hideDone, setHideDone] = useState(false);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [milestoneFilter, setMilestoneFilter] = useState<MilestoneFilter>(null);
   const [layout, setLayout] = useState<Layout>("board");
   const [openKey, setOpenKey] = useOpenTaskParam();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -107,6 +117,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
     const q = query.trim().toLowerCase();
     return views.filter((v) => {
       if (hideDone && v.done) return false;
+      if (!taskMatchesMilestone(v.task, milestoneFilter)) return false;
       if (focus && !matchesFocus(v, focus)) return false;
       if (assigneeId && v.task.assigneeId !== assigneeId) return false;
       if (labelIds.size > 0 && !v.labels.some((l) => labelIds.has(l.id))) {
@@ -119,7 +130,16 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
         v.labels.some((l) => l.name.toLowerCase().includes(q))
       );
     });
-  }, [views, query, labelIds, assigneeId, hideDone, focus]);
+  }, [views, query, labelIds, assigneeId, hideDone, focus, milestoneFilter]);
+
+  const milestoneOptions = useMemo<MilestoneOption[]>(() => {
+    const categories = new Map(columns.map((c) => [c.id, c.category]));
+    const tasks = data.tasks.map((t) => ({ ...t, archivedAt: null }));
+    return data.milestones.map((m) => ({
+      ...m,
+      progress: milestoneProgress(tasks, categories, m.id),
+    }));
+  }, [data.tasks, data.milestones, columns]);
 
   const byColumn = useMemo(() => {
     const map = new Map<string, TaskView[]>(columns.map((c) => [c.id, []]));
@@ -135,7 +155,8 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
     labelIds.size > 0 ||
     assigneeId != null ||
     hideDone ||
-    focus != null;
+    focus != null ||
+    milestoneFilter != null;
   const openView = openKey ? views.find((v) => v.key === openKey) : undefined;
 
   function clearFilters() {
@@ -144,6 +165,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
     setAssigneeId(null);
     setHideDone(false);
     setFocus(null);
+    setMilestoneFilter(null);
   }
 
   return (
@@ -195,6 +217,14 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
       />
 
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-4 sm:px-6">
+        {milestoneOptions.length > 0 ? (
+          <MilestoneMenu
+            canWrite={false}
+            filter={milestoneFilter}
+            milestones={milestoneOptions}
+            onFilterChange={setMilestoneFilter}
+          />
+        ) : null}
         <InputGroup className="min-w-0 flex-1 sm:w-64 sm:flex-none">
           <InputGroupAddon>
             <SearchIcon aria-hidden="true" />
@@ -337,6 +367,7 @@ function BoardSnapshot({ data }: { data: PublicBoard }) {
                         index={i}
                         key={v.task.id}
                         onOpen={() => setOpenKey(v.key)}
+                        showMilestone={milestoneFilter === null}
                         view={v}
                       />
                     ))
@@ -608,6 +639,7 @@ function useTaskViews(data: PublicBoard): TaskView[] {
     const columnById = new Map(data.columns.map((c) => [c.id, c]));
     const labelById = new Map(data.labels.map((l) => [l.id, l]));
     const assigneeById = new Map(data.assignees.map((a) => [a.id, a]));
+    const milestoneById = new Map(data.milestones.map((m) => [m.id, m.name]));
     const labelsByTask = new Map<string, PublicLabel[]>();
     for (const tl of data.taskLabels) {
       const l = labelById.get(tl.labelId);
@@ -651,6 +683,9 @@ function useTaskViews(data: PublicBoard): TaskView[] {
         hiddenFiles: hiddenByTask.get(task.id) ?? 0,
         done,
         overdue: !done && task.dueAt != null && task.dueAt.getTime() < now,
+        milestone: task.milestoneId
+          ? (milestoneById.get(task.milestoneId) ?? null)
+          : null,
       });
     }
     return out;

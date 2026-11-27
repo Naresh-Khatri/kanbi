@@ -18,6 +18,7 @@ import type { db as Database } from "@/server/db";
 import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
 import { stripReplyPrefix } from "@/lib/task-title";
 import { recordActivity } from "@/server/activity/record";
+import { assertOpenMilestone } from "@/server/api/routers/milestone";
 import { AiNotConfiguredError, draftModel } from "@/server/ai/model";
 import {
   assertCanWrite,
@@ -171,10 +172,14 @@ export const taskRouter = createTRPCRouter({
         dueAt: z.date().nullable().optional(),
         estimatePomodoros: z.number().int().min(1).max(16).nullable().optional(),
         sourceText: z.string().max(10_000).optional(),
+        milestoneId: z.string().min(1).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
+      if (input.milestoneId) {
+        await assertOpenMilestone(ctx.db, input.boardId, input.milestoneId);
+      }
 
       const col = await ctx.db
         .select({ id: boardColumn.id, boardId: boardColumn.boardId })
@@ -213,6 +218,7 @@ export const taskRouter = createTRPCRouter({
           dueAt: input.dueAt ?? null,
           estimatePomodoros: input.estimatePomodoros ?? null,
           sourceText: input.sourceText ?? null,
+          milestoneId: input.milestoneId ?? null,
         })
         .returning();
       bus.emitBoard(input.boardId, { scope: "task", ids: row ? [row.id] : [] });
@@ -267,10 +273,14 @@ export const taskRouter = createTRPCRouter({
         assigneeId: z.string().nullable().optional(),
         dueAt: z.date().nullable().optional(),
         estimatePomodoros: z.number().int().min(1).max(16).nullable().optional(),
+        milestoneId: z.string().min(1).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
+      const milestoneRow = input.milestoneId
+        ? await assertOpenMilestone(ctx.db, input.boardId, input.milestoneId)
+        : null;
       if (input.assigneeId) {
         await assertProjectAssignees(ctx.db, ctx.access.projectId, [
           input.assigneeId,
@@ -283,6 +293,7 @@ export const taskRouter = createTRPCRouter({
           assigneeId: task.assigneeId,
           title: task.title,
           description: task.description,
+          milestoneId: task.milestoneId,
         })
         .from(task)
         .where(and(eq(task.id, taskId), eq(task.boardId, boardId)))
@@ -294,12 +305,31 @@ export const taskRouter = createTRPCRouter({
         .set(rest)
         .where(and(eq(task.id, taskId), eq(task.boardId, boardId)));
       bus.emitBoard(boardId, { scope: "task", ids: [taskId] });
-      await recordActivity(ctx, {
-        boardId,
-        taskId,
-        verb: "task.updated",
-        payload: { fields: Object.keys(rest) },
-      });
+      // milestone gets its own verb so feed/digest can name it
+      const fields = Object.keys(rest).filter((k) => k !== "milestoneId");
+      if (fields.length > 0) {
+        await recordActivity(ctx, {
+          boardId,
+          taskId,
+          verb: "task.updated",
+          payload: { fields },
+        });
+      }
+      if (
+        rest.milestoneId !== undefined &&
+        previous &&
+        rest.milestoneId !== previous.milestoneId
+      ) {
+        await recordActivity(ctx, {
+          boardId,
+          taskId,
+          verb: "task.milestone",
+          payload: {
+            milestoneId: rest.milestoneId,
+            milestoneName: milestoneRow?.name ?? null,
+          },
+        });
+      }
 
       if (
         "assigneeId" in rest &&
@@ -568,10 +598,13 @@ export const taskRouter = createTRPCRouter({
           taskIds: z.array(z.string().min(1)).min(1).max(100),
           priority: priorityEnum.optional(),
           archived: z.boolean().optional(),
+          milestoneId: z.string().min(1).nullable().optional(),
         })
         .refine(
           (input) =>
-            input.priority !== undefined || input.archived !== undefined,
+            input.priority !== undefined ||
+            input.archived !== undefined ||
+            input.milestoneId !== undefined,
           { message: "Choose at least one update." },
         ),
     )
@@ -581,8 +614,15 @@ export const taskRouter = createTRPCRouter({
       const updates: {
         priority?: z.infer<typeof priorityEnum>;
         archivedAt?: Date | null;
+        milestoneId?: string | null;
       } = {};
       if (input.priority !== undefined) updates.priority = input.priority;
+      if (input.milestoneId !== undefined) {
+        if (input.milestoneId) {
+          await assertOpenMilestone(ctx.db, input.boardId, input.milestoneId);
+        }
+        updates.milestoneId = input.milestoneId;
+      }
       if (input.archived !== undefined) {
         updates.archivedAt = input.archived ? new Date() : null;
       }
@@ -920,6 +960,7 @@ export const taskRouter = createTRPCRouter({
                 .optional(),
               checklist: z.array(z.string().min(1).max(280)).max(20).optional(),
               sourceText: z.string().max(10_000).optional(),
+              milestoneId: z.string().min(1).nullable().optional(),
             }),
           )
           .min(1)
@@ -972,6 +1013,12 @@ export const taskRouter = createTRPCRouter({
         }
       }
 
+      for (const milestoneId of new Set(
+        input.tasks.flatMap((t) => (t.milestoneId ? [t.milestoneId] : [])),
+      )) {
+        await assertOpenMilestone(ctx.db, input.boardId, milestoneId);
+      }
+
       await assertProjectAssignees(
         ctx.db,
         ctx.access.projectId,
@@ -1002,6 +1049,7 @@ export const taskRouter = createTRPCRouter({
           dueAt: t.dueAt ?? null,
           estimatePomodoros: t.estimatePomodoros ?? null,
           sourceText: t.sourceText ?? null,
+          milestoneId: t.milestoneId ?? null,
         };
       });
 

@@ -37,6 +37,18 @@ import { useAppShell } from "@/components/keybinds/shell-store";
 import { Badge } from "@/components/ui/badge";
 import { toastManager } from "@/components/ui/toast";
 import { OPEN_TASK_EVENT } from "@/components/rich-text/hover-card";
+import { CloseMilestoneDialog } from "@/components/milestone/close-milestone-dialog";
+import {
+  type EditableMilestone,
+  MilestoneFormDialog,
+} from "@/components/milestone/milestone-form-dialog";
+import {
+  isResolvedCategory,
+  type MilestoneFilter,
+  milestoneProgress,
+  NO_MILESTONE,
+  taskMatchesMilestone,
+} from "@/lib/milestone";
 import { POSITION_STEP, positionBetween } from "@/lib/position";
 import { matchTaskParam, taskPageHref } from "@/lib/task-link";
 import { compareTasks } from "@/lib/task-sort";
@@ -65,8 +77,14 @@ import { BulkTaskActions } from "./bulk-task-actions";
 import { SortableColumn } from "./sortable-column";
 import { TaskCardPreview } from "./task-card";
 import { HiddenColumns } from "./hidden-columns";
+import { MilestoneMenu, type MilestoneOption } from "./milestone-menu";
+import { MoveToMilestoneDialog } from "@/components/milestone/move-to-milestone-dialog";
 import { TaskSheetHost } from "./task-sheet-host";
-import { isTaskSheetOpen, openTaskSheet } from "./task-sheet-store";
+import {
+  isTaskSheetOpen,
+  openTaskSheet,
+  useTaskSheet,
+} from "./task-sheet-store";
 import { useBoardRealtime } from "./use-board-realtime";
 import { useTicketItems } from "./use-ticket-items";
 import { useBoardUpdates, useMarkSeen } from "./use-board-updates";
@@ -121,9 +139,10 @@ export function BoardView({
     return map;
   }, [members]);
   const utils = api.useUtils();
-  const { columns, tasks, labels, taskLabels, access } = data;
+  const { columns, tasks, labels, taskLabels, milestones, access } = data;
   const {
     preferences,
+    setMilestoneFilter,
     setColumnCollapsed,
     setColumnHidden,
     setColumnSort,
@@ -131,6 +150,58 @@ export function BoardView({
   } = useBoardViewPreferences(boardId, data.viewPreferences);
   const canWrite = access.canWrite;
   const router = useRouter();
+
+  const categoryByColumn = useMemo(
+    () => new Map(columns.map((c) => [c.id, c.category])),
+    [columns],
+  );
+  const openMilestones = useMemo<MilestoneOption[]>(
+    () =>
+      milestones
+        .filter((m) => m.status !== "closed")
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          status: m.status,
+          targetAt: m.targetAt,
+          progress: milestoneProgress(tasks, categoryByColumn, m.id),
+        })),
+    [milestones, tasks, categoryByColumn],
+  );
+  // stale pref (deleted/closed milestone) -> all tasks
+  const milestoneFilter: MilestoneFilter =
+    preferences.milestoneFilter === NO_MILESTONE ||
+    openMilestones.some((m) => m.id === preferences.milestoneFilter)
+      ? preferences.milestoneFilter
+      : null;
+  const milestoneNameById = useMemo(
+    () =>
+      milestoneFilter !== null && milestoneFilter !== NO_MILESTONE
+        ? null
+        : new Map(openMilestones.map((m) => [m.id, m.name])),
+    [milestoneFilter, openMilestones],
+  );
+  const [milestoneForm, setMilestoneForm] = useState<{
+    open: boolean;
+    milestone: EditableMilestone | null;
+  }>({ open: false, milestone: null });
+  const [closingMilestoneId, setClosingMilestoneId] = useState<string | null>(
+    null,
+  );
+  const [moveTaskIds, setMoveTaskIds] = useState<string[] | null>(null);
+  const closing = useMemo(() => {
+    if (!closingMilestoneId) return null;
+    const m = milestones.find((x) => x.id === closingMilestoneId);
+    if (!m) return null;
+    let finished = 0;
+    let unfinished = 0;
+    for (const t of tasks) {
+      if (t.milestoneId !== m.id || t.archivedAt) continue;
+      if (isResolvedCategory(categoryByColumn.get(t.columnId))) finished++;
+      else unfinished++;
+    }
+    return { milestone: { id: m.id, name: m.name }, finished, unfinished };
+  }, [closingMilestoneId, milestones, tasks, categoryByColumn]);
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
   const openTaskRef = useRef((_taskId: string) => {});
@@ -362,6 +433,9 @@ export function BoardView({
                       ...(vars.priority !== undefined
                         ? { priority: vars.priority }
                         : {}),
+                      ...(vars.milestoneId !== undefined
+                        ? { milestoneId: vars.milestoneId }
+                        : {}),
                       ...(vars.archived !== undefined
                         ? {
                             archivedAt: vars.archived ? new Date() : null,
@@ -467,6 +541,7 @@ export function BoardView({
     const empty = new Set<string>();
     for (const t of tasks) {
       if (t.archivedAt) continue;
+      if (!taskMatchesMilestone(t, milestoneFilter)) continue;
       total++;
       if (
         filtersActive &&
@@ -503,6 +578,7 @@ export function BoardView({
     filtersActive,
     labelsByTask,
     membersById,
+    milestoneFilter,
     preferences.sorts,
     updatedIds,
   ]);
@@ -916,6 +992,42 @@ export function BoardView({
     bulkUpdateTasks.mutate({ boardId, taskIds, priority });
   }
 
+  function openMilestoneMove() {
+    if (!canWrite) return;
+    if (openMilestones.length === 0) {
+      toastManager.add({ title: "No open milestones yet" });
+      return;
+    }
+    const selected = selectedTaskIdsInVisualOrder();
+    const sheetId = useTaskSheet.getState().openId;
+    // open sheet beats a leftover board selection: that's the task on screen
+    const ids = sheetId
+      ? [sheetId]
+      : selected.length > 0
+        ? selected
+        : focusedTaskId
+          ? [focusedTaskId]
+          : [];
+    if (ids.length === 0) {
+      toastManager.add({ title: "Focus or select a task first" });
+      return;
+    }
+    setMoveTaskIds(ids);
+  }
+
+  function moveTasksToMilestone(taskIds: string[], milestoneId: string | null) {
+    bulkUpdateTasks.mutate({ boardId, taskIds, milestoneId });
+    const name = milestoneId
+      ? (openMilestones.find((m) => m.id === milestoneId)?.name ?? "milestone")
+      : null;
+    const what = taskIds.length === 1 ? "Task" : `${taskIds.length} tasks`;
+    toastManager.add({
+      title: name
+        ? `${what} moved to ${name}`
+        : `${what} removed from milestone`,
+    });
+  }
+
   function archiveSelectedTasks() {
     const taskIds = selectedTaskIdsInVisualOrder();
     if (taskIds.length === 0) return;
@@ -987,19 +1099,48 @@ export function BoardView({
   // aiDraftOpen lives in the shell store (read imperatively in nav handlers so
   // opening the AI dialog never re-renders the board); the rest are local.
   // sheet state read imperatively (isTaskSheetOpen) for the same reason
-  const navActive = !quickAddOpen && !archiveOpen && !digestOpen;
+  const navActive =
+    !quickAddOpen &&
+    !archiveOpen &&
+    !digestOpen &&
+    !milestoneForm.open &&
+    !closingMilestoneId &&
+    !moveTaskIds;
   const kbRef = useRef({
     navColumns,
     focusedTaskId,
     active: navActive,
     canWrite,
+    openMilestoneMove,
   });
   kbRef.current = {
     navColumns,
     focusedTaskId,
     active: navActive,
     canWrite,
+    openMilestoneMove,
   };
+
+  const milestoneMoveToken = useAppShell((s) => s.milestoneMoveToken);
+  const lastMilestoneMoveToken = useRef(milestoneMoveToken);
+  useEffect(() => {
+    if (milestoneMoveToken === lastMilestoneMoveToken.current) return;
+    lastMilestoneMoveToken.current = milestoneMoveToken;
+    kbRef.current.openMilestoneMove();
+  }, [milestoneMoveToken]);
+  const milestoneMoveAvailable = canWrite && openMilestones.length > 0;
+  useEffect(() => {
+    const { setMilestoneMoveAvailable } = useAppShell.getState();
+    setMilestoneMoveAvailable(milestoneMoveAvailable);
+    return () => setMilestoneMoveAvailable(false);
+  }, [milestoneMoveAvailable]);
+  const moveCurrent = useMemo(() => {
+    if (!moveTaskIds) return undefined;
+    const ids = new Set(
+      tasks.filter((t) => moveTaskIds.includes(t.id)).map((t) => t.milestoneId),
+    );
+    return ids.size === 1 ? [...ids][0] : undefined;
+  }, [moveTaskIds, tasks]);
 
   function moveFocus(dir: "up" | "down" | "left" | "right") {
     const { navColumns: cols, focusedTaskId: fid } = kbRef.current;
@@ -1136,6 +1277,20 @@ export function BoardView({
     cardKeyOpts,
   );
   useHotkeys(
+    "m",
+    (e) => {
+      if (
+        useAppShell.getState().aiDraftOpen ||
+        !kbRef.current.active ||
+        !kbRef.current.canWrite
+      )
+        return;
+      e.preventDefault();
+      kbRef.current.openMilestoneMove();
+    },
+    cardKeyOpts,
+  );
+  useHotkeys(
     "esc",
     () => {
       if (
@@ -1166,6 +1321,23 @@ export function BoardView({
         updateCount={updates.size}
         onOpenArchive={() => setArchiveOpen(true)}
         onOpenDigest={() => setDigestOpen(true)}
+        milestoneMenu={
+          openMilestones.length > 0 || milestoneFilter !== null ? (
+            <MilestoneMenu
+              canWrite={canWrite}
+              filter={milestoneFilter}
+              milestones={openMilestones}
+              onClose={setClosingMilestoneId}
+              onCreate={() => setMilestoneForm({ open: true, milestone: null })}
+              onEdit={(id) => {
+                const m = milestones.find((x) => x.id === id);
+                if (m) setMilestoneForm({ open: true, milestone: m });
+              }}
+              onFilterChange={setMilestoneFilter}
+              settingsHref={`/app/p/${projectSlug}/settings/milestones`}
+            />
+          ) : null
+        }
         ref={searchInputRef}
         totalCount={totalCount}
         visibleCount={visibleCount}
@@ -1203,6 +1375,7 @@ export function BoardView({
                     key={col.id}
                     labelsByTask={cardLabelsByTask}
                     membersById={membersById}
+                    milestoneNameById={milestoneNameById}
                     onAddTask={handleAddTask}
                     onCollapseChange={(collapsed) =>
                       setColumnCollapsed(col.id, collapsed)
@@ -1278,6 +1451,9 @@ export function BoardView({
           onClear={clearTaskSelection}
           onMove={moveSelectedTasks}
           onPriorityChange={setSelectedPriority}
+          onMilestone={
+            openMilestones.length > 0 ? openMilestoneMove : undefined
+          }
         />
       ) : null}
       <TaskSheetHost
@@ -1301,6 +1477,43 @@ export function BoardView({
         onOpenChange={setArchiveOpen}
         open={archiveOpen}
         tasks={archivedTasks}
+      />
+      <MilestoneFormDialog
+        boardId={boardId}
+        milestone={milestoneForm.milestone}
+        onOpenChange={(open) => setMilestoneForm((f) => ({ ...f, open }))}
+        onSaved={(row) => {
+          if (!milestoneForm.milestone) setMilestoneFilter(row.id);
+        }}
+        open={milestoneForm.open}
+      />
+      <MoveToMilestoneDialog
+        count={moveTaskIds?.length ?? 0}
+        current={moveCurrent}
+        milestones={openMilestones}
+        onOpenChange={(open) => {
+          if (!open) setMoveTaskIds(null);
+        }}
+        onSelect={(id) => {
+          if (moveTaskIds) moveTasksToMilestone(moveTaskIds, id);
+        }}
+        open={moveTaskIds !== null}
+      />
+      <CloseMilestoneDialog
+        boardId={boardId}
+        finishedCount={closing?.finished ?? 0}
+        milestone={closing?.milestone ?? null}
+        onClosed={(id) => {
+          if (milestoneFilter === id) setMilestoneFilter(null);
+        }}
+        onOpenChange={(open) => {
+          if (!open) setClosingMilestoneId(null);
+        }}
+        otherMilestones={openMilestones.filter(
+          (m) => m.id !== closingMilestoneId,
+        )}
+        projectSlug={projectSlug}
+        unfinishedCount={closing?.unfinished ?? 0}
       />
       <DigestPanel
         boardId={boardId}

@@ -23,6 +23,7 @@ export type TaskView = {
   hiddenFiles: number;
   done: boolean;
   overdue: boolean;
+  milestone: string | null;
 };
 
 export const DONE_CATEGORIES = new Set(["completed", "canceled"]);

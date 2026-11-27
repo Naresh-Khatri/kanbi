@@ -20,6 +20,7 @@ export function SettingsShell({
   const tabs = [
     { value: base, label: "General" },
     { value: `${base}/access`, label: "Access" },
+    { value: `${base}/milestones`, label: "Milestones" },
     { value: `${base}/notifications`, label: "Notifications" },
   ];
 
@@ -29,7 +30,7 @@ export function SettingsShell({
         <h1 className="font-heading text-2xl font-semibold">Settings</h1>
         <p className="text-muted-foreground text-sm">
           {project ? `${project.name} · ` : null}
-          project details, who has access, and what Kanbi emails you.
+          project details, access, milestones, and what Kanbi emails you.
         </p>
       </header>
       {/* route links; pathname drives selection */}

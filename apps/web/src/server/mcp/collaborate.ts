@@ -25,6 +25,7 @@ import {
 import type { McpAuthorization } from "./authorization";
 import { agentIdentity, createMcpCaller } from "./caller";
 import { docBodyFromMarkdown } from "./docs";
+import { milestoneRefInput, openMilestoneId } from "./milestones";
 import { priorityEnum } from "./project-context";
 import { McpUserError, ok, toFailure, userFacing } from "./result";
 import { sanitizeRichText } from "./sanitize";
@@ -596,7 +597,7 @@ export function registerCollaborationTools(
     {
       title: "Update task",
       description:
-        'Edit a task\'s title, description, priority, or due date, as the user. Only when the user asks; first show them exactly what will change and wait for approval. Pass only the fields to change. description is markdown: mode "append" (default) adds to the end, "replace" rewrites it; for replace, start from the description get_task returned and keep what still applies. Keep image labels from get_task (e.g. [image 1 below: a.png]) where the image belongs; images your text drops are kept at the end. New screenshots: use the `markdown` from add_attachment after its PUT. Works on any task the user can edit.',
+        'Edit a task\'s title, description, priority, due date, or milestone, as the user. Only when the user asks; first show them exactly what will change and wait for approval. Pass only the fields to change. description is markdown: mode "append" (default) adds to the end, "replace" rewrites it; for replace, start from the description get_task returned and keep what still applies. Keep image labels from get_task (e.g. [image 1 below: a.png]) where the image belongs; images your text drops are kept at the end. New screenshots: use the `markdown` from add_attachment after its PUT. Works on any task the user can edit.',
       inputSchema: {
         task: taskRefInput,
         title: z.string().trim().min(1).max(200).optional(),
@@ -616,6 +617,12 @@ export function registerCollaborationTools(
           .nullable()
           .optional()
           .describe("YYYY-MM-DD, or null to clear."),
+        milestone: milestoneRefInput
+          .nullable()
+          .optional()
+          .describe(
+            'Milestone name like "v1.2" or id, or null to take it out of its milestone.',
+          ),
         agent: agentInput,
       },
       outputSchema: {
@@ -633,6 +640,7 @@ export function registerCollaborationTools(
       mode = "append",
       priority,
       dueAt,
+      milestone,
       agent,
     }) =>
       run(async (caller) => {
@@ -642,7 +650,11 @@ export function registerCollaborationTools(
           description?: string | null;
           priority?: typeof priority;
           dueAt?: Date | null;
+          milestoneId?: string | null;
         } = {};
+        if (milestone !== undefined) {
+          patch.milestoneId = await openMilestoneId(t.boardId, milestone);
+        }
         if (title !== undefined && title !== t.title) patch.title = title;
         if (priority !== undefined && priority !== t.priority) {
           patch.priority = priority;
@@ -684,7 +696,7 @@ export function registerCollaborationTools(
         const updated = Object.keys(patch);
         if (updated.length === 0) {
           throw new McpUserError(
-            "Nothing to change. Pass title, description, priority, or dueAt.",
+            "Nothing to change. Pass title, description, priority, dueAt, or milestone.",
           );
         }
         await caller.task

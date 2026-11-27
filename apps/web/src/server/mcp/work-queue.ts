@@ -166,6 +166,8 @@ export function describeSince(rows: readonly SinceRow[]): string[] {
       lines.push(`${actor} attached ${plural(n, "file")}`);
     else if (verb === "task.updated") lines.push(`${actor} edited the task`);
     else if (verb === "task.blocked") lines.push(`${actor} reported a blocker`);
+    else if (verb === "task.milestone")
+      lines.push(`${actor} changed its milestone`);
   }
   return lines;
 }

@@ -12,6 +12,7 @@ export type BoardViewPreferences = {
   hiddenColumnIds: string[];
   collapsedColumnIds: string[];
   defaultColumnId: string | null;
+  milestoneFilter: string | null;
 };
 
 export function useBoardViewPreferences(
@@ -26,7 +27,15 @@ export function useBoardViewPreferences(
       const previous = utils.board.get.getData({ boardId });
       const { boardId: _boardId, ...next } = vars;
       utils.board.get.setData({ boardId }, (old) =>
-        old ? { ...old, viewPreferences: next } : old,
+        old
+          ? {
+              ...old,
+              viewPreferences: {
+                ...next,
+                milestoneFilter: next.milestoneFilter ?? null,
+              },
+            }
+          : old,
       );
       return { previous };
     },
@@ -92,8 +101,16 @@ export function useBoardViewPreferences(
     [update],
   );
 
+  const setMilestoneFilter = useCallback(
+    (milestoneFilter: string | null) => {
+      update((current) => ({ ...current, milestoneFilter }));
+    },
+    [update],
+  );
+
   return {
     preferences,
+    setMilestoneFilter,
     setColumnSort,
     setColumnHidden,
     setColumnCollapsed,

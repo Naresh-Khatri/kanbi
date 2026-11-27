@@ -226,14 +226,14 @@ the mutations. The `work` prompt needs both scopes.
 | Tool                  | Scope | Purpose                                                                           |
 | --------------------- | ----- | --------------------------------------------------------------------------------- |
 | `list_projects`       | read  | Resolve the target project when the discussion does not make it unambiguous.      |
-| `get_project_context` | read  | Get the project's board, columns, labels, members, priorities, and guidance.      |
+| `get_project_context` | read  | Board, columns, labels, members, open milestones, priorities, and guidance.       |
 | `search_tasks`        | read  | Title search for duplicates, or lookup by identifier (`KAN-42`); shows assignee.  |
 | `create_tasks`        | write | Create only the exact approved task set; retry-safe with `requestKey`.            |
 | `create_project`      | write | Create an approved project with default columns; returns its context and URL.     |
 | `add_column`          | write | Owner only: add an approved column; default spot is the end of its category.      |
 | `update_column`       | write | Owner only: rename, recategorize, or reorder; keeps the last done column.         |
-| `find_tasks`          | read  | Ad-hoc questions: who, when, status, assignee, label, priority; pages by offset.  |
-| `get_work_queue`      | read  | Your open assigned tasks for the project matching the repo.                       |
+| `find_tasks`          | read  | Ad-hoc questions: who, when, status, assignee, label, milestone; pages by offset. |
+| `get_work_queue`      | read  | Your open assigned tasks for the repo's project; `activeMilestonesOnly` narrows.  |
 | `get_task`            | read  | Trust-ordered brief: first 4 images inlined, latest 20 comments.                  |
 | `get_task_comments`   | read  | Page older comments (`offset` back from newest, up to 50 per call).               |
 | `get_task_images`     | read  | Inline the next 4 images from the `offset` `get_task` gives.                      |
@@ -249,8 +249,14 @@ the mutations. The `work` prompt needs both scopes.
 | `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                    |
 | `edit_comment`        | write | Edit a comment this agent client posted.                                          |
 | `delete_comment`      | write | Delete a comment this agent client posted.                                        |
-| `update_task`         | write | Edit title, description (markdown, append or replace), priority, or due date.     |
+| `update_task`         | write | Edit title, description (append or replace), priority, due date, or milestone.    |
 | `delete_task`         | write | Archive a task (restorable from the board's archive); only on explicit request.   |
+| `list_milestones`     | read  | A project's milestones in board order with done/total progress.                   |
+| `get_milestone`       | read  | One milestone, its progress, and its open tasks.                                  |
+| `create_milestone`    | write | Add an approved milestone; retry-safe with a required `requestKey`.               |
+| `update_milestone`    | write | Rename, describe, re-date, or change status; a status on a closed one reopens it. |
+| `close_milestone`     | write | Archive finished tasks, carry unfinished ones over, optionally write a summary.   |
+| `set_task_milestone`  | write | Put any tasks in the project into a milestone, or take them out with `null`.      |
 | `list_docs`           | read  | A project's doc pages as a tree.                                                  |
 | `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.            |
 | `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                            |
@@ -271,20 +277,24 @@ when omitted), so a taken key fails with a suggested alternative instead of
 silently becoming `KEY2`. Column tools resolve names case-insensitively, refuse
 duplicate names, and place columns with fractional positions (`lib/position.ts`);
 they never renumber, and refuse when there is no room left between two columns.
+Milestones are referenced by name (case-insensitive; an open one wins a tie
+with a closed one) or id. `create_tasks` takes a per-task `milestone`;
+assigning to a closed milestone is refused. Milestone writes need editor or
+owner access, like the board itself.
 `create_tasks` takes an optional `followUpOf` task: each new description links
 back to it, and if that task is yours, it gets a comment listing the follow-ups.
 
 Editing task titles or descriptions, writing to other people's tasks, archiving
 or deleting anything (tasks, columns, projects), creating labels, project
-settings and membership, deleting docs, and backend AI drafting are unavailable
+settings and membership, deleting docs or milestones, and backend AI drafting are unavailable
 over MCP.
 
 ## Scopes
 
 | Scope            | Granted access                                                                                                                                                                                                                                                                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                                                                                                                                                     |
-| `kanbi:write`    | `create_tasks`, `create_project`, `add_column`, `update_column`, `start_task`, `finish_task`, `move_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`, `update_task`, `delete_task`, `create_doc`, `update_doc`, `move_doc`. |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_milestones`, `get_milestone`, `list_docs`, `get_doc`, `search_docs`.                                                                                                                                  |
+| `kanbi:write`    | `create_tasks`, `create_project`, `add_column`, `update_column`, `start_task`, `finish_task`, `move_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`, `update_task`, `delete_task`, `create_milestone`, `update_milestone`, `close_milestone`, `set_task_milestone`, `create_doc`, `update_doc`, `move_doc`. |
 | `openid`         | Standard identity claim (requested by default).                                                                                                                                                                                                                                                                                                        |
 | `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                                                                                                                                                                  |
 
@@ -337,6 +347,8 @@ the configured origin.
 - `collaborate.ts` - comments, blockers, checklist, labels, attachments on the
   user's assigned tasks; `task-ref.ts` holds the shared task resolution, column
   moves, and agent comment posting.
+- `milestones.ts` - milestone tools plus `findMilestone` / `openMilestoneId`,
+  shared with `create_tasks` and `update_task`.
 - `docs.ts` - doc tools: reads, plus create/update/move with markdown -> editor HTML.
 - `result.ts` - shared tool results; `McpUserError` messages reach the agent
   verbatim, everything else is logged and genericized.
