@@ -82,6 +82,8 @@ describe("registerTools", () => {
       "confirm_attachment",
       "edit_comment",
       "delete_comment",
+      "update_task",
+      "delete_task",
       "create_doc",
       "update_doc",
       "move_doc",
@@ -117,6 +119,8 @@ describe("registerTools", () => {
       "confirm_attachment",
       "edit_comment",
       "delete_comment",
+      "update_task",
+      "delete_task",
       "list_docs",
       "get_doc",
       "search_docs",
@@ -151,6 +155,8 @@ describe("registerTools", () => {
       "confirm_attachment",
       "edit_comment",
       "delete_comment",
+      "update_task",
+      "delete_task",
       "create_doc",
       "update_doc",
       "move_doc",
@@ -166,12 +172,13 @@ describe("registerTools", () => {
     expect(hints("create_doc")?.idempotentHint).toBe(false);
     expect(hints("update_doc")?.idempotentHint).toBe(false);
     expect(hints("move_doc")?.idempotentHint).toBe(true);
+    expect(hints("update_task")?.idempotentHint).toBe(false);
     for (const tool of tools) {
       expect(tool.config.annotations?.readOnlyHint).toBe(
         !writes.includes(tool.name),
       );
       expect(tool.config.annotations?.destructiveHint).toBe(
-        tool.name === "delete_comment",
+        tool.name === "delete_comment" || tool.name === "delete_task",
       );
     }
     expect(tools.every((tool) => tool.config.outputSchema)).toBe(true);

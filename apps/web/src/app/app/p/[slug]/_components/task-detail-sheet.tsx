@@ -1996,6 +1996,8 @@ function formatVerb(verb: string, payload: Record<string, unknown> | null) {
       return "moved the task";
     case "task.blocked":
       return "reported a blocker";
+    case "task.archived":
+      return "archived the task";
     case "comment.created":
       return "commented";
     case "attachment.added":

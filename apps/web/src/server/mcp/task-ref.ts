@@ -216,7 +216,17 @@ export async function agentCommentBody(
   caller: Caller,
   t: { id: string; boardId: string },
 ) {
-  let html = markdownToHtml(markdown);
+  return sanitizeRichText(
+    await attachUploadRefs(markdownToHtml(markdown), caller, t),
+  );
+}
+
+/** Registers `kanbi-upload:` refs in html as task attachments -> file urls. */
+export async function attachUploadRefs(
+  html: string,
+  caller: Caller,
+  t: { id: string; boardId: string },
+) {
   const keys = uploadRefKeys(html);
   if (keys.length > 0) {
     const ids = new Map<string, string>();
@@ -234,7 +244,7 @@ export async function agentCommentBody(
     }
     html = replaceUploadRefs(html, ids);
   }
-  return sanitizeRichText(html);
+  return html;
 }
 
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;

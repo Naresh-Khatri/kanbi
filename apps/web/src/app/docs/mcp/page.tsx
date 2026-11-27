@@ -127,6 +127,16 @@ const TOOLS = [
     purpose: "Delete a comment the same agent posted.",
   },
   {
+    name: "update_task",
+    scope: "write",
+    purpose: "Edit a task's title, description, priority, or due date.",
+  },
+  {
+    name: "delete_task",
+    scope: "write",
+    purpose: "Archive a task; it can be restored from the board.",
+  },
+  {
     name: "list_docs",
     scope: "read",
     purpose: "A project's doc pages as a tree.",

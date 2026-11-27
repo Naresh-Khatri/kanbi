@@ -173,7 +173,7 @@ export function linkTickets(
 }
 
 /** Agent markdown -> doc body html (router still sanitizes). */
-async function docBodyFromMarkdown(
+export async function docBodyFromMarkdown(
   markdown: string,
   project: { id: string; key: string },
   projectIds: readonly string[],

@@ -2,11 +2,11 @@ import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AgentId } from "@/lib/agents";
-import { fileUrl, UPLOAD_REF_PREFIX } from "@/lib/file-url";
+import { extractFileIds, fileUrl, UPLOAD_REF_PREFIX } from "@/lib/file-url";
 import {
   buildAttachmentKey,
   MAX_ATTACHMENT_BYTES,
@@ -14,16 +14,26 @@ import {
 } from "@/lib/r2";
 import { recordActivity } from "@/server/activity/record";
 import { db } from "@/server/db";
-import { checklistItem, comment, label, taskLabel } from "@/server/db/schema";
+import {
+  checklistItem,
+  comment,
+  label,
+  taskAttachment,
+  taskLabel,
+} from "@/server/db/schema";
 
 import type { McpAuthorization } from "./authorization";
 import { agentIdentity, createMcpCaller } from "./caller";
+import { docBodyFromMarkdown } from "./docs";
+import { priorityEnum } from "./project-context";
 import { McpUserError, ok, toFailure, userFacing } from "./result";
+import { sanitizeRichText } from "./sanitize";
 import {
   agentCommentBody,
   agentInput,
   assertMine,
   assertOpen,
+  attachUploadRefs,
   type Caller,
   commentBodyInput,
   firstColumn,
@@ -36,6 +46,64 @@ import {
 } from "./task-ref";
 
 const UPLOAD_TTL_SECONDS = 10 * 60;
+const MAX_DESCRIPTION_HTML = 10_000;
+
+const FILE_TAG_RE =
+  /<img\b[^>]*?\bsrc="\/api\/files\/([A-Za-z0-9_-]+)"[^>]*>|<video\b[^>]*?\bsrc="\/api\/files\/([A-Za-z0-9_-]+)"[^>]*>(?:<\/video>)?/g;
+
+/** Image/video tags in `before` whose file the new html dropped. */
+function droppedFileTags(before: string, after: string): string[] {
+  const kept = new Set(extractFileIds(after));
+  const out = new Map<string, string>();
+  for (const m of before.matchAll(FILE_TAG_RE)) {
+    const id = (m[1] ?? m[2])!;
+    if (!kept.has(id) && !out.has(id)) out.set(id, m[0]);
+  }
+  return [...out.values()];
+}
+
+// get_task's "[image 1 below: a.png]" / "[image a.png: https://…]" labels
+const IMAGE_LABEL_RE =
+  /\\?\[image (?:\d+ below: )?(.+?)(?:: https?:\/\/[^\s\]]+)?\\?\]/g;
+
+/**
+ * Swap image labels copied from get_task back to the original tags, in place.
+ * Tokens survive markdown -> html; `restore` puts the tags in.
+ */
+async function relinkImageLabels(
+  markdown: string,
+  t: { id: string; description: string | null },
+) {
+  const ids = extractFileIds(t.description ?? "");
+  const noop = { markdown, restore: (html: string) => html };
+  if (ids.length === 0 || !/\[image /.test(markdown)) return noop;
+  const rows = await db
+    .select({ id: taskAttachment.id, filename: taskAttachment.filename })
+    .from(taskAttachment)
+    .where(
+      and(eq(taskAttachment.taskId, t.id), inArray(taskAttachment.id, ids)),
+    );
+  const tags = new Map<string, string>();
+  for (const m of (t.description ?? "").matchAll(FILE_TAG_RE)) {
+    tags.set((m[1] ?? m[2])!, m[0]);
+  }
+  const byName = new Map(rows.map((r) => [r.filename, tags.get(r.id)]));
+  const used: string[] = [];
+  const out = markdown.replace(IMAGE_LABEL_RE, (match, raw: string) => {
+    const tag = byName.get(raw.replace(/\\(.)/g, "$1"));
+    if (!tag) return match;
+    used.push(tag);
+    return `KANBIFILETOKEN${used.length - 1}X`;
+  });
+  return {
+    markdown: out,
+    restore: (html: string) =>
+      html.replace(
+        /KANBIFILETOKEN(\d+)X/g,
+        (m, i: string) => used[Number(i)] ?? m,
+      ),
+  };
+}
 
 const checklistOutput = z.array(
   z.object({ id: z.string(), text: z.string(), done: z.boolean() }),
@@ -521,5 +589,150 @@ export function registerCollaborationTools(
         await caller.comment.delete({ boardId: t.boardId, commentId });
         return ok({ deleted: true, identifier: t.identifier });
       }),
+  );
+
+  server.registerTool(
+    "update_task",
+    {
+      title: "Update task",
+      description:
+        'Edit a task\'s title, description, priority, or due date, as the user. Only when the user asks; first show them exactly what will change and wait for approval. Pass only the fields to change. description is markdown: mode "append" (default) adds to the end, "replace" rewrites it; for replace, start from the description get_task returned and keep what still applies. Keep image labels from get_task (e.g. [image 1 below: a.png]) where the image belongs; images your text drops are kept at the end. New screenshots: use the `markdown` from add_attachment after its PUT. Works on any task the user can edit.',
+      inputSchema: {
+        task: taskRefInput,
+        title: z.string().trim().min(1).max(200).optional(),
+        description: z
+          .string()
+          .trim()
+          .max(10_000)
+          .optional()
+          .describe(
+            "Markdown (paragraphs, lists, **bold**, `code`, links). Ticket ids like KAN-42 become linked tickets. Empty string with mode replace clears it.",
+          ),
+        mode: z.enum(["append", "replace"]).optional(),
+        priority: priorityEnum.optional(),
+        dueAt: z
+          .string()
+          .date()
+          .nullable()
+          .optional()
+          .describe("YYYY-MM-DD, or null to clear."),
+        agent: agentInput,
+      },
+      outputSchema: {
+        identifier: z.string(),
+        url: z.string().url(),
+        updated: z.array(z.string()),
+        keptImages: z.number().int(),
+      },
+      annotations: { ...writeHints, idempotentHint: false },
+    },
+    async ({
+      task: ref,
+      title,
+      description,
+      mode = "append",
+      priority,
+      dueAt,
+      agent,
+    }) =>
+      run(async (caller) => {
+        const t = await resolveTask(caller, ref);
+        const patch: {
+          title?: string;
+          description?: string | null;
+          priority?: typeof priority;
+          dueAt?: Date | null;
+        } = {};
+        if (title !== undefined && title !== t.title) patch.title = title;
+        if (priority !== undefined && priority !== t.priority) {
+          patch.priority = priority;
+        }
+        if (dueAt !== undefined) patch.dueAt = dueAt ? new Date(dueAt) : null;
+
+        let keptImages = 0;
+        if (description !== undefined) {
+          const before = t.description ?? "";
+          if (mode === "append" && !description) {
+            throw new McpUserError("Nothing to append; description is empty.");
+          }
+          const labels = await relinkImageLabels(description, t);
+          let added = labels.markdown
+            ? await docBodyFromMarkdown(
+                labels.markdown,
+                { id: t.projectId, key: t.projectKey },
+                [t.projectId],
+              )
+            : "";
+          added = labels.restore(await attachUploadRefs(added, caller, t));
+          let html: string;
+          if (mode === "append") {
+            html = before + added;
+          } else {
+            const dropped = droppedFileTags(before, added);
+            keptImages = dropped.length;
+            html = added + dropped.map((tag) => `<p>${tag}</p>`).join("");
+          }
+          html = sanitizeRichText(html);
+          if (html.length > MAX_DESCRIPTION_HTML) {
+            throw new McpUserError(
+              "Description would be too long. Shorten it, or use replace with a tighter version.",
+            );
+          }
+          patch.description = html || null;
+        }
+
+        const updated = Object.keys(patch);
+        if (updated.length === 0) {
+          throw new McpUserError(
+            "Nothing to change. Pass title, description, priority, or dueAt.",
+          );
+        }
+        await caller.task
+          .update({ boardId: t.boardId, taskId: t.id, ...patch })
+          .catch(userFacing);
+        return ok({
+          identifier: t.identifier,
+          url: taskUrl(t.projectSlug, t.number),
+          updated,
+          keptImages,
+        });
+      }, agent),
+  );
+
+  server.registerTool(
+    "delete_task",
+    {
+      title: "Delete task",
+      description:
+        "Delete a task by moving it to the board's archive, where people can restore it. Only when the user explicitly asks to delete that task; confirm the identifier and title with them first. Never use it to close finished work; finish_task does that.",
+      inputSchema: { task: taskRefInput, agent: agentInput },
+      outputSchema: {
+        status: z.literal("archived"),
+        identifier: z.string(),
+        title: z.string(),
+      },
+      annotations: { ...writeHints, destructiveHint: true },
+    },
+    async ({ task: ref, agent }) =>
+      run(async (caller) => {
+        const t = await resolveTask(caller, ref);
+        await caller.task
+          .archive({ boardId: t.boardId, taskId: t.id, archived: true })
+          .catch(userFacing);
+        // router logs nothing for archive -> keep who/which agent removed it
+        await recordActivity(
+          {
+            db,
+            session: { user: { id: auth.userId } },
+            agent: await agentIdentity(auth.clientId, agent),
+          },
+          { boardId: t.boardId, taskId: t.id, verb: "task.archived" },
+        );
+        return ok({
+          status: "archived",
+          identifier: t.identifier,
+          title: t.title,
+        });
+      }, agent),
   );
 }

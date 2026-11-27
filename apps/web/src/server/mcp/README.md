@@ -164,10 +164,13 @@ report_blocker(KAN-42, reason)
   agent can edit or delete only comments its own OAuth client posted
   (`comment.agent_client_id`), never ones you typed. Identical comments
   retried within 10 minutes are deduplicated.
-- **Write scope:** every task write tool acts only on tasks assigned to you
+- **Write scope:** the work tools act only on tasks assigned to you
   (`create_tasks` and the project and column tools are capture tools, not task
-  writes). Agents never edit a task's title or description, archive, delete, or
-  reassign.
+  writes). `update_task` and `delete_task` work on any task you can edit and
+  are for explicit requests only. `delete_task` archives rather than hard
+  deletes. A `replace` description edit keeps any image or video the new text
+  drops, because `get_task` shows them as labels that cannot be round-tripped.
+  Agents never reassign.
 - **Races:** `start_task`, `move_task`, and `finish_task` move with a compare-and-swap on the
   current column (`task.move` `expectedColumnId`). If someone moved the card
   meanwhile, the call fails and the agent re-reads the queue.
@@ -246,6 +249,8 @@ the mutations. The `work` prompt needs both scopes.
 | `confirm_attachment`  | write | Record an uploaded file on the task after verifying it exists.                    |
 | `edit_comment`        | write | Edit a comment this agent client posted.                                          |
 | `delete_comment`      | write | Delete a comment this agent client posted.                                        |
+| `update_task`         | write | Edit title, description (markdown, append or replace), priority, or due date.     |
+| `delete_task`         | write | Archive a task (restorable from the board's archive); only on explicit request.   |
 | `list_docs`           | read  | A project's doc pages as a tree.                                                  |
 | `get_doc`             | read  | One doc page as markdown, chunked; follow `nextOffset` for long pages.            |
 | `search_docs`         | read  | Keyword search over doc titles and text with excerpts.                            |
@@ -276,12 +281,12 @@ over MCP.
 
 ## Scopes
 
-| Scope            | Granted access                                                                                                                                                                                                                                                                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                                                                                                                       |
-| `kanbi:write`    | `create_tasks`, `create_project`, `add_column`, `update_column`, `start_task`, `finish_task`, `move_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`, `create_doc`, `update_doc`, `move_doc`. |
-| `openid`         | Standard identity claim (requested by default).                                                                                                                                                                                                                                                                          |
-| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                                                                                                                                    |
+| Scope            | Granted access                                                                                                                                                                                                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kanbi:read`     | `list_projects`, `get_project_context`, `search_tasks`, `find_tasks`, `get_work_queue`, `get_task`, `get_task_comments`, `get_task_images`, `list_docs`, `get_doc`, `search_docs`.                                                                                                                                                                     |
+| `kanbi:write`    | `create_tasks`, `create_project`, `add_column`, `update_column`, `start_task`, `finish_task`, `move_task`, `assign_to_me`, `comment_on_task`, `report_blocker`, `update_checklist`, `set_task_labels`, `add_attachment`, `confirm_attachment`, `edit_comment`, `delete_comment`, `update_task`, `delete_task`, `create_doc`, `update_doc`, `move_doc`. |
+| `openid`         | Standard identity claim (requested by default).                                                                                                                                                                                                                                                                                                        |
+| `offline_access` | Issues a refresh token so the agent renews silently instead of reopening the browser.                                                                                                                                                                                                                                                                  |
 
 ## Managing access
 
