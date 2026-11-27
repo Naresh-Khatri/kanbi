@@ -28,6 +28,18 @@ describe("milestoneProgress", () => {
       total: 2,
     });
   });
+
+  it("counts archived tasks when asked (closed milestone history)", () => {
+    const tasks = [
+      { milestoneId: "m1", columnId: "done", archivedAt: new Date() },
+      { milestoneId: "m1", columnId: "done", archivedAt: new Date() },
+      { milestoneId: "m1", columnId: "nope", archivedAt: new Date() },
+    ];
+    expect(milestoneProgress(tasks, categories, "m1", true)).toEqual({
+      done: 2,
+      total: 2,
+    });
+  });
 });
 
 describe("taskMatchesMilestone", () => {

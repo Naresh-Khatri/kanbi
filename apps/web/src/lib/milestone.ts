@@ -14,7 +14,7 @@ type ColumnCategory =
 
 export type MilestoneProgress = { done: number; total: number };
 
-/** canceled tasks don't count toward either side; archived ones are ignored */
+/** canceled tasks don't count toward either side; archived ones only when `withArchived` */
 export function milestoneProgress(
   tasks: readonly {
     milestoneId: string | null;
@@ -23,11 +23,14 @@ export function milestoneProgress(
   }[],
   categoryByColumn: ReadonlyMap<string, ColumnCategory>,
   milestoneId: string,
+  // closed milestone: close archives its finished tasks, they're what shipped
+  withArchived = false,
 ): MilestoneProgress {
   let done = 0;
   let total = 0;
   for (const t of tasks) {
-    if (t.milestoneId !== milestoneId || t.archivedAt) continue;
+    if (t.milestoneId !== milestoneId || (t.archivedAt && !withArchived))
+      continue;
     const category = categoryByColumn.get(t.columnId);
     if (category === "canceled") continue;
     total += 1;

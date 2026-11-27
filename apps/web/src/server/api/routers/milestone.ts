@@ -53,7 +53,7 @@ export async function assertOpenMilestone(
 }
 
 export const milestoneRouter = createTRPCRouter({
-  /** Milestones in board order, with progress over non-archived tasks. */
+  /** Milestones in board order; progress skips archived tasks unless closed. */
   list: boardProcedure
     .input(z.object({ includeClosed: z.boolean().default(true) }))
     .query(async ({ ctx, input }) => {
@@ -90,7 +90,12 @@ export const milestoneRouter = createTRPCRouter({
           }
           return {
             ...m,
-            progress: milestoneProgress(tasks, categories, m.id),
+            progress: milestoneProgress(
+              tasks,
+              categories,
+              m.id,
+              m.status === "closed",
+            ),
             finished,
             unfinished,
           };
