@@ -42,6 +42,14 @@ export function buildAttachmentKey(opts: { taskId: string; filename: string }) {
   return `attachments/${opts.taskId}/${nanoid()}-${safeName}`;
 }
 
+export function buildDocumentFileKey(opts: {
+  projectId: string;
+  filename: string;
+}) {
+  const safeName = opts.filename.replace(/[^\w.-]+/g, "_").slice(0, 80);
+  return `docs/${opts.projectId}/${nanoid()}-${safeName}`;
+}
+
 export async function presignUpload(opts: {
   key: string;
   contentType: string;

@@ -4,6 +4,7 @@ import {
   documentExcerpt,
   documentRelevance,
   documentSearchTerms,
+  extractPageIds,
   extractTicketIds,
   richTextToPlainText,
   wouldCreateDocumentCycle,
@@ -25,6 +26,20 @@ describe("document content", () => {
       '<span data-type="ticket" data-id="bad id">bad</span>',
     ].join("");
     expect(extractTicketIds(html)).toEqual(["task_abc123"]);
+  });
+
+  it("extracts linked page ids, ignoring tickets", () => {
+    const html = [
+      '<span data-type="page" data-id="doc_abc123" data-label="Runbook">Runbook</span>',
+      '<span data-type="ticket" data-id="task_abc123">KAN-1</span>',
+      '<span data-id="doc_abc123" data-type="page">Runbook</span>',
+    ].join("");
+    expect(extractPageIds(html)).toEqual(["doc_abc123"]);
+    expect(
+      sanitizeRichText(
+        '<p><span data-type="page" data-id="doc_abc123" data-label="Runbook">Runbook</span></p>',
+      ),
+    ).toContain('data-type="page"');
   });
 
   it("builds a compact lexical query for project questions", () => {

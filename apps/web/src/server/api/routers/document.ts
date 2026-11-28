@@ -5,6 +5,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
   isNull,
@@ -16,6 +17,13 @@ import {
 import { z } from "zod";
 
 import { positionAtEnd, positionBetween } from "@/lib/position";
+import {
+  buildDocumentFileKey,
+  deleteObject,
+  headObject,
+  MAX_ATTACHMENT_BYTES,
+  presignUpload,
+} from "@/lib/r2";
 import { AiNotConfiguredError, draftModel } from "@/server/ai/model";
 import {
   assertCanWrite,
@@ -26,6 +34,9 @@ import {
 } from "@/server/api/trpc";
 import type { db as Db } from "@/server/db";
 import {
+  documentFavorite,
+  documentFile,
+  documentPageLink,
   documentRevision,
   documentTaskLink,
   board,
@@ -40,10 +51,12 @@ import {
   documentExcerpt,
   documentRelevance,
   documentSearchTerms,
+  extractPageIds,
   extractTicketIds,
   richTextToPlainText,
   wouldCreateDocumentCycle,
 } from "@/server/documents/content";
+import { heartbeat } from "@/server/documents/presence";
 import { sanitizeRichText } from "@/server/rich-text/sanitize";
 
 const titleSchema = z.string().trim().min(1).max(160);
@@ -55,6 +68,10 @@ const askDocsResponseSchema = z
     sourceIds: z.array(z.string().min(1)).max(5),
   })
   .refine((value) => value.insufficientContext || value.sourceIds.length > 0);
+
+// one emoji (incl. zwj/flag sequences); not validated as emoji, just short
+const iconSchema = z.string().trim().min(1).max(16).nullable();
+const REVISION_SESSION_MS = 10 * 60_000;
 
 const NO_DOCS_ANSWER =
   "I couldn’t find enough information in this project’s docs to answer that.";
@@ -83,6 +100,85 @@ async function validProjectTaskIds(
   return rows.map((row) => row.id);
 }
 
+type Tx = Parameters<Parameters<typeof Db.transaction>[0]>[0];
+
+async function validProjectPageIds(
+  db: typeof Db,
+  projectId: string,
+  documentId: string,
+  ids: string[],
+) {
+  const others = ids.filter((id) => id !== documentId);
+  if (others.length === 0) return [];
+  const rows = await db
+    .select({ id: projectDocument.id })
+    .from(projectDocument)
+    .where(
+      and(
+        eq(projectDocument.projectId, projectId),
+        inArray(projectDocument.id, others),
+      ),
+    );
+  return rows.map((row) => row.id);
+}
+
+/** Resolve ticket + page refs in `body` before opening the write tx. */
+async function resolveLinks(
+  db: typeof Db,
+  projectId: string,
+  documentId: string,
+  body: string,
+) {
+  const [taskIds, pageIds] = await Promise.all([
+    validProjectTaskIds(db, projectId, extractTicketIds(body)),
+    validProjectPageIds(db, projectId, documentId, extractPageIds(body)),
+  ]);
+  return { taskIds, pageIds };
+}
+
+async function writeLinks(
+  tx: Tx,
+  documentId: string,
+  links: { taskIds: string[]; pageIds: string[] },
+) {
+  await tx
+    .delete(documentTaskLink)
+    .where(eq(documentTaskLink.documentId, documentId));
+  if (links.taskIds.length > 0) {
+    await tx
+      .insert(documentTaskLink)
+      .values(links.taskIds.map((taskId) => ({ documentId, taskId })));
+  }
+  await tx
+    .delete(documentPageLink)
+    .where(eq(documentPageLink.sourceId, documentId));
+  if (links.pageIds.length > 0) {
+    await tx
+      .insert(documentPageLink)
+      .values(
+        links.pageIds.map((targetId) => ({ sourceId: documentId, targetId })),
+      );
+  }
+}
+
+async function assertProjectDocument(
+  db: typeof Db,
+  projectId: string,
+  documentId: string,
+) {
+  const [row] = await db
+    .select({ id: projectDocument.id })
+    .from(projectDocument)
+    .where(
+      and(
+        eq(projectDocument.id, documentId),
+        eq(projectDocument.projectId, projectId),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+}
+
 export const documentRouter = createTRPCRouter({
   list: projectProcedure.query(({ ctx, input }) =>
     ctx.db
@@ -90,12 +186,21 @@ export const documentRouter = createTRPCRouter({
         id: projectDocument.id,
         parentId: projectDocument.parentId,
         title: projectDocument.title,
+        icon: projectDocument.icon,
         position: projectDocument.position,
         version: projectDocument.version,
         updatedAt: projectDocument.updatedAt,
         createdAt: projectDocument.createdAt,
+        favoritedAt: documentFavorite.createdAt,
       })
       .from(projectDocument)
+      .leftJoin(
+        documentFavorite,
+        and(
+          eq(documentFavorite.documentId, projectDocument.id),
+          eq(documentFavorite.userId, ctx.session.user.id),
+        ),
+      )
       .where(eq(projectDocument.projectId, input.projectId))
       .orderBy(asc(projectDocument.position)),
   ),
@@ -107,6 +212,7 @@ export const documentRouter = createTRPCRouter({
         .select({
           id: projectDocument.id,
           title: projectDocument.title,
+          icon: projectDocument.icon,
           parentId: projectDocument.parentId,
           updatedAt: projectDocument.updatedAt,
           createdAt: projectDocument.createdAt,
@@ -131,6 +237,7 @@ export const documentRouter = createTRPCRouter({
           projectId: projectDocument.projectId,
           parentId: projectDocument.parentId,
           title: projectDocument.title,
+          icon: projectDocument.icon,
           body: projectDocument.body,
           position: projectDocument.position,
           version: projectDocument.version,
@@ -277,15 +384,18 @@ export const documentRouter = createTRPCRouter({
         expectedVersion: z.number().int().positive(),
         title: titleSchema,
         body: bodySchema,
+        // autosave: fold into own recent revision vs new checkpoint
+        coalesce: z.boolean().default(false),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
       const body = sanitizeRichText(input.body) || "<p></p>";
-      const taskIds = await validProjectTaskIds(
+      const links = await resolveLinks(
         ctx.db,
         input.projectId,
-        extractTicketIds(body),
+        input.documentId,
+        body,
       );
       return ctx.db.transaction(async (tx) => {
         const [document] = await tx
@@ -314,23 +424,38 @@ export const documentRouter = createTRPCRouter({
             message: "This page changed since you started editing.",
           });
         }
-        await tx.insert(documentRevision).values({
-          documentId: document.id,
-          version: document.version,
-          title: input.title,
-          body,
-          editorId: ctx.session.user.id,
-        });
-        await tx
-          .delete(documentTaskLink)
-          .where(eq(documentTaskLink.documentId, document.id));
-        if (taskIds.length > 0) {
-          await tx
-            .insert(documentTaskLink)
-            .values(
-              taskIds.map((taskId) => ({ documentId: document.id, taskId })),
-            );
+        const merged = input.coalesce
+          ? await tx
+              .update(documentRevision)
+              .set({
+                version: document.version,
+                title: input.title,
+                body,
+                createdAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(documentRevision.documentId, document.id),
+                  eq(documentRevision.version, input.expectedVersion),
+                  eq(documentRevision.editorId, ctx.session.user.id),
+                  gt(
+                    documentRevision.createdAt,
+                    new Date(Date.now() - REVISION_SESSION_MS),
+                  ),
+                ),
+              )
+              .returning({ id: documentRevision.id })
+          : [];
+        if (merged.length === 0) {
+          await tx.insert(documentRevision).values({
+            documentId: document.id,
+            version: document.version,
+            title: input.title,
+            body,
+            editorId: ctx.session.user.id,
+          });
         }
+        await writeLinks(tx, document.id, links);
         return document;
       });
     }),
@@ -399,6 +524,290 @@ export const documentRouter = createTRPCRouter({
             eq(projectDocument.projectId, input.projectId),
           ),
         );
+    }),
+
+  // outside version/CAS: icon isn't part of revisions, so no autosave conflicts
+  setIcon: projectProcedure
+    .input(z.object({ documentId: z.string().min(1), icon: iconSchema }))
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const rows = await ctx.db
+        .update(projectDocument)
+        .set({ icon: input.icon })
+        .where(
+          and(
+            eq(projectDocument.id, input.documentId),
+            eq(projectDocument.projectId, input.projectId),
+          ),
+        )
+        .returning({ id: projectDocument.id });
+      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+    }),
+
+  /** Deletes the page and its whole subtree; the client holds an undo window first. */
+  delete: projectProcedure
+    .input(z.object({ documentId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const documents = await ctx.db
+        .select({ id: projectDocument.id, parentId: projectDocument.parentId })
+        .from(projectDocument)
+        .where(eq(projectDocument.projectId, input.projectId));
+      if (!documents.some((doc) => doc.id === input.documentId)) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      const ids = new Set([input.documentId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const doc of documents) {
+          if (doc.parentId && ids.has(doc.parentId) && !ids.has(doc.id)) {
+            ids.add(doc.id);
+            grew = true;
+          }
+        }
+      }
+      await ctx.db
+        .delete(projectDocument)
+        .where(
+          and(
+            eq(projectDocument.projectId, input.projectId),
+            inArray(projectDocument.id, [...ids]),
+          ),
+        );
+      return { ids: [...ids] };
+    }),
+
+  /** Copies title/body/icon (not children) right below the original. */
+  duplicate: projectProcedure
+    .input(z.object({ documentId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const [source] = await ctx.db
+        .select({
+          parentId: projectDocument.parentId,
+          title: projectDocument.title,
+          icon: projectDocument.icon,
+          body: projectDocument.body,
+          searchText: projectDocument.searchText,
+          position: projectDocument.position,
+        })
+        .from(projectDocument)
+        .where(
+          and(
+            eq(projectDocument.id, input.documentId),
+            eq(projectDocument.projectId, input.projectId),
+          ),
+        )
+        .limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND" });
+      const [next] = await ctx.db
+        .select({ position: projectDocument.position })
+        .from(projectDocument)
+        .where(
+          and(
+            eq(projectDocument.projectId, input.projectId),
+            parentCondition(source.parentId),
+            gt(projectDocument.position, source.position),
+          ),
+        )
+        .orderBy(asc(projectDocument.position))
+        .limit(1);
+      const title = `${source.title} (copy)`.slice(0, 160);
+      const links = await resolveLinks(
+        ctx.db,
+        input.projectId,
+        input.documentId,
+        source.body,
+      );
+      return ctx.db.transaction(async (tx) => {
+        const [document] = await tx
+          .insert(projectDocument)
+          .values({
+            projectId: input.projectId,
+            parentId: source.parentId,
+            title,
+            icon: source.icon,
+            body: source.body,
+            searchText: source.searchText,
+            position: positionBetween(source.position, next?.position),
+            createdById: ctx.session.user.id,
+            updatedById: ctx.session.user.id,
+          })
+          .returning({
+            id: projectDocument.id,
+            version: projectDocument.version,
+          });
+        if (!document) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        }
+        await tx.insert(documentRevision).values({
+          documentId: document.id,
+          version: document.version,
+          title,
+          body: source.body,
+          editorId: ctx.session.user.id,
+        });
+        await writeLinks(tx, document.id, links);
+        return document;
+      });
+    }),
+
+  // per-user; readers can favorite too
+  setFavorite: projectProcedure
+    .input(z.object({ documentId: z.string().min(1), favorite: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectDocument(ctx.db, input.projectId, input.documentId);
+      const userId = ctx.session.user.id;
+      if (input.favorite) {
+        await ctx.db
+          .insert(documentFavorite)
+          .values({ userId, documentId: input.documentId })
+          .onConflictDoNothing();
+      } else {
+        await ctx.db
+          .delete(documentFavorite)
+          .where(
+            and(
+              eq(documentFavorite.userId, userId),
+              eq(documentFavorite.documentId, input.documentId),
+            ),
+          );
+      }
+    }),
+
+  backlinks: projectProcedure
+    .input(z.object({ documentId: z.string().min(1) }))
+    .query(({ ctx, input }) =>
+      ctx.db
+        .select({
+          id: projectDocument.id,
+          title: projectDocument.title,
+          icon: projectDocument.icon,
+          updatedAt: projectDocument.updatedAt,
+          createdAt: projectDocument.createdAt,
+        })
+        .from(documentPageLink)
+        .innerJoin(
+          projectDocument,
+          eq(projectDocument.id, documentPageLink.sourceId),
+        )
+        .where(
+          and(
+            eq(documentPageLink.targetId, input.documentId),
+            eq(projectDocument.projectId, input.projectId),
+          ),
+        )
+        .orderBy(desc(projectDocument.updatedAt)),
+    ),
+
+  /** Heartbeat: marks the caller as viewing and returns everyone else. */
+  presence: projectProcedure
+    .input(
+      z.object({
+        documentId: z.string().min(1),
+        editing: z.boolean().default(false),
+        leaving: z.boolean().default(false),
+      }),
+    )
+    .mutation(({ ctx, input }) => {
+      const me = ctx.session.user;
+      return heartbeat(
+        `${input.projectId}:${input.documentId}`,
+        {
+          id: me.id,
+          name: me.name,
+          image: me.image ?? null,
+          editing: input.editing,
+        },
+        input.leaving,
+      );
+    }),
+
+  createUploadUrl: projectProcedure
+    .input(
+      z.object({
+        filename: z.string().min(1).max(160),
+        mime: z.string().regex(/^image\//).max(100),
+        sizeBytes: z.number().int().positive().max(MAX_ATTACHMENT_BYTES),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      const key = buildDocumentFileKey({
+        projectId: input.projectId,
+        filename: input.filename,
+      });
+      const uploadUrl = await presignUpload({ key, contentType: input.mime });
+      return { key, uploadUrl };
+    }),
+
+  /** Registers an uploaded doc image; size/type come from R2. Safe to repeat. */
+  registerFile: projectProcedure
+    .input(
+      z.object({
+        documentId: z.string().min(1),
+        key: z.string().min(1).max(400),
+        filename: z.string().trim().min(1).max(160),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertCanWrite(ctx.access);
+      await assertProjectDocument(ctx.db, input.projectId, input.documentId);
+      if (
+        !input.key.startsWith(`docs/${input.projectId}/`) ||
+        input.key.includes("..")
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That upload key does not belong to this project.",
+        });
+      }
+      const byKey = async () =>
+        (
+          await ctx.db
+            .select({ id: documentFile.id })
+            .from(documentFile)
+            .where(eq(documentFile.key, input.key))
+            .limit(1)
+        )[0];
+      const existing = await byKey();
+      if (existing) return existing;
+
+      const head = await headObject(input.key);
+      if (!head || head.sizeBytes === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "No uploaded file at that key yet.",
+        });
+      }
+      if (
+        head.sizeBytes > MAX_ATTACHMENT_BYTES ||
+        !head.contentType?.startsWith("image/")
+      ) {
+        await deleteObject(input.key).catch(() => undefined);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only images up to 25 MB can be added to a page.",
+        });
+      }
+      const [row] = await ctx.db
+        .insert(documentFile)
+        .values({
+          projectId: input.projectId,
+          documentId: input.documentId,
+          key: input.key,
+          filename: input.filename,
+          mime: head.contentType,
+          sizeBytes: head.sizeBytes,
+          uploaderId: ctx.session.user.id,
+        })
+        .onConflictDoNothing()
+        .returning({ id: documentFile.id });
+      if (row) return row;
+      const raced = await byKey();
+      if (!raced) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return raced;
     }),
 
   history: projectProcedure
@@ -504,10 +913,11 @@ export const documentRouter = createTRPCRouter({
         )
         .limit(1);
       if (!source) throw new TRPCError({ code: "NOT_FOUND" });
-      const taskIds = await validProjectTaskIds(
+      const links = await resolveLinks(
         ctx.db,
         input.projectId,
-        extractTicketIds(source.body),
+        input.documentId,
+        source.body,
       );
       return ctx.db.transaction(async (tx) => {
         const [document] = await tx
@@ -540,16 +950,7 @@ export const documentRouter = createTRPCRouter({
           body: source.body,
           editorId: ctx.session.user.id,
         });
-        await tx
-          .delete(documentTaskLink)
-          .where(eq(documentTaskLink.documentId, document.id));
-        if (taskIds.length > 0) {
-          await tx
-            .insert(documentTaskLink)
-            .values(
-              taskIds.map((taskId) => ({ documentId: document.id, taskId })),
-            );
-        }
+        await writeLinks(tx, document.id, links);
         return document;
       });
     }),

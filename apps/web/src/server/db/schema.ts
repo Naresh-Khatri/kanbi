@@ -609,6 +609,8 @@ export const projectDocument = createTable(
       { onDelete: "set null" },
     ),
     title: text("title").notNull(),
+    // single emoji; null = default page glyph
+    icon: text("icon"),
     body: text("body").notNull().default("<p></p>"),
     searchText: text("search_text").notNull().default(""),
     position: real("position").notNull(),
@@ -672,6 +674,63 @@ export const documentTaskLink = createTable(
   (t) => [
     primaryKey({ columns: [t.documentId, t.taskId] }),
     index("document_task_link_task_idx").on(t.taskId),
+  ],
+);
+
+// [[page]] mentions; rebuilt on every save like documentTaskLink
+export const documentPageLink = createTable(
+  "document_page_link",
+  {
+    sourceId: text("source_id")
+      .notNull()
+      .references(() => projectDocument.id, { onDelete: "cascade" }),
+    targetId: text("target_id")
+      .notNull()
+      .references(() => projectDocument.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sourceId, t.targetId] }),
+    index("document_page_link_target_idx").on(t.targetId),
+  ],
+);
+
+export const documentFavorite = createTable(
+  "document_favorite",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => projectDocument.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.documentId] })],
+);
+
+// inline doc images; project-scoped so copies/restores keep resolving
+export const documentFile = createTable(
+  "document_file",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    documentId: text("document_id").references(() => projectDocument.id, {
+      onDelete: "set null",
+    }),
+    key: text("key").notNull(),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    uploaderId: text("uploader_id")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("document_file_project_idx").on(t.projectId),
+    uniqueIndex("document_file_key_uq").on(t.key),
   ],
 );
 

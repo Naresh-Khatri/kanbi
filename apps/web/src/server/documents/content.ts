@@ -66,6 +66,18 @@ export function extractTicketIds(html: string): string[] {
   return [...ids];
 }
 
+/** Extract linked page ids from `[[page]]` mention spans. */
+export function extractPageIds(html: string): string[] {
+  const ids = new Set<string>();
+  for (const match of html.matchAll(/<span\b([^>]*)>/gi)) {
+    const attributes = match[1] ?? "";
+    if (!/data-type\s*=\s*["']page["']/i.test(attributes)) continue;
+    const id = attributes.match(/data-id\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (id && TICKET_ID.test(id)) ids.add(id);
+  }
+  return [...ids];
+}
+
 /** Small lexical query used by Ask Docs before introducing an embedding index. */
 export function documentSearchTerms(question: string): string[] {
   const tokens = question.toLowerCase().match(/[a-z0-9][a-z0-9_-]*/g) ?? [];

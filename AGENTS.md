@@ -73,9 +73,13 @@ Better Auth (`src/server/better-auth/`): `config.ts` (email/password + Google + 
 ### Docs feature (`src/app/app/p/[slug]/docs/`)
 
 - Docs are project-scoped pages exposed beside the board at `/app/p/[slug]/docs/[documentId]`; they reuse project owner/editor/viewer permissions through `projectProcedure`.
-- `src/server/api/routers/document.ts` owns the page tree, explicit versioned saves, history/restore, search, and task backlinks. Page ordering uses the same fractional position helpers as board entities.
-- Current content lives in `projectDocument`; immutable checkpoints live in `documentRevision`. Saves use an `expectedVersion` compare-and-swap so stale editors cannot overwrite newer work.
+- `src/server/api/routers/document.ts` owns the page tree, versioned saves, history/restore, search, and task backlinks. Page ordering uses the same fractional position helpers as board entities.
+- Current content lives in `projectDocument`; immutable checkpoints live in `documentRevision`. Saves use an `expectedVersion` compare-and-swap so stale editors cannot overwrite newer work. Writers always edit in place; the client autosaves (debounced, flushed on blur/leave) with `coalesce: true`, which folds saves into the same editor's revision from the last 10 min so history stays one checkpoint per session. MCP/agent saves never coalesce.
 - Ticket mentions inside page HTML are sanitized and normalized into `documentTaskLink`. The task sheet reads that join table to show linked Docs; clients must not write backlink rows directly.
+- Page-to-page links (`[[` or slash "Link to page", `components/rich-text/page-mention.tsx`) are normalized the same way into `documentPageLink` on `update`/`restore` and power the "Linked from" list (`document.backlinks`).
+- Per-page metadata outside versioning (so it never conflicts with autosave): `icon` (emoji, `document.setIcon`) and per-user favourites (`documentFavorite`, returned as `favoritedAt` on `list`). Doc images upload via `document.createUploadUrl`/`registerFile` into `documentFile` and are served by `/api/files/[id]`; the editor skips saves while uploads are in flight.
+- Client page mutations (delete with 6s undo, duplicate, favourite, icon, move) live in `docs/_components/use-doc-actions.ts` and patch `document.list` optimistically. The sidebar supports drag-and-drop reorder/nest (`@dnd-kit`); the Move dialog stays as the keyboard path. `c` and the palette "New page" create a top-level page while docs are open (shell store `docCreateAvailable`).
+- Presence (`src/server/documents/presence.ts`) is an in-memory heartbeat map polled every 15s. Single-instance only: move it to Redis/Postgres before running multiple web replicas.
 - Shared server rich-text sanitization lives in `src/server/rich-text/`. Keep task/comment and document editor schemas compatible when adding nodes or marks.
 - Docs intentionally do not share the board activity/digest stream or implement realtime coediting yet. Do not add either accidentally without defining document-specific invalidation and digest behavior.
 
