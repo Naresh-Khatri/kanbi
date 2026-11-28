@@ -88,7 +88,7 @@ export function SuggestionMenu<I>({
     <div
       aria-label={label}
       className={cn(
-        "bg-popover text-popover-foreground relative max-h-72 min-w-48 overflow-y-auto rounded-lg border p-1 shadow-lg/5 not-dark:bg-clip-padding",
+        "bg-popover text-popover-foreground relative max-h-[min(--spacing(72),var(--suggestion-max-h,--spacing(72)))] min-w-48 overflow-y-auto rounded-lg border p-1 shadow-lg/5 not-dark:bg-clip-padding",
         className,
       )}
       ref={list}
@@ -124,6 +124,10 @@ export function SuggestionMenu<I>({
   );
 }
 
+const GAP = 6;
+const PAD = 8;
+const MAX_H = 288; // max-h-72
+
 // mount inside the open dialog/drawer: base ui treats clicks outside its popup
 // as outside-press and would dismiss it
 function createPopup(editor: Editor) {
@@ -137,18 +141,67 @@ function createPopup(editor: Editor) {
   popup.style.pointerEvents = "auto";
   host.appendChild(popup);
 
+  let last: (() => DOMRect | null) | null | undefined;
   const place = (clientRect?: (() => DOMRect | null) | null) => {
-    const rect = clientRect?.();
+    if (clientRect !== undefined) last = clientRect;
+    const rect = last?.();
     if (!rect) return;
     // transformed hosts re-base `fixed`; measure the real origin first
     popup.style.left = "0px";
     popup.style.top = "0px";
     const origin = popup.getBoundingClientRect();
-    popup.style.left = `${rect.left - origin.left}px`;
-    popup.style.top = `${rect.bottom + 6 - origin.top}px`;
+
+    const vv = window.visualViewport;
+    const viewTop = vv?.offsetTop ?? 0;
+    const viewBottom = viewTop + (vv?.height ?? window.innerHeight);
+    const viewLeft = vv?.offsetLeft ?? 0;
+    const viewRight = viewLeft + (vv?.width ?? window.innerWidth);
+    const below = viewBottom - rect.bottom - GAP - PAD;
+    const above = rect.top - viewTop - GAP - PAD;
+
+    const { width } = popup.getBoundingClientRect();
+    const list = popup.querySelector<HTMLElement>('[role="listbox"]');
+    // uncapped height from scrollHeight; dropping the cap would reset list scroll
+    const height = list
+      ? Math.min(
+          list.scrollHeight + list.offsetHeight - list.clientHeight,
+          MAX_H,
+        )
+      : 0;
+    const flip = height > below && above > below;
+    const room = Math.max(flip ? above : below, 0);
+    popup.style.setProperty("--suggestion-max-h", `${room}px`);
+    const h = Math.min(height, room);
+
+    const top = flip ? rect.top - GAP - h : rect.bottom + GAP;
+    const left = Math.max(
+      viewLeft + PAD,
+      Math.min(rect.left, viewRight - width - PAD),
+    );
+    popup.style.left = `${left - origin.left}px`;
+    popup.style.top = `${top - origin.top}px`;
   };
 
-  return { popup, place };
+  // list size changes after render/filtering -> re-place
+  const resize = new ResizeObserver(() => place());
+  resize.observe(popup);
+  const onViewport = (e: Event) => {
+    if (e.target instanceof Node && popup.contains(e.target)) return;
+    place();
+  };
+  window.visualViewport?.addEventListener("resize", onViewport);
+  window.addEventListener("resize", onViewport);
+  // caret moves with any scrolling ancestor
+  window.addEventListener("scroll", onViewport, true);
+  const destroy = () => {
+    resize.disconnect();
+    window.visualViewport?.removeEventListener("resize", onViewport);
+    window.removeEventListener("resize", onViewport);
+    window.removeEventListener("scroll", onViewport, true);
+    popup.remove();
+  };
+
+  return { popup, place, destroy };
 }
 
 /** Suggestion `render` that mounts `List` in a caret-anchored popup. */
@@ -183,7 +236,7 @@ export function suggestionPopup<I>(
         return component?.ref?.onKeyDown(props) ?? false;
       },
       onExit: () => {
-        mount?.popup.remove();
+        mount?.destroy();
         mount = null;
         component?.destroy();
         component = null;

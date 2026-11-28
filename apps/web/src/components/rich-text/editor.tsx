@@ -534,9 +534,16 @@ function LinkControl({
   React.useEffect(() => {
     if (!requestRef) return;
     requestRef.current = () => {
-      const c = editor.view.coordsAtPos(editor.state.selection.from);
-      const rect = new DOMRect(c.left, c.top, 0, c.bottom - c.top);
-      show({ getBoundingClientRect: () => rect });
+      const pos = editor.state.selection.from;
+      // re-measure each call so the popover tracks the caret on scroll
+      show({
+        getBoundingClientRect: () => {
+          const c = editor.view.coordsAtPos(
+            Math.min(pos, editor.state.doc.content.size),
+          );
+          return new DOMRect(c.left, c.top, 0, c.bottom - c.top);
+        },
+      });
     };
     return () => {
       requestRef.current = null;
