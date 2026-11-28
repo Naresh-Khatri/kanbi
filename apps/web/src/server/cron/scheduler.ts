@@ -3,6 +3,7 @@ import { Cron } from "croner";
 import { db } from "@/server/db";
 import { runDueReminders } from "@/server/notifications/due-reminders";
 import { runWeeklyDigests } from "@/server/notifications/weekly-digest";
+import { runStorageSweep } from "@/server/storage/sweep";
 
 // register() can fire more than once (dev hmr, worker reuse) -> only wire once
 let started = false;
@@ -34,6 +35,16 @@ export function startCronJobs() {
       console.log("[cron] weekly-digests", r);
     } catch (err) {
       console.error("[cron] weekly-digests failed", err);
+    }
+  });
+
+  // daily 03:30, quiet hours
+  new Cron("30 3 * * *", { name: "storage-sweep", protect: true }, async () => {
+    try {
+      const r = await runStorageSweep(db);
+      console.log("[cron] storage-sweep", r);
+    } catch (err) {
+      console.error("[cron] storage-sweep failed", err);
     }
   });
 

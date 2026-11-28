@@ -4,6 +4,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -13,6 +14,14 @@ import { env } from "@/env";
 import { nanoid } from "@/lib/ids";
 
 let cached: S3Client | null = null;
+
+export const r2Configured = () =>
+  !!(
+    env.R2_ACCOUNT_ID &&
+    env.R2_ACCESS_KEY_ID &&
+    env.R2_SECRET_ACCESS_KEY &&
+    env.R2_BUCKET
+  );
 
 export function getR2() {
   if (cached) return cached;
@@ -114,4 +123,35 @@ export async function deleteObject(key: string) {
   await getR2().send(
     new DeleteObjectCommand({ Bucket: env.R2_BUCKET!, Key: key }),
   );
+}
+
+/** Best effort: returns the keys that failed. Single deletes, not DeleteObjects (r2 checksum quirks). */
+export async function deleteObjects(keys: string[], concurrency = 8) {
+  const failed: string[] = [];
+  for (let i = 0; i < keys.length; i += concurrency) {
+    await Promise.all(
+      keys
+        .slice(i, i + concurrency)
+        .map((key) => deleteObject(key).catch(() => failed.push(key))),
+    );
+  }
+  return failed;
+}
+
+export async function* listObjects(prefix: string) {
+  let token: string | undefined;
+  do {
+    const res = await getR2().send(
+      new ListObjectsV2Command({
+        Bucket: env.R2_BUCKET!,
+        Prefix: prefix,
+        ContinuationToken: token,
+      }),
+    );
+    for (const o of res.Contents ?? []) {
+      if (o.Key)
+        yield { key: o.Key, lastModified: o.LastModified ?? new Date(0) };
+    }
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
 }

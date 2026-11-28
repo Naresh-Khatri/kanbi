@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import type { db as Database } from "@/server/db";
 import { POSITION_STEP, positionAtEnd, positionBetween } from "@/lib/position";
+import { deleteObjects } from "@/lib/r2";
 import { stripReplyPrefix } from "@/lib/task-title";
 import { recordActivity } from "@/server/activity/record";
 import { assertOpenMilestone } from "@/server/api/routers/milestone";
@@ -34,6 +35,7 @@ import {
   project,
   projectMember,
   task,
+  taskAttachment,
   taskLabel,
   taskPriority,
   user as userTable,
@@ -387,9 +389,19 @@ export const taskRouter = createTRPCRouter({
     .input(z.object({ taskId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       assertCanWrite(ctx.access);
-      await ctx.db
-        .delete(task)
+      const files = await ctx.db
+        .select({ key: taskAttachment.key })
+        .from(taskAttachment)
+        .innerJoin(task, eq(task.id, taskAttachment.taskId))
         .where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)));
+      const deleted = await ctx.db
+        .delete(task)
+        .where(and(eq(task.id, input.taskId), eq(task.boardId, input.boardId)))
+        .returning({ id: task.id });
+      // misses -> nightly storage sweep
+      if (deleted.length > 0 && files.length > 0) {
+        void deleteObjects(files.map((f) => f.key));
+      }
       bus.emitBoard(input.boardId, { scope: "task", ids: [input.taskId] });
     }),
 

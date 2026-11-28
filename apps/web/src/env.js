@@ -35,6 +35,8 @@ export const env = createEnv({
     SMTP_PASSWORD: z.string().optional(),
     SMTP_FROM: z.string().optional(),
     CRON_SECRET: z.string().optional(),
+    // nightly R2 cleanup; dry-run only logs counts
+    STORAGE_SWEEP: z.enum(["off", "dry-run", "on"]).default("dry-run"),
     // any enables ai drafting, ask docs, digests; tried in order groq -> openrouter
     GROQ_API_KEY: z.string().optional(),
     OPENROUTER_API_KEY: z.string().optional(),
@@ -69,6 +71,7 @@ export const env = createEnv({
     SMTP_PASSWORD: process.env.SMTP_PASSWORD,
     SMTP_FROM: process.env.SMTP_FROM,
     CRON_SECRET: process.env.CRON_SECRET,
+    STORAGE_SWEEP: process.env.STORAGE_SWEEP,
     GROQ_API_KEY: process.env.GROQ_API_KEY,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     MCP_RESOURCE_URL: process.env.MCP_RESOURCE_URL,

@@ -23,6 +23,7 @@ import {
 } from "@/lib/ids";
 import { DEFAULT_COLUMNS } from "@/lib/default-board";
 import { DEFAULT_LABELS } from "@/lib/palette";
+import { deleteObjects } from "@/lib/r2";
 import {
   assertCanAdmin,
   createTRPCRouter,
@@ -34,12 +35,14 @@ import {
   activity,
   board,
   boardColumn,
+  documentFile,
   label,
   project,
   projectInvite,
   projectInviteLink,
   projectMember,
   task,
+  taskAttachment,
   user as userTable,
 } from "@/server/db/schema";
 import {
@@ -499,7 +502,21 @@ export const projectRouter = createTRPCRouter({
 
   delete: projectProcedure.mutation(async ({ ctx, input }) => {
     assertCanAdmin(ctx.access);
+    const [attachments, docFiles] = await Promise.all([
+      ctx.db
+        .select({ key: taskAttachment.key })
+        .from(taskAttachment)
+        .innerJoin(task, eq(task.id, taskAttachment.taskId))
+        .innerJoin(board, eq(board.id, task.boardId))
+        .where(eq(board.projectId, input.projectId)),
+      ctx.db
+        .select({ key: documentFile.key })
+        .from(documentFile)
+        .where(eq(documentFile.projectId, input.projectId)),
+    ]);
     await ctx.db.delete(project).where(eq(project.id, input.projectId));
+    // misses -> nightly storage sweep
+    void deleteObjects([...attachments, ...docFiles].map((f) => f.key));
   }),
 
   setStatus: projectProcedure
