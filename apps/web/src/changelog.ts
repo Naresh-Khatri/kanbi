@@ -23,6 +23,10 @@ export const releases: Release[] = [
       "Paste screenshots straight into the new task dialog and mark them up before saving",
       "If your session expires while the app is open, you can sign back in without losing what you were writing",
     ],
+    video: {
+      src: "https://kanbi-cdn.nareshkhatri.dev/videos/release-0-4.mp4",
+      poster: "https://kanbi-cdn.nareshkhatri.dev/videos/release-0-4.jpg",
+    },
   },
   {
     version: "0.3.0",
