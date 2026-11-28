@@ -79,7 +79,7 @@ export function HistoryDrawer({
         <DrawerHeader>
           <DrawerTitle>Page history</DrawerTitle>
           <DrawerDescription>
-            Every save is a checkpoint you can preview and restore.
+            Edits are grouped into one checkpoint per editing session.
           </DrawerDescription>
         </DrawerHeader>
         <div className="grid min-h-0 flex-1 border-t sm:grid-cols-[13rem_1fr]">
@@ -106,7 +106,7 @@ export function HistoryDrawer({
                           type="button"
                         >
                           <span className="flex items-center gap-1.5 font-medium">
-                            Version {item.version}
+                            {formatRelative(item.createdAt)}
                             {item.version === currentVersion ? (
                               <Badge size="sm" variant="secondary">
                                 Current
@@ -117,7 +117,7 @@ export function HistoryDrawer({
                             className="text-muted-foreground text-xs"
                             title={formatDateTime(item.createdAt)}
                           >
-                            {item.editorName} · {formatRelative(item.createdAt)}
+                            {item.editorName}
                           </span>
                         </button>
                       </li>
@@ -134,7 +134,7 @@ export function HistoryDrawer({
                       {revision.data.title}
                     </h3>
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                      Version {revision.data.version} by{" "}
+                      {formatDateTime(revision.data.createdAt)} by{" "}
                       {revision.data.editorName}
                     </p>
                   </div>

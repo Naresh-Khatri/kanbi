@@ -52,6 +52,11 @@ import {
   type MentionItem,
   type TicketMentionItem,
 } from "./mention";
+import {
+  createPageMentionExtension,
+  createPageRenderExtension,
+  type PageMentionItem,
+} from "./page-mention";
 import { createSlashExtension } from "./slash";
 import { Video } from "./video";
 
@@ -91,6 +96,8 @@ interface RichTextEditorProps {
   mentions?: MentionItem[];
   /** When provided, enables #-mention autocomplete against these tickets. */
   tickets?: TicketMentionItem[];
+  /** When provided, enables `[[` page links against these docs. */
+  pages?: PageMentionItem[];
   /**
    * `box` = bordered field; `inline` = reads as plain text until focused;
    * `document` = borderless page with a sticky toolbar.
@@ -116,6 +123,7 @@ export function RichTextEditor({
   minHeight = "72px",
   mentions,
   tickets,
+  pages,
   variant = "box",
   uploadImage,
   onUploadingChange,
@@ -128,6 +136,9 @@ export function RichTextEditor({
   const enableTickets = tickets !== undefined;
   const ticketsRef = React.useRef<TicketMentionItem[]>(tickets ?? []);
   ticketsRef.current = tickets ?? [];
+  const enablePages = pages !== undefined;
+  const pagesRef = React.useRef<PageMentionItem[]>(pages ?? []);
+  pagesRef.current = pages ?? [];
 
   // extensions are fixed at mount; read the latest callbacks through refs
   const enableUploads = uploadImage !== undefined;
@@ -178,10 +189,14 @@ export function RichTextEditor({
       ...(enableTickets
         ? [createTicketMentionExtension(() => ticketsRef.current)]
         : []),
+      ...(enablePages
+        ? [createPageMentionExtension(() => pagesRef.current)]
+        : []),
       createSlashExtension({
         headings,
         mentions: enableMentions,
         tickets: enableTickets,
+        pages: enablePages,
         onLink: () => requestLink.current?.(),
         onImage: enableUploads
           ? (editor) => pickImages((files) => upload(editor, files))
@@ -192,6 +207,7 @@ export function RichTextEditor({
       placeholder,
       enableMentions,
       enableTickets,
+      enablePages,
       enableUploads,
       upload,
       headings,
@@ -618,9 +634,12 @@ export function RichTextContent({
   className,
   mentions,
   tickets,
+  pages,
 }: {
   value: string;
   className?: string;
+  /** Resolves `[[page]]` chips to live titles + links. */
+  pages?: PageMentionItem[];
   /** Resolves @-mention chips to a hover card with avatar/email. */
   mentions?: MentionItem[];
   /** Resolves #-ticket chips to a hover card + click-to-open. */
@@ -631,6 +650,8 @@ export function RichTextContent({
   mentionsRef.current = mentions ?? [];
   const ticketsRef = React.useRef<TicketMentionItem[]>(tickets ?? []);
   ticketsRef.current = tickets ?? [];
+  const pagesRef = React.useRef<PageMentionItem[]>(pages ?? []);
+  pagesRef.current = pages ?? [];
   const gallery = useImageGallery();
   const extensions = React.useMemo(
     () => [
@@ -643,6 +664,7 @@ export function RichTextContent({
       Video,
       createMentionRenderExtension(() => mentionsRef.current),
       createTicketRenderExtension(() => ticketsRef.current),
+      createPageRenderExtension(() => pagesRef.current),
     ],
     [],
   );

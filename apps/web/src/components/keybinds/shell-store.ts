@@ -24,6 +24,12 @@ type AppShellState = {
   requestMilestoneMove: () => void;
   setMilestoneMoveAvailable: (available: boolean) => void;
   setAiDraftOpen: (open: boolean) => void;
+  /** bump to signal "new page" to the docs workspace */
+  createDocToken: number;
+  /** set by docs; `c` and the palette create a page instead of a task */
+  docCreateAvailable: boolean;
+  requestCreateDoc: () => void;
+  setDocCreateAvailable: (available: boolean) => void;
 };
 
 export const useAppShell = create<AppShellState>((set) => ({
@@ -46,4 +52,9 @@ export const useAppShell = create<AppShellState>((set) => ({
   setMilestoneMoveAvailable: (available) =>
     set({ milestoneMoveAvailable: available }),
   setAiDraftOpen: (open) => set({ aiDraftOpen: open }),
+  createDocToken: 0,
+  docCreateAvailable: false,
+  requestCreateDoc: () =>
+    set((s) => ({ createDocToken: s.createDocToken + 1 })),
+  setDocCreateAvailable: (available) => set({ docCreateAvailable: available }),
 }));

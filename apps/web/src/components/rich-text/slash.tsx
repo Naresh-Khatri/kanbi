@@ -5,6 +5,7 @@ import { PluginKey } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
 import {
   AtSignIcon,
+  FileTextIcon,
   HashIcon,
   Heading1Icon,
   Heading2Icon,
@@ -42,6 +43,7 @@ export type SlashOptions = {
   headings: (1 | 2 | 3)[];
   mentions: boolean;
   tickets: boolean;
+  pages?: boolean;
   onLink: (editor: Editor) => void;
   onImage?: (editor: Editor) => void;
 };
@@ -139,6 +141,19 @@ function commandsFor(opts: SlashOptions): SlashCommand[] {
             keywords: "ticket issue reference",
             // hands off to the # suggestion
             run: (e, r) => e.chain().focus().insertContentAt(r, "#").run(),
+          } satisfies SlashCommand,
+        ]
+      : []),
+    ...(opts.pages
+      ? [
+          {
+            id: "page",
+            label: "Link to page",
+            group: "Insert",
+            icon: FileTextIcon,
+            hint: "[[",
+            keywords: "doc document reference backlink wiki",
+            run: (e, r) => e.chain().focus().insertContentAt(r, "[[").run(),
           } satisfies SlashCommand,
         ]
       : []),

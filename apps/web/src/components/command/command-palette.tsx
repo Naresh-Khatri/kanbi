@@ -67,6 +67,8 @@ export function CommandPalette() {
     requestAiImport,
     requestMilestoneMove,
     milestoneMoveAvailable,
+    requestCreateDoc,
+    docCreateAvailable,
   } = useAppShell();
   const [query, setQuery] = useState("");
 
@@ -122,6 +124,17 @@ export function CommandPalette() {
         icon: <PlusIcon />,
         run: go(requestCreateProject),
       },
+      ...(docCreateAvailable
+        ? [
+            {
+              id: "new-page",
+              label: "New page",
+              keywords: "create doc document",
+              icon: <FileTextIcon />,
+              run: go(requestCreateDoc),
+            },
+          ]
+        : []),
       {
         id: "new-task",
         label: "New task on current board",
@@ -221,6 +234,8 @@ export function CommandPalette() {
     requestAiImport,
     requestMilestoneMove,
     milestoneMoveAvailable,
+    requestCreateDoc,
+    docCreateAvailable,
   ]);
 
   const filtered = useMemo(() => {

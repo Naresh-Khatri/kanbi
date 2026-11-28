@@ -22,6 +22,8 @@ export function KeybindProvider() {
     setCheatsheetOpen,
     requestCreateProject,
     requestCreateTask,
+    requestCreateDoc,
+    docCreateAvailable,
   } = useAppShell();
 
   // shared cache w/ dashboard + palette; active projects, server order = jump-target order
@@ -49,10 +51,15 @@ export function KeybindProvider() {
     requestCreateProject();
   });
 
-  useHotkeys("c", (e) => {
-    e.preventDefault();
-    requestCreateTask();
-  });
+  useHotkeys(
+    "c",
+    (e) => {
+      e.preventDefault();
+      if (docCreateAvailable) requestCreateDoc();
+      else requestCreateTask();
+    },
+    [docCreateAvailable],
+  );
 
   useHotkeys(
     JUMP_KEYS,

@@ -20,7 +20,7 @@ export const KEYBIND_GROUPS: KeybindGroup[] = [
     title: "Create",
     entries: [
       { keys: "C", description: "New project" },
-      { keys: "c", description: "New task (on board)" },
+      { keys: "c", description: "New task (board) / new page (docs)" },
       { keys: "V", description: "Draft tasks with AI" },
     ],
   },

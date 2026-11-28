@@ -1,7 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+
+import { useAppShell } from "@/components/keybinds/shell-store";
+import type { PageMentionItem } from "@/components/rich-text/page-mention";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toastManager } from "@/components/ui/toast";
@@ -11,6 +14,7 @@ import { DocsHome } from "./docs-home";
 import { DocsTree } from "./docs-tree";
 import { DocumentView } from "./document-view";
 import { MovePageDialog } from "./move-page-dialog";
+import { useDocActions } from "./use-doc-actions";
 import { taskBoardHref } from "@/lib/task-link";
 
 export function DocsWorkspace({
@@ -43,7 +47,7 @@ export function DocsWorkspace({
         utils.document.list.invalidate({ projectId }),
         utils.document.recent.invalidate({ projectId, limit: 6 }),
       ]);
-      router.push(`/app/p/${slug}/docs/${document.id}?edit=1`);
+      router.push(`/app/p/${slug}/docs/${document.id}`);
     },
     onError: (error) =>
       toastManager.add({ type: "error", title: error.message }),
@@ -60,7 +64,38 @@ export function DocsWorkspace({
       })),
     [context.data?.tickets, slug],
   );
-  const list = documents.data ?? [];
+  const list = useMemo(() => documents.data ?? [], [documents.data]);
+  const actions = useDocActions({
+    projectId,
+    slug,
+    activeId: initialDocumentId,
+  });
+
+  const pageItems = useMemo<PageMentionItem[]>(() => {
+    const titles = new Map(list.map((doc) => [doc.id, doc.title]));
+    return list.map((doc) => ({
+      id: doc.id,
+      label: doc.title,
+      icon: doc.icon,
+      href: `/app/p/${slug}/docs/${doc.id}`,
+      sublabel: doc.parentId ? titles.get(doc.parentId) : null,
+    }));
+  }, [list, slug]);
+
+  // `c` / palette -> top level, not child of open page
+  const setDocCreateAvailable = useAppShell((s) => s.setDocCreateAvailable);
+  const createDocToken = useAppShell((s) => s.createDocToken);
+  const lastToken = useRef(createDocToken);
+  useEffect(() => {
+    setDocCreateAvailable(canWrite);
+    return () => setDocCreateAvailable(false);
+  }, [canWrite, setDocCreateAvailable]);
+  useEffect(() => {
+    if (createDocToken === lastToken.current) return;
+    lastToken.current = createDocToken;
+    if (canWrite && !create.isPending) createPage(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createDocToken]);
 
   return (
     // phones: main is the scroller so the sticky header stays put
@@ -72,13 +107,17 @@ export function DocsWorkspace({
         documents={list}
         onCreate={createPage}
         onMove={setMoveId}
+        actions={actions}
         query={query}
         searchResults={deferredQuery ? (search.data ?? []) : null}
         setQuery={setQuery}
         slug={slug}
       />
 
-      <ScrollArea className="min-w-0 max-md:flex-none md:flex-1" render={<section />}>
+      <ScrollArea
+        className="min-w-0 max-md:flex-none md:flex-1"
+        render={<section />}
+      >
         {initialDocumentId ? (
           <DocumentView
             canWrite={canWrite}
@@ -87,6 +126,8 @@ export function DocsWorkspace({
             members={context.data?.members ?? []}
             onCreateChild={() => createPage(initialDocumentId)}
             onMove={() => setMoveId(initialDocumentId)}
+            actions={actions}
+            pages={pageItems}
             projectId={projectId}
             slug={slug}
             tickets={ticketItems}
